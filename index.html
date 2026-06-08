@@ -491,9 +491,36 @@ async function criarUsuarioAuth(nome,email,password,papel){
   const res=await fetch(APP.url+"/auth/v1/signup",{
     method:"POST",headers:{apikey:APP.key,"Content-Type":"application/json"},
     body:JSON.stringify({email,password,data:{nome,papel}})});
-  const data=await res.json();
-  if(!res.ok)throw new Error(data.error_description||data.msg||data.error||"Não foi possível criar o usuário.");
-  return data;
+  const txt=await res.text();let data={};try{data=JSON.parse(txt);}catch(e){}
+  if(!res.ok){
+    let m=data.error_description||data.msg||data.error||data.message||txt||("Erro "+res.status);
+    if(/signups? not allowed/i.test(m))m="Cadastro de novos usuários está desativado no Supabase (Auth → Providers → Email → desmarque \"Disable signups\").";
+    if(/already registered|already been registered/i.test(m))m="Este e-mail já possui login.";
+    throw new Error(m);
+  }
+  const uid=(data.user&&data.user.id)||data.id;
+  if(!uid)throw new Error("Login criado, mas o Supabase não retornou o ID do usuário.");
+  return uid;
+}
+async function provisionarUsuario(uid,nome,email,papel){
+  // Provisiona colaborador + usuário direto pelo cliente (não depende de trigger). Idempotente.
+  if(!APP.tenantId)throw new Error("Tenant não carregado — saia e entre novamente.");
+  let colabId=null;
+  try{
+    const c=await api("resc_colaboradores",{method:"POST",
+      body:{tenant_id:APP.tenantId,auth_id:uid,nome,email,status:'ativo'},
+      prefer:"return=representation"});
+    colabId=c&&c[0]&&c[0].id;
+  }catch(e){ if(!/duplicate|already exists|23505/i.test(e.message))throw e; }
+  if(!colabId){
+    const rows=await api("resc_colaboradores?select=id&auth_id=eq."+uid);
+    colabId=rows&&rows[0]&&rows[0].id;
+  }
+  if(!colabId)throw new Error("Não consegui criar nem localizar o colaborador (verifique a policy RLS de INSERT em resc_colaboradores).");
+  try{
+    await api("resc_usuarios",{method:"POST",
+      body:{tenant_id:APP.tenantId,auth_id:uid,colaborador_id:colabId,papel}});
+  }catch(e){ if(!/duplicate|already exists|23505/i.test(e.message))throw e; }
 }
 async function loadMe(){
   const rows=await api("resc_usuarios?select=*,colaborador:resc_colaboradores(nome)");
@@ -699,7 +726,7 @@ function novaRescisao(){
   document.getElementById('formWarn').classList.remove('on');atualizarCalculos();abrir('ovForm');
 }
 function editar(id){
-  const r=APP.dados.find(x=>String(x.id)===String(id));if(!r)return;
+  const r=APP.dados.find(x=>x.id===id);if(!r)return;
   APP.editId=id;document.getElementById('formTitle').textContent='Editar Rescisão';
   FCAMPOS.forEach(k=>document.getElementById('f_'+k).value=r[k]||'');
   document.getElementById('f_status_rescisao').checked=!!r.status_rescisao;
@@ -723,7 +750,7 @@ async function salvar(){
   try{
     if(APP.editId){
       const res=await api("resc_rescisoes?id=eq."+APP.editId,{method:"PATCH",body:obj,prefer:"return=representation"});
-      const i=APP.dados.findIndex(x=>String(x.id)===String(APP.editId));if(i>=0&&res&&res[0])APP.dados[i]=res[0];
+      const i=APP.dados.findIndex(x=>x.id===APP.editId);if(i>=0&&res&&res[0])APP.dados[i]=res[0];
       toast("Rescisão atualizada.","ok");
     }else{
       const res=await api("resc_rescisoes",{method:"POST",body:obj,prefer:"return=representation"});
@@ -734,10 +761,10 @@ async function salvar(){
   finally{document.getElementById('btnSalvar').disabled=false;}
 }
 async function excluir(id){
-  const r=APP.dados.find(x=>String(x.id)===String(id));if(!r)return;
+  const r=APP.dados.find(x=>x.id===id);if(!r)return;
   if(!confirm('Excluir a rescisão de "'+(r.nome_empregado||'')+'"?'))return;
   try{await api("resc_rescisoes?id=eq."+id,{method:"DELETE",prefer:"return=minimal"});
-    APP.dados=APP.dados.filter(x=>String(x.id)!==String(id));render();toast("Excluída.","ok");
+    APP.dados=APP.dados.filter(x=>x.id!==id);render();toast("Excluída.","ok");
   }catch(e){toast("Erro ao excluir: "+e.message,"error");}
 }
 
@@ -869,14 +896,18 @@ async function criarUsuario(){
   if(!nome){w.textContent="Informe o nome.";w.classList.add('on');return;}
   if(!email.endsWith(DOMINIO_ARTECON)){w.textContent="Use um e-mail "+DOMINIO_ARTECON+".";w.classList.add('on');return;}
   if(senha.length<6){w.textContent="A senha precisa ter ao menos 6 caracteres.";w.classList.add('on');return;}
-  $("#btnCriarUser").disabled=true;
+  const btn=$("#btnCriarUser");btn.disabled=true;
   try{
-    await criarUsuarioAuth(nome,email,senha,papel);
+    const uid=await criarUsuarioAuth(nome,email,senha,papel);
+    await provisionarUsuario(uid,nome,email,papel);
     toast("Usuário criado: "+email,"ok",4000);
     $("#u_nome").value='';$("#u_email").value='';$("#u_senha").value='';
-    setTimeout(carregarUsuarios,800); // dá tempo do gatilho provisionar
-  }catch(e){w.textContent=e.message;w.classList.add('on');}
-  finally{$("#btnCriarUser").disabled=false;}
+    await carregarUsuarios();
+  }catch(e){
+    console.error("criarUsuario:",e);
+    w.textContent=e.message||"Falha ao criar usuário.";w.classList.add('on');
+    toast("Falha: "+(e.message||"erro"),"error",5000);
+  }finally{btn.disabled=false;}
 }
 
 /* ===== HISTÓRICO (ADMIN) ===== */
