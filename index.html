@@ -185,6 +185,12 @@ pre.sql{background:#0f172a;color:#e9f0ec;padding:16px;border-radius:10px;font-si
 .spin{width:34px;height:34px;border:3px solid var(--surface-2);border-top-color:var(--gold);border-radius:50%;animation:r 1s linear infinite}
 @keyframes r{to{transform:rotate(360deg)}}
 
+.urow-acoes{display:inline-flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.mini{padding:5px 9px;border:1.5px solid var(--border-lt);border-radius:8px;background:var(--surface);cursor:pointer;
+  font-size:14px;line-height:1;transition:.15s}
+.mini:hover{border-color:var(--text-3);background:var(--surface-2)}
+.mini.danger:hover{border-color:var(--red);background:var(--red-lt)}
+.mini:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:760px){
   .sidebar{position:static;width:100%;min-height:auto;flex-direction:row;flex-wrap:wrap;gap:4px;align-items:center}
   .sidebar-brand,.sidebar-footer{border:none;padding:10px 12px}.sidebar-nav{display:flex;flex-wrap:wrap;padding:6px}
@@ -397,10 +403,47 @@ pre.sql{background:#0f172a;color:#e9f0ec;padding:16px;border-radius:10px;font-si
       <div style="margin-top:14px"><button class="btn-accent" id="btnCriarUser" onclick="criarUsuario()">＋ Criar usuário</button></div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
       <p style="font-weight:700;margin-bottom:10px">Usuários cadastrados</p>
-      <div class="tscroll"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th></tr></thead><tbody id="usList"></tbody></table></div>
+      <div class="tscroll"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th style="text-align:right">Ações</th></tr></thead><tbody id="usList"></tbody></table></div>
     </div>
     <div class="modal-foot">
       <button class="btn-outline" onclick="fechar('ovUsers')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovUEdit">
+  <div class="modal">
+    <div class="modal-head"><h3>Editar usuário</h3><button class="x" onclick="fechar('ovUEdit')">×</button></div>
+    <div class="modal-body">
+      <div class="warn" id="ueWarn"></div>
+      <div><label>Nome completo *</label><input id="ue_nome"></div>
+      <div style="margin-top:12px"><label>E-mail *</label><input id="ue_email" type="email"></div>
+      <div style="margin-top:12px"><label>Papel</label>
+        <select id="ue_papel">
+          <option value="usuario">Usuário</option>
+          <option value="diretoria">Diretoria (admin)</option>
+        </select></div>
+      <div class="field-hint" style="margin-top:6px">Alterar o e-mail muda também o login de acesso da pessoa.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="fechar('ovUEdit')">Cancelar</button>
+      <button class="btn-accent" id="ueBtn" onclick="uEditarSalvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovUSenha">
+  <div class="modal">
+    <div class="modal-head"><h3>Alterar senha</h3><button class="x" onclick="fechar('ovUSenha')">×</button></div>
+    <div class="modal-body">
+      <div class="warn" id="usWarn2"></div>
+      <p class="muted" id="usSenhaAlvo" style="margin-bottom:12px"></p>
+      <div><label>Nova senha *</label><input id="us_nova" type="text" placeholder="mínimo 6 caracteres"></div>
+      <div class="field-hint" style="margin-top:6px">Informe a nova senha à pessoa com segurança.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="fechar('ovUSenha')">Cancelar</button>
+      <button class="btn-accent" id="usBtn" onclick="uSenhaSalvar()">Definir senha</button>
     </div>
   </div>
 </div>
@@ -447,7 +490,8 @@ const CONFIG = {
 };
 const APP = { url:CONFIG.url, key:CONFIG.key, token:null, refresh:null, user:null,
   tenantId:null, papel:null, nome:null, needsBootstrap:false,
-  dados:[], equipe:[], editId:null, sort:{col:'data_pagamento',dir:'asc'}, imp:null, hist:[] };
+  dados:[], equipe:[], editId:null, sort:{col:'data_pagamento',dir:'asc'}, imp:null, hist:[],
+  usuarios:[], uAlvo:null };
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}},
@@ -872,15 +916,104 @@ function fechar(id){document.getElementById(id).classList.remove('on');}
 /* ===== USUÁRIOS (ADMIN) ===== */
 const DOMINIO_ARTECON="@artecon.cnt.br";
 async function carregarUsuarios(){
-  const tb=$("#usList");tb.innerHTML='<tr><td colspan="3" style="color:var(--text-3)">Carregando…</td></tr>';
+  const tb=$("#usList");tb.innerHTML='<tr><td colspan="4" style="color:var(--text-3)">Carregando…</td></tr>';
   try{
-    const rows=await api("resc_usuarios?select=papel,colaborador:resc_colaboradores(nome,email)&order=papel.asc");
-    if(!rows||!rows.length){tb.innerHTML='<tr><td colspan="3" style="color:var(--text-3)">Nenhum usuário.</td></tr>';return;}
-    tb.innerHTML=rows.map(r=>{
+    const rows=await api("resc_usuarios?select=papel,auth_id,colaborador:resc_colaboradores(id,nome,email,status)&order=papel.asc");
+    APP.usuarios=rows||[];
+    if(!APP.usuarios.length){tb.innerHTML='<tr><td colspan="4" style="color:var(--text-3)">Nenhum usuário.</td></tr>';return;}
+    tb.innerHTML=APP.usuarios.map((r,i)=>{
       const c=r.colaborador||{};
-      return "<tr><td>"+esc(c.nome||'—')+"</td><td>"+esc(c.email||'—')+"</td><td>"+esc(r.papel||'—')+"</td></tr>";
+      const inativo=(c.status&&c.status!=='ativo');
+      const papelTxt=r.papel==='diretoria'?'Diretoria':(r.papel==='usuario'?'Usuário':(r.papel||'—'));
+      const eu=(APP.user&&r.auth_id===APP.user.id);
+      const acoes=eu
+        ? '<span class="muted" style="font-size:12px">(você)</span>'
+        : '<div class="urow-acoes">'
+          +'<button class="mini" title="Editar" onclick="uEditar('+i+')">✏️</button>'
+          +'<button class="mini" title="Alterar senha" onclick="uSenha('+i+')">🔑</button>'
+          +(inativo
+              ?'<button class="mini" title="Reativar acesso" onclick="uReativar('+i+')">▶️</button>'
+              :'<button class="mini" title="Cancelar (inativar)" onclick="uCancelar('+i+')">⏸️</button>')
+          +'<button class="mini danger" title="Excluir" onclick="uExcluir('+i+')">🗑️</button>'
+          +'</div>';
+      return '<tr'+(inativo?' style="opacity:.55"':'')+'>'
+        +'<td>'+esc(c.nome||'—')+(inativo?' <span class="badge badge-red">cancelado</span>':'')+'</td>'
+        +'<td>'+esc(c.email||'—')+'</td>'
+        +'<td>'+esc(papelTxt)+'</td>'
+        +'<td style="text-align:right">'+acoes+'</td></tr>';
     }).join('');
-  }catch(e){tb.innerHTML='<tr><td colspan="3" style="color:var(--danger)">'+esc(e.message)+'</td></tr>';}
+  }catch(e){tb.innerHTML='<tr><td colspan="4" style="color:var(--danger)">'+esc(e.message)+'</td></tr>';}
+}
+
+/* ===== GESTÃO DE USUÁRIOS (via Edge Function gerir-usuario) ===== */
+const FN_GERIR=CONFIG.url+"/functions/v1/gerir-usuario";
+async function gerirUsuario(payload){
+  const res=await fetch(FN_GERIR,{method:"POST",
+    headers:{apikey:APP.key,Authorization:"Bearer "+APP.token,"Content-Type":"application/json"},
+    body:JSON.stringify(payload)});
+  const txt=await res.text();let d={};try{d=JSON.parse(txt);}catch(e){}
+  if(!res.ok)throw new Error(d.error||txt||("Erro "+res.status));
+  return d;
+}
+function _uAlvo(i){return APP.usuarios&&APP.usuarios[i];}
+
+function uEditar(i){
+  const r=_uAlvo(i);if(!r)return;const c=r.colaborador||{};
+  APP.uAlvo=i;$("#ueWarn").classList.remove('on');
+  $("#ue_nome").value=c.nome||'';$("#ue_email").value=c.email||'';$("#ue_papel").value=r.papel||'usuario';
+  abrir('ovUEdit');
+}
+async function uEditarSalvar(){
+  const r=_uAlvo(APP.uAlvo);if(!r)return;const c=r.colaborador||{};
+  const nome=$("#ue_nome").value.trim(),email=$("#ue_email").value.trim().toLowerCase(),papel=$("#ue_papel").value;
+  const w=$("#ueWarn");w.classList.remove('on');
+  if(!nome){w.textContent="Informe o nome.";w.classList.add('on');return;}
+  if(!email.endsWith(DOMINIO_ARTECON)){w.textContent="Use um e-mail "+DOMINIO_ARTECON+".";w.classList.add('on');return;}
+  const b=$("#ueBtn");b.disabled=true;
+  try{
+    await gerirUsuario({acao:'editar',auth_id:r.auth_id,colaborador_id:c.id,nome,email,papel});
+    toast("Usuário atualizado.","ok");fechar('ovUEdit');await carregarUsuarios();
+  }catch(e){w.textContent=e.message;w.classList.add('on');}
+  finally{b.disabled=false;}
+}
+
+function uSenha(i){
+  const r=_uAlvo(i);if(!r)return;const c=r.colaborador||{};
+  APP.uAlvo=i;$("#usWarn2").classList.remove('on');$("#us_nova").value='';
+  $("#usSenhaAlvo").textContent="Nova senha para "+(c.email||c.nome||'usuário');
+  abrir('ovUSenha');
+}
+async function uSenhaSalvar(){
+  const r=_uAlvo(APP.uAlvo);if(!r)return;
+  const nova=$("#us_nova").value;const w=$("#usWarn2");w.classList.remove('on');
+  if((nova||'').length<6){w.textContent="A senha precisa ter ao menos 6 caracteres.";w.classList.add('on');return;}
+  const b=$("#usBtn");b.disabled=true;
+  try{
+    await gerirUsuario({acao:'senha',auth_id:r.auth_id,senha:nova});
+    toast("Senha alterada.","ok");fechar('ovUSenha');
+  }catch(e){w.textContent=e.message;w.classList.add('on');}
+  finally{b.disabled=false;}
+}
+
+async function uCancelar(i){
+  const r=_uAlvo(i);if(!r)return;const c=r.colaborador||{};
+  if(!confirm("Cancelar (inativar) o acesso de "+(c.nome||c.email)+"?\n\nO cadastro é mantido e o login fica bloqueado. Pode ser reativado depois."))return;
+  try{await gerirUsuario({acao:'cancelar',auth_id:r.auth_id,colaborador_id:c.id});
+    toast("Usuário cancelado.","ok");await carregarUsuarios();
+  }catch(e){toast("Falha: "+e.message,"error",5000);}
+}
+async function uReativar(i){
+  const r=_uAlvo(i);if(!r)return;const c=r.colaborador||{};
+  try{await gerirUsuario({acao:'reativar',auth_id:r.auth_id,colaborador_id:c.id});
+    toast("Usuário reativado.","ok");await carregarUsuarios();
+  }catch(e){toast("Falha: "+e.message,"error",5000);}
+}
+async function uExcluir(i){
+  const r=_uAlvo(i);if(!r)return;const c=r.colaborador||{};
+  if(!confirm("EXCLUIR definitivamente "+(c.nome||c.email)+"?\n\nIsso remove o login e o cadastro. Não há como desfazer."))return;
+  try{await gerirUsuario({acao:'excluir',auth_id:r.auth_id,colaborador_id:c.id});
+    toast("Usuário excluído.","ok");await carregarUsuarios();
+  }catch(e){toast("Falha: "+e.message,"error",5000);}
 }
 function abrirUsuarios(){
   if(!isAdmin()){toast("Apenas administradores.","error");return;}
