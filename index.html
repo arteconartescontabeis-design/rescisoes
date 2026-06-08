@@ -946,7 +946,7 @@ async function carregarUsuarios(){
 }
 
 /* ===== GESTÃO DE USUÁRIOS (via Edge Function gerir-usuario) ===== */
-const FN_GERIR=CONFIG.url+"/functions/v1/gerir-usuario";
+const FN_GERIR=CONFIG.url+"/functions/v1/super-service";
 async function gerirUsuario(payload){
   const res=await fetch(FN_GERIR,{method:"POST",
     headers:{apikey:APP.key,Authorization:"Bearer "+APP.token,"Content-Type":"application/json"},
