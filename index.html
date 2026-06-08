@@ -138,6 +138,9 @@ tbody tr.r-fin td:not(.acoes){color:var(--green);font-weight:600}
 .badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:20px;font-size:10.5px;font-weight:600}
 .badge-green{background:var(--green-lt);color:var(--green)}
 .badge-gray{background:var(--surface-2);color:var(--text-3)}
+.badge-blue{background:var(--gold-lt);color:var(--gold)}
+.badge-red{background:var(--red-lt);color:var(--red)}
+.badge-amber{background:var(--amber-lt);color:var(--amber)}
 .legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 2px 0;font-size:12px;color:var(--text-2)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .dot{width:12px;height:12px;border-radius:3px;display:inline-block}
@@ -250,6 +253,8 @@ pre.sql{background:#0f172a;color:#e9f0ec;padding:16px;border-radius:10px;font-si
       <div class="nav-section hidden" id="nav-admin-sec">Administração</div>
       <button class="nav-item hidden" id="nav-users" onclick="abrirUsuarios()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg> Usuários</button>
+      <button class="nav-item hidden" id="nav-historico" onclick="abrirHistorico()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg> Histórico</button>
     </nav>
     <div class="sidebar-footer">
       <div class="who"><b id="me-nome">—</b><span id="me-papel">—</span></div>
@@ -400,6 +405,32 @@ pre.sql{background:#0f172a;color:#e9f0ec;padding:16px;border-radius:10px;font-si
   </div>
 </div>
 
+<!-- ===== MODAL HISTÓRICO (ADMIN) ===== -->
+<div class="overlay" id="ovHistorico">
+  <div class="modal wide">
+    <div class="modal-head"><h3>Histórico de Alterações</h3><button class="x" onclick="fechar('ovHistorico')">×</button></div>
+    <div class="modal-body">
+      <div class="filters" style="margin:0 0 14px">
+        <input class="search" id="histBusca" placeholder="Buscar por empregado, empresa ou usuário…" oninput="renderHistorico()">
+        <select id="histAcao" onchange="renderHistorico()">
+          <option value="">Todas as ações</option>
+          <option value="INSERT">Criação</option>
+          <option value="UPDATE">Edição</option>
+          <option value="DELETE">Exclusão</option>
+        </select>
+        <button class="btn-outline btn-sm" onclick="carregarHistorico()" style="margin-left:auto">↻ Atualizar</button>
+      </div>
+      <div class="field-hint" style="margin-bottom:10px">Registra automaticamente quem alterou, o que mudou e quando — inclusive importações. Visível apenas para administradores.</div>
+      <div class="tscroll">
+        <table><thead><tr><th style="white-space:nowrap">Quando</th><th>Quem</th><th>Ação</th><th>Empregado / Empresa</th><th>O que mudou</th></tr></thead><tbody id="histList"></tbody></table>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="fechar('ovHistorico')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <datalist id="dlEquipe"></datalist>
 <datalist id="dlTipos"></datalist>
 <div id="toasts"></div>
@@ -416,7 +447,7 @@ const CONFIG = {
 };
 const APP = { url:CONFIG.url, key:CONFIG.key, token:null, refresh:null, user:null,
   tenantId:null, papel:null, nome:null, needsBootstrap:false,
-  dados:[], equipe:[], editId:null, sort:{col:'data_pagamento',dir:'asc'}, imp:null };
+  dados:[], equipe:[], editId:null, sort:{col:'data_pagamento',dir:'asc'}, imp:null, hist:[] };
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}},
@@ -848,6 +879,67 @@ async function criarUsuario(){
   finally{$("#btnCriarUser").disabled=false;}
 }
 
+/* ===== HISTÓRICO (ADMIN) ===== */
+const HCAMPOS={cod_empresa:'Cód. Empresa',empresa:'Empresa',responsavel:'Responsável',
+  cod_empregado:'Cód. Empregado',nome_empregado:'Empregado',tipo_rescisao:'Tipo de Rescisão',
+  data_admissao:'Data de Admissão',data_aviso:'Data do Aviso',data_fim_aviso:'Fim do Aviso',
+  data_pagamento:'Data de Pagamento',calculado_por:'Calculado por',observacoes:'Observações',
+  status_rescisao:'Rescisão (status)',status_esocial:'eSocial (status)'};
+function fmtDataHora(s){const d=new Date(s);if(isNaN(d))return esc(String(s));const p=n=>('0'+n).slice(-2);
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes());}
+function _valHist(k,v){
+  if(v===null||v===undefined||v==='')return '—';
+  if(k.indexOf('status_')===0)return v?'Sim':'Não';
+  if(k.indexOf('data_')===0)return fmtBR(v);
+  return esc(String(v));
+}
+function _acaoBadge(a){
+  if(a==='INSERT')return '<span class="badge badge-green">Criação</span>';
+  if(a==='UPDATE')return '<span class="badge badge-blue">Edição</span>';
+  if(a==='DELETE')return '<span class="badge badge-red">Exclusão</span>';
+  return esc(a||'—');
+}
+function descreveAlteracao(r){
+  if(r.acao==='INSERT')return '<span class="muted">Cadastro criado</span>';
+  if(r.acao==='DELETE')return '<span class="muted">Registro excluído</span>';
+  const a=r.alteracoes||{};const ks=Object.keys(a);
+  if(!ks.length)return '<span class="muted">—</span>';
+  return ks.map(k=>'<div style="margin:2px 0;font-size:12.5px">'+
+    '<b>'+esc(HCAMPOS[k]||k)+':</b> '+
+    '<span style="color:var(--red)">'+_valHist(k,a[k]&&a[k].de)+'</span> → '+
+    '<span style="color:var(--green)">'+_valHist(k,a[k]&&a[k].para)+'</span></div>').join('');
+}
+async function carregarHistorico(){
+  const tb=$("#histList");
+  tb.innerHTML='<tr><td colspan="5" style="color:var(--text-3)">Carregando…</td></tr>';
+  try{
+    APP.hist=await api("resc_auditoria?select=*&order=criado_em.desc&limit=400")||[];
+    renderHistorico();
+  }catch(e){tb.innerHTML='<tr><td colspan="5" style="color:var(--red)">'+esc(e.message)+'</td></tr>';}
+}
+function renderHistorico(){
+  const tb=$("#histList");const all=APP.hist||[];
+  const q=($("#histBusca").value||'').trim().toLowerCase();
+  const fa=$("#histAcao").value;
+  let arr=all;
+  if(fa)arr=arr.filter(r=>r.acao===fa);
+  if(q)arr=arr.filter(r=>((r.empregado||'')+' '+(r.empresa||'')+' '+(r.quem_nome||'')+' '+(r.quem_email||'')).toLowerCase().includes(q));
+  if(!arr.length){tb.innerHTML='<tr><td colspan="5" style="color:var(--text-3)">Nenhuma alteração registrada.</td></tr>';return;}
+  tb.innerHTML=arr.map(r=>{
+    const quem=esc(r.quem_nome||r.quem_email||'—')+(r.quem_email&&r.quem_nome?'<div style="font-size:11px;color:var(--text-3)">'+esc(r.quem_email)+'</div>':'');
+    return '<tr><td style="white-space:nowrap">'+fmtDataHora(r.criado_em)+'</td>'+
+      '<td>'+quem+'</td>'+
+      '<td>'+_acaoBadge(r.acao)+'</td>'+
+      '<td><b>'+esc(r.empregado||'—')+'</b>'+(r.empresa?'<div style="font-size:11px;color:var(--text-3)">'+esc(r.empresa)+'</div>':'')+'</td>'+
+      '<td>'+descreveAlteracao(r)+'</td></tr>';
+  }).join('');
+}
+function abrirHistorico(){
+  if(!isAdmin()){toast("Apenas administradores.","error");return;}
+  $("#histBusca").value='';$("#histAcao").value='';
+  abrir('ovHistorico');carregarHistorico();
+}
+
 /* ===== BOOT ===== */
 async function boot(){
   show("view-loading");
@@ -859,6 +951,7 @@ async function boot(){
     const adm=isAdmin();
     document.getElementById('nav-admin-sec').classList.toggle('hidden',!adm);
     document.getElementById('nav-users').classList.toggle('hidden',!adm);
+    document.getElementById('nav-historico').classList.toggle('hidden',!adm);
     show("view-app");
     await carregar();
   }catch(e){toast("Erro: "+e.message,"error");doLogout();}
