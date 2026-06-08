@@ -699,7 +699,7 @@ function novaRescisao(){
   document.getElementById('formWarn').classList.remove('on');atualizarCalculos();abrir('ovForm');
 }
 function editar(id){
-  const r=APP.dados.find(x=>x.id===id);if(!r)return;
+  const r=APP.dados.find(x=>String(x.id)===String(id));if(!r)return;
   APP.editId=id;document.getElementById('formTitle').textContent='Editar Rescisão';
   FCAMPOS.forEach(k=>document.getElementById('f_'+k).value=r[k]||'');
   document.getElementById('f_status_rescisao').checked=!!r.status_rescisao;
@@ -723,7 +723,7 @@ async function salvar(){
   try{
     if(APP.editId){
       const res=await api("resc_rescisoes?id=eq."+APP.editId,{method:"PATCH",body:obj,prefer:"return=representation"});
-      const i=APP.dados.findIndex(x=>x.id===APP.editId);if(i>=0&&res&&res[0])APP.dados[i]=res[0];
+      const i=APP.dados.findIndex(x=>String(x.id)===String(APP.editId));if(i>=0&&res&&res[0])APP.dados[i]=res[0];
       toast("Rescisão atualizada.","ok");
     }else{
       const res=await api("resc_rescisoes",{method:"POST",body:obj,prefer:"return=representation"});
@@ -734,10 +734,10 @@ async function salvar(){
   finally{document.getElementById('btnSalvar').disabled=false;}
 }
 async function excluir(id){
-  const r=APP.dados.find(x=>x.id===id);if(!r)return;
+  const r=APP.dados.find(x=>String(x.id)===String(id));if(!r)return;
   if(!confirm('Excluir a rescisão de "'+(r.nome_empregado||'')+'"?'))return;
   try{await api("resc_rescisoes?id=eq."+id,{method:"DELETE",prefer:"return=minimal"});
-    APP.dados=APP.dados.filter(x=>x.id!==id);render();toast("Excluída.","ok");
+    APP.dados=APP.dados.filter(x=>String(x.id)!==String(id));render();toast("Excluída.","ok");
   }catch(e){toast("Erro ao excluir: "+e.message,"error");}
 }
 
