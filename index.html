@@ -121,10 +121,11 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold);bo
 .tablewrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
 .tscroll{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
-thead th{text-align:left;padding:10px 14px;font-size:10.5px;font-weight:700;color:var(--text-3);
-  text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+thead th{text-align:left;padding:8px 7px;font-size:10px;font-weight:700;color:var(--text-3);
+  text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
 thead th:hover{color:var(--text-2)}
-tbody td{padding:11px 14px;font-size:13px;border-bottom:1px solid var(--surface-2);white-space:nowrap}
+tbody td{padding:8px 7px;font-size:12px;line-height:1.3;border-bottom:1px solid var(--surface-2);white-space:normal;word-break:break-word}
+tbody td.dt,tbody td.acoes{white-space:nowrap}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover{background:var(--bg)}
 tbody tr.r-amarelo td:not(.acoes){color:var(--amber);font-weight:600}
@@ -750,25 +751,22 @@ function filtrados(){
 }
 function render(){
   const arr=filtrados();
-  const heads=[{k:'cod_empresa',l:'Cód.'},{k:'empresa',l:'Empresa'},{k:'cod_empregado',l:'Cód. Emp.'},{k:'nome_empregado',l:'Empregado'},{k:'tipo_rescisao',l:'Tipo de Rescisão'},{k:'data_fim_aviso',l:'Fim Aviso'},{k:'data_pagamento',l:'Pagamento'},{k:'prazo',l:'Prazo legal'},{k:'status_rescisao',l:'Rescisão'},{k:'status_esocial',l:'eSocial'},{k:'',l:''}];
+  const heads=[{k:'cod_empresa',l:'Cód.'},{k:'empresa',l:'Empresa'},{k:'cod_empregado',l:'Cód. Emp.'},{k:'nome_empregado',l:'Empregado'},{k:'tipo_rescisao',l:'Tipo de Rescisão'},{k:'data_fim_aviso',l:'Fim Aviso'},{k:'data_pagamento',l:'Pagamento'},{k:'status_rescisao',l:'Rescisão'},{k:'status_esocial',l:'eSocial'},{k:'',l:''}];
   document.getElementById('thead').innerHTML=heads.map(h=>{
     if(!h.k)return '<th class="acoes"></th>';
-    if(h.k==='prazo')return '<th>'+esc(h.l)+'</th>';
     const a=APP.sort.col===h.k?(APP.sort.dir==='asc'?' ▲':' ▼'):'';
     return '<th onclick="ordenar(\''+h.k+'\')">'+esc(h.l)+a+'</th>';
   }).join('');
   const tb=document.getElementById('tbody');
   if(!arr.length){
-    tb.innerHTML='<tr><td colspan="11"><div class="empty">Nenhuma rescisão encontrada.<br>Clique em <b>＋ Nova Rescisão</b> ou <b>⬆ Importar</b>.</div></td></tr>';
+    tb.innerHTML='<tr><td colspan="10"><div class="empty">Nenhuma rescisão encontrada.<br>Clique em <b>＋ Nova Rescisão</b> ou <b>⬆ Importar</b>.</div></td></tr>';
   }else{
     const pill=v=>v?'<span class="badge badge-green">✓ OK</span>':'<span class="badge badge-gray">—</span>';
     tb.innerHTML=arr.map(r=>{
-      const lim=limitePagamento(r),sc=statusCodigo(r);
-      const prazo=lim?(sc==='atraso'?'<span style="color:var(--red);font-weight:700">'+fmtBRd(lim)+' ⚠</span>':fmtBRd(lim)):'—';
       return '<tr class="'+classeLinha(r)+'">'+
       '<td>'+esc(r.cod_empresa)+'</td><td><b>'+esc(r.empresa)+'</b></td><td>'+esc(r.cod_empregado)+'</td>'+
       '<td>'+esc(r.nome_empregado)+'</td><td>'+esc(r.tipo_rescisao)+'</td>'+
-      '<td>'+fmtBR(r.data_fim_aviso)+'</td><td>'+fmtBR(r.data_pagamento)+'</td><td>'+prazo+'</td>'+
+      '<td class="dt">'+fmtBR(r.data_fim_aviso)+'</td><td class="dt">'+fmtBR(r.data_pagamento)+'</td>'+
       '<td>'+pill(r.status_rescisao)+'</td><td>'+pill(r.status_esocial)+'</td>'+
       '<td class="acoes"><button class="iconbtn" title="Editar" onclick="editar(\''+r.id+'\')">✏️</button>'+
       '<button class="iconbtn" title="Excluir" onclick="excluir(\''+r.id+'\')">🗑️</button></td></tr>';
