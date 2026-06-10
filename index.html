@@ -1,1 +1,1301 @@
 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rescisões Pro — Artecon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f4f6f9; --bg-2:#ffffff; --surface:#ffffff; --surface-2:#f0f2f5;
+  --border:rgba(0,0,0,0.08); --border-lt:rgba(0,0,0,0.14);
+  --text:#1a2332; --text-2:#4a5568; --text-3:#8896a8;
+  --gold:#1a5276; --gold-lt:#d6e4f0; --gold-dim:#154360; --gold-glow:0 0 20px rgba(26,82,118,.15);
+  --green:#1e8449; --green-lt:#eafaf1; --red:#c0392b; --red-lt:#fdedec;
+  --amber:#b7770d; --amber-lt:#fef9e7;
+  --sidebar-w:200px; --radius:12px;
+  --shadow:0 2px 12px rgba(0,0,0,0.08); --shadow-lg:0 8px 32px rgba(0,0,0,0.14);
+  --font:'DM Sans',Arial,sans-serif; --mono:'DM Mono',monospace; --display:'Playfair Display',Georgia,serif;
+  --tr:160ms cubic-bezier(.4,0,.2,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0;font-weight:700}
+button{font-family:inherit;cursor:pointer}
+.hidden{display:none !important}
+.muted{color:var(--text-3)}
+.flex{display:flex;align-items:center;gap:10px}
+
+/* ===== AUTH ===== */
+.auth-screen{min-height:100%;display:grid;place-items:center;padding:16px;
+  background:linear-gradient(135deg,#1a3a5c 0%,#1a5276 50%,#2e86c1 100%)}
+.auth-wrap{width:calc(100vw - 32px);max-width:400px;position:relative;z-index:1}
+.auth-logo{max-width:180px;height:auto;display:block;margin:0 auto 14px}
+.side-logo{max-width:138px;height:auto;display:block;margin:0 auto}
+.auth-brand{display:flex;align-items:center;gap:14px;margin-bottom:26px;justify-content:center}
+.brand-mark{width:48px;height:48px;background:linear-gradient(135deg,var(--gold-dim),var(--gold));
+  border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;
+  font-family:var(--display);box-shadow:var(--gold-glow)}
+.auth-title{text-align:center;color:#fff;font-weight:700;font-size:22px;letter-spacing:.04em;text-transform:uppercase}
+.auth-tagline{text-align:center;color:rgba(255,255,255,.78);font-size:12px;letter-spacing:.04em;margin:4px 0 26px}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,0.18)}
+.auth-card h1{font-family:var(--display);font-size:23px;margin-bottom:4px}
+.auth-card .sub{color:var(--text-3);font-size:13px;margin-bottom:22px}
+.auth-switch{text-align:center;color:var(--text-3);font-size:13px;margin-top:16px}
+.auth-switch a{color:#1a5276;font-weight:600;text-decoration:none}
+.auth-switch a:hover{text-decoration:underline}
+.calc-box{margin-top:10px;padding:11px 13px;border-radius:10px;background:var(--gold-lt);border:1px solid var(--border);font-size:12.5px;line-height:1.75;color:var(--text-2)}
+.calc-box b{color:var(--text)}
+.calc-box .at{color:var(--red);font-weight:700}
+.calc-box .ok{color:var(--green);font-weight:700}
+.calc-box .rules{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.calc-box .chip{background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:2px 10px;font-size:11.5px;white-space:nowrap}
+.calc-box .disc{display:block;margin-top:6px;font-size:10.5px;color:var(--text-3)}
+.auth-err{color:var(--red);font-size:12.5px;margin-top:12px;text-align:center;min-height:18px}
+
+label{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin:14px 0 6px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border-lt);border-radius:9px;
+  background:var(--surface);font-family:inherit;font-size:13.5px;color:var(--text);transition:var(--tr)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-lt)}
+
+/* ===== BUTTONS ===== */
+.btn-primary{width:100%;padding:11px;background:linear-gradient(135deg,var(--gold-dim),var(--gold));color:#fff;
+  border:none;border-radius:9px;font-size:13.5px;font-weight:700;transition:var(--tr);margin-top:18px;letter-spacing:.01em}
+.btn-primary:hover{filter:brightness(1.08);box-shadow:0 4px 20px rgba(26,82,118,.28)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-accent{padding:9px 18px;background:linear-gradient(135deg,var(--gold-dim),var(--gold));color:#fff;border:none;
+  border-radius:9px;font-size:13px;font-weight:700;transition:var(--tr);display:inline-flex;align-items:center;gap:7px}
+.btn-accent:hover{filter:brightness(1.08);box-shadow:0 4px 16px rgba(26,82,118,.25)}
+.btn-accent:disabled{opacity:.5;cursor:not-allowed}
+.btn-outline{padding:9px 18px;border:1.5px solid var(--border-lt);border-radius:9px;background:transparent;
+  font-size:13px;font-weight:500;color:var(--text-2);transition:var(--tr);display:inline-flex;align-items:center;gap:7px}
+.btn-outline:hover{border-color:var(--text-3);color:var(--text)}
+.btn-sm{padding:6px 12px;font-size:12.5px}
+
+/* ===== APP SHELL ===== */
+.sidebar{width:var(--sidebar-w);min-height:100vh;background:var(--bg-2);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100}
+.sidebar-brand{padding:18px 16px 14px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border)}
+.sidebar-brand .brand-mark{width:36px;height:36px;border-radius:11px;font-size:18px}
+.sidebar-brand .nm{font-family:var(--display);font-size:17px;line-height:1;color:var(--text)}
+.sidebar-brand .nm small{display:block;font-family:var(--font);font-size:9px;color:var(--text-3);
+  letter-spacing:.12em;text-transform:uppercase;font-weight:600;margin-top:2px}
+.sidebar-nav{flex:1;padding:10px 10px;overflow-y:auto}
+.nav-section{font-size:9.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.1em;padding:14px 10px 5px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:9px;color:var(--text-3);
+  font-size:13px;font-weight:500;cursor:pointer;transition:var(--tr);margin-bottom:1px;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--bg);color:var(--text-2)}
+.nav-item.active{background:var(--gold-lt);color:var(--gold);font-weight:600}
+.nav-item svg{width:16px;height:16px;flex-shrink:0}
+.sidebar-footer{padding:12px 14px;border-top:1px solid var(--border)}
+.sidebar-footer .who{font-size:12.5px;color:var(--text)}
+.sidebar-footer .who b{display:block;font-weight:600} .sidebar-footer .who span{font-size:11px;color:var(--text-3)}
+.content{margin-left:var(--sidebar-w);padding:26px 34px;max-width:1240px}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.page-head h1{font-family:var(--display);font-size:28px;color:var(--text)}
+.page-head .sub{color:var(--text-3);font-size:13px;margin-top:4px}
+
+/* ===== CARDS / KPIS ===== */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.card-gold-line{border-top:2px solid var(--gold)}
+.alert-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px}
+.alert-card{text-align:left;background:var(--surface);border:1px solid var(--border);border-left-width:3px;border-radius:12px;padding:14px 16px;cursor:pointer;transition:.15s;font:inherit;color:var(--text)}
+.alert-card:hover{box-shadow:var(--gold-glow);transform:translateY(-1px)}
+.alert-card.on{box-shadow:0 0 0 2px var(--gold) inset}
+.alert-card .ac-n{font-family:var(--mono);font-size:26px;font-weight:500;line-height:1}
+.alert-card .ac-t{font-weight:600;margin-top:5px;font-size:13px;color:var(--text-2)}
+.alert-card.a-gray .ac-n{color:var(--text)} .alert-card.a-gray{border-left-color:var(--border-lt)}
+.alert-card.a-amber{border-left-color:var(--amber)} .alert-card.a-amber .ac-n{color:var(--amber)}
+.alert-card.a-blue{border-left-color:var(--gold)} .alert-card.a-blue .ac-n{color:var(--gold)}
+.alert-card.a-red{border-left-color:var(--red)} .alert-card.a-red .ac-n{color:var(--red)}
+.alert-card.a-green{border-left-color:var(--green)} .alert-card.a-green .ac-n{color:var(--green)}
+
+/* ===== FILTERS / TABLE ===== */
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.filters input,.filters select{width:auto}
+.filters .search{min-width:240px;flex:1;max-width:360px}
+.tablewrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.tscroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;padding:8px 7px;font-size:10px;font-weight:700;color:var(--text-3);
+  text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--text-2)}
+tbody td{padding:8px 7px;font-size:12px;line-height:1.3;border-bottom:1px solid var(--surface-2);white-space:normal;word-break:break-word}
+tbody td.dt,tbody td.acoes{white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--bg)}
+tbody tr.r-amarelo td:not(.acoes){color:var(--amber);font-weight:600}
+tbody tr.r-vermelho td:not(.acoes){color:var(--red);font-weight:700}
+tbody tr.r-fin{background:var(--green-lt)}
+tbody tr.r-fin:hover{background:#e0f5e9}
+tbody tr.r-fin td:not(.acoes){color:var(--green);font-weight:600}
+.acoes{text-align:right}
+.iconbtn{border:none;background:transparent;padding:5px 7px;border-radius:7px;font-size:15px;color:var(--text-3)}
+.iconbtn:hover{background:var(--surface-2);color:var(--text)}
+.badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:20px;font-size:10.5px;font-weight:600}
+.badge-green{background:var(--green-lt);color:var(--green)}
+.badge-gray{background:var(--surface-2);color:var(--text-3)}
+.badge-blue{background:var(--gold-lt);color:var(--gold)}
+.badge-red{background:var(--red-lt);color:var(--red)}
+.badge-amber{background:var(--amber-lt);color:var(--amber)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 2px 0;font-size:12px;color:var(--text-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+.empty{text-align:center;color:var(--text-3);padding:40px 0;font-size:14px}
+
+/* ===== MODAL ===== */
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;place-items:start center;padding:30px 18px;z-index:200;overflow-y:auto}
+.overlay.on{display:grid}
+.modal{background:var(--surface);border-radius:16px;box-shadow:var(--shadow-lg);width:100%;max-width:600px;animation:sl .2s ease}
+.modal.wide{max-width:900px}
+.modal-head{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.modal-head h3{font-family:var(--display);font-size:19px}
+.modal-body{padding:20px 24px} .modal-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.x{border:none;background:none;font-size:22px;color:var(--text-3);cursor:pointer;line-height:1}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px} .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.field-hint{font-size:11.5px;color:var(--text-3);margin-top:5px}
+.chk{display:flex;align-items:center;gap:9px;padding:11px 13px;border:1px solid var(--border-lt);border-radius:9px;cursor:pointer;font-weight:600;font-size:13px}
+.chk input{width:auto}
+.warn{background:var(--red-lt);color:var(--red);border:1px solid #f1b0b0;border-radius:9px;padding:10px 13px;font-size:12.5px;font-weight:600;margin-bottom:16px;display:none}
+.warn.on{display:block}
+
+/* ===== IMPORT ===== */
+.dropzone{border:2px dashed var(--border-lt);border-radius:12px;padding:30px;text-align:center;color:var(--text-2);cursor:pointer;transition:.15s}
+.dropzone:hover{border-color:var(--gold);background:var(--gold-lt)}
+.map-table{width:100%;font-size:12.5px;border-collapse:collapse;margin-top:8px}
+.map-table td{padding:6px 8px;border-bottom:1px solid var(--surface-2)}
+.map-table td:first-child{font-weight:700;color:var(--text-2);width:42%}
+.map-table select{width:100%}
+.prev{max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:9px;margin-top:12px}
+.prev th{font-size:10px;padding:7px 9px} .prev td{padding:6px 9px;font-size:11.5px}
+
+/* ===== MISC ===== */
+#toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:10px;z-index:300}
+.toast{background:var(--text);color:#fff;padding:12px 16px;border-radius:10px;font-size:13px;box-shadow:var(--shadow-lg);max-width:340px;animation:sl .25s ease}
+.toast.ok{background:var(--green)} .toast.error{background:var(--red)} .toast.warn{background:var(--amber)}
+@keyframes sl{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.center-msg{min-height:100%;display:grid;place-items:center;padding:24px}
+.center-msg .card{max-width:640px;border-radius:18px;padding:30px 32px}
+.center-msg .card h1{font-family:var(--display);font-size:23px}
+pre.sql{background:#0f172a;color:#e9f0ec;padding:16px;border-radius:10px;font-size:12px;font-family:var(--mono);
+  overflow:auto;line-height:1.55;white-space:pre-wrap;word-break:break-word;margin-top:14px}
+.spin{width:34px;height:34px;border:3px solid var(--surface-2);border-top-color:var(--gold);border-radius:50%;animation:r 1s linear infinite}
+@keyframes r{to{transform:rotate(360deg)}}
+
+.urow-acoes{display:inline-flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.mini{padding:5px 9px;border:1.5px solid var(--border-lt);border-radius:8px;background:var(--surface);cursor:pointer;
+  font-size:14px;line-height:1;transition:.15s}
+.mini:hover{border-color:var(--text-3);background:var(--surface-2)}
+.mini.danger:hover{border-color:var(--red);background:var(--red-lt)}
+.mini:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:760px){
+  .sidebar{position:static;width:100%;min-height:auto;flex-direction:row;flex-wrap:wrap;gap:4px;align-items:center}
+  .sidebar-brand,.sidebar-footer{border:none;padding:10px 12px}.sidebar-nav{display:flex;flex-wrap:wrap;padding:6px}
+  .nav-section{display:none}.content{margin-left:0;padding:18px 14px}.row2,.row3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="view-login" class="auth-screen">
+  <div class="auth-wrap">
+    <img class="auth-logo" src="logo.webp" alt="Artecon">
+    <div class="auth-title">Rescisões Pro</div>
+    <div class="auth-tagline">Controle de Desligamentos · eSocial</div>
+    <div class="auth-card">
+      <h1>Acesse sua conta</h1>
+      <div class="sub">Gestão e acompanhamento de rescisões.</div>
+      <label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="username" placeholder="voce@artecon.cnt.br" />
+      <label for="senha">Senha</label>
+      <input id="senha" type="password" autocomplete="current-password" placeholder="••••••••" />
+      <button id="btn-login" class="btn-primary">Entrar</button>
+      <div id="login-err" class="auth-err"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LOADING ===== -->
+<div id="view-loading" class="center-msg hidden"><div class="spin"></div></div>
+
+<!-- ===== BOOTSTRAP ===== -->
+<div id="view-bootstrap" class="center-msg hidden">
+  <div class="card card-gold-line">
+    <h1>Configuração inicial</h1>
+    <p class="muted" style="margin:10px 0 4px">
+      Seu login funcionou, mas este usuário ainda não está vinculado a um papel.
+      Copie o comando abaixo, rode <b>uma vez</b> no <b>SQL Editor</b> do Supabase e recarregue a página.
+    </p>
+    <pre class="sql" id="bootstrap-sql"></pre>
+    <div class="flex" style="margin-top:16px;gap:10px">
+      <button class="btn-accent" onclick="copyBootstrap()">Copiar comando</button>
+      <button class="btn-outline" onclick="location.reload()">Já rodei — recarregar</button>
+      <button class="btn-outline" onclick="doLogout()">Sair</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="view-app" class="hidden">
+  <aside class="sidebar">
+    <div class="sidebar-brand" style="justify-content:center">
+      <img class="side-logo" src="logo.webp" alt="Artecon">
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Gestão</div>
+      <button class="nav-item active" onclick="scrollTopo()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg> Painel</button>
+      <div class="nav-section">Ações</div>
+      <button class="nav-item" onclick="novaRescisao()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Nova rescisão</button>
+      <button class="nav-item" onclick="abrirImport()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5-5 5 5M12 5v12"/></svg> Importar</button>
+      <button class="nav-item" onclick="exportar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg> Exportar Excel</button>
+      <button class="nav-item" onclick="abrirRelatorios()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg> Relatórios</button>
+      <div class="nav-section hidden" id="nav-admin-sec">Administração</div>
+      <button class="nav-item hidden" id="nav-users" onclick="abrirUsuarios()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg> Usuários</button>
+      <button class="nav-item hidden" id="nav-historico" onclick="abrirHistorico()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg> Histórico</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="who"><b id="me-nome">—</b><span id="me-papel">—</span></div>
+      <button class="nav-item" style="margin-top:8px" onclick="doLogout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg> Sair</button>
+    </div>
+  </aside>
+
+  <main class="content">
+    <div class="page-head">
+      <div><h1>Controle de Rescisões</h1><div class="sub">Gestão de desligamentos — Artecon Artes Contábeis</div></div>
+      <div class="flex">
+        <button class="btn-accent" onclick="novaRescisao()">＋ Nova Rescisão</button>
+        <button class="btn-outline" onclick="abrirImport()">⬆ Importar</button>
+      </div>
+    </div>
+
+    <div class="alert-strip" id="kpis"></div>
+
+    <div class="card" style="margin-bottom:16px;padding:16px 18px">
+      <div class="filters" style="margin:0">
+        <input class="search" id="fBusca" placeholder="Buscar empresa, empregado, código…" oninput="render()">
+        <select id="fStatus" onchange="render()">
+          <option value="">Todos os status</option>
+          <option value="pend">Pendentes</option>
+          <option value="fin">Finalizadas</option>
+          <option value="atraso">Em atraso (prazo legal)</option>
+          <option value="alert">Vencimento nos próximos 7 dias</option>
+          <option value="crit">Crítico (≤2 dias)</option>
+        </select>
+        <select id="fTipo" onchange="render()"><option value="">Todos os tipos</option></select>
+        <select id="fResp" onchange="render()"><option value="">Todos os responsáveis</option></select>
+        <button class="btn-outline btn-sm" onclick="carregar()" style="margin-left:auto">↻ Atualizar</button>
+      </div>
+    </div>
+
+    <div class="tablewrap">
+      <div class="tscroll">
+        <table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><i class="dot" style="background:var(--amber-lt);border:1px solid var(--amber)"></i> Vencimento na mesma semana</span>
+      <span><i class="dot" style="background:var(--red-lt);border:1px solid var(--red)"></i> Faltam 2 dias ou menos</span>
+      <span><i class="dot" style="background:var(--green-lt);border:1px solid var(--green)"></i> Finalizada (Rescisão + eSocial + FGTS OK)</span>
+    </div>
+  </main>
+</div>
+
+<!-- ===== MODAL CADASTRO ===== -->
+<div class="overlay" id="ovForm">
+  <div class="modal">
+    <div class="modal-head"><h3 id="formTitle">Nova Rescisão</h3><button class="x" onclick="fechar('ovForm')">×</button></div>
+    <div class="modal-body">
+      <div class="warn" id="formWarn"></div>
+      <div class="row2">
+        <div><label>Código da Empresa</label><input id="f_cod_empresa" inputmode="numeric"></div>
+        <div><label>Empresa *</label><input id="f_empresa"></div>
+      </div>
+      <div class="row2" style="margin-top:14px">
+        <div><label>Responsável pela Empresa</label><input id="f_responsavel" list="dlEquipe" placeholder="Colaborador que atende a conta"></div>
+        <div><label>Código Empregado</label><input id="f_cod_empregado"></div>
+      </div>
+      <div style="margin-top:14px"><label>Nome do Empregado *</label><input id="f_nome_empregado"></div>
+      <div style="margin-top:14px"><label>Tipo de Rescisão</label><input id="f_tipo_rescisao" list="dlTipos" placeholder="Selecione ou digite" oninput="atualizarCalculos()"></div>
+      <div id="tipoInfo" class="calc-box hidden"></div>
+      <div class="row2" style="margin-top:14px">
+        <div><label>Data de Admissão</label><input type="date" id="f_data_admissao" onchange="atualizarCalculos()"><div class="field-hint">Para o aviso prévio proporcional.</div></div>
+        <div><label>Data do Aviso</label><input type="date" id="f_data_aviso" onchange="atualizarCalculos()"></div>
+      </div>
+      <div class="row2" style="margin-top:14px">
+        <div><label>Data Fim do Aviso (término)</label><input type="date" id="f_data_fim_aviso" onchange="atualizarCalculos()"></div>
+        <div><label>Data de Pagamento</label><input type="date" id="f_data_pagamento" onchange="atualizarCalculos()"></div>
+      </div>
+      <div id="prazoInfo" class="calc-box hidden"></div>
+      <div style="margin-top:14px"><label>Calculado por</label>
+        <input id="f_calculado_por" list="dlEquipe" placeholder="Colaborador que fez o cálculo">
+        <div class="field-hint">Obrigatório para concluir Rescisão ou eSocial.</div></div>
+      <div class="row2" style="margin-top:16px">
+        <label class="chk"><input type="checkbox" id="f_status_rescisao"> Status Rescisão — OK</label>
+        <label class="chk"><input type="checkbox" id="f_status_esocial"> Status eSocial — OK</label>
+      </div>
+      <div style="margin-top:10px">
+        <label class="chk"><input type="checkbox" id="f_status_fgts"> Status FGTS Digital — OK <span class="muted" style="font-weight:400">(recolhimento rescisório + multa)</span></label>
+      </div>
+      <div style="margin-top:14px"><label>Observações</label><textarea id="f_observacoes" rows="2"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="fechar('ovForm')">Cancelar</button>
+      <button class="btn-accent" id="btnSalvar" onclick="salvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL IMPORTAÇÃO ===== -->
+<div class="overlay" id="ovImport">
+  <div class="modal wide">
+    <div class="modal-head"><h3>Importar Rescisões</h3><button class="x" onclick="fechar('ovImport')">×</button></div>
+    <div class="modal-body">
+      <div id="impStep1">
+        <div class="dropzone" id="dropzone">
+          <div style="font-size:34px">📄</div>
+          <p style="margin-top:8px;font-weight:700">Clique para selecionar a planilha</p>
+          <p class="field-hint">Excel (.xlsx, .xls) ou CSV — primeira linha = cabeçalho</p>
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+        </div>
+      </div>
+      <div id="impStep2" style="display:none">
+        <p style="font-weight:700;margin-bottom:4px">Mapear colunas da planilha → campos do sistema</p>
+        <p class="field-hint" style="margin-bottom:10px">Detectado automaticamente. Ajuste se necessário. "—" ignora o campo.</p>
+        <table class="map-table" id="mapTable"></table>
+        <p style="font-weight:700;margin:16px 0 4px">Prévia (<span id="prevCount">0</span> linhas)</p>
+        <div class="prev"><table id="prevTable"></table></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="fechar('ovImport')">Cancelar</button>
+      <button class="btn-accent" id="btnImportar" onclick="confirmarImport()" style="display:none">Importar registros</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL USUÁRIOS (ADMIN) ===== -->
+<div class="overlay" id="ovUsers">
+  <div class="modal wide">
+    <div class="modal-head"><h3>Usuários</h3><button class="x" onclick="fechar('ovUsers')">×</button></div>
+    <div class="modal-body">
+      <div class="warn" id="usWarn"></div>
+      <p style="font-weight:700;margin-bottom:10px">Cadastrar novo usuário</p>
+      <div class="row2">
+        <div><label>Nome completo *</label><input id="u_nome" placeholder="Nome do colaborador"></div>
+        <div><label>E-mail *</label><input id="u_email" type="email" placeholder="pessoa@artecon.cnt.br"></div>
+      </div>
+      <div class="row2" style="margin-top:14px">
+        <div><label>Senha inicial *</label><input id="u_senha" type="text" placeholder="mínimo 6 caracteres"></div>
+        <div><label>Papel</label>
+          <select id="u_papel">
+            <option value="usuario">Usuário</option>
+            <option value="diretoria">Diretoria (admin)</option>
+          </select></div>
+      </div>
+      <div class="field-hint" style="margin-top:6px">A senha pode ser trocada depois pelo próprio usuário. Informe-a a ele com segurança.</div>
+      <div style="margin-top:14px"><button class="btn-accent" id="btnCriarUser" onclick="criarUsuario()">＋ Criar usuário</button></div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
+      <p style="font-weight:700;margin-bottom:10px">Usuários cadastrados</p>
+      <div class="tscroll"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th style="text-align:right">Ações</th></tr></thead><tbody id="usList"></tbody></table></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="fechar('ovUsers')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovUEdit">
+  <div class="modal">
+    <div class="modal-head"><h3>Editar usuário</h3><button class="x" onclick="fechar('ovUEdit')">×</button></div>
+    <div class="modal-body">
+      <div class="warn" id="ueWarn"></div>
+      <div><label>Nome completo *</label><input id="ue_nome"></div>
+      <div style="margin-top:12px"><label>E-mail *</label><input id="ue_email" type="email"></div>
+      <div style="margin-top:12px"><label>Papel</label>
+        <select id="ue_papel">
+          <option value="usuario">Usuário</option>
+          <option value="diretoria">Diretoria (admin)</option>
+        </select></div>
+      <div class="field-hint" style="margin-top:6px">Alterar o e-mail muda também o login de acesso da pessoa.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="fechar('ovUEdit')">Cancelar</button>
+      <button class="btn-accent" id="ueBtn" onclick="uEditarSalvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ovUSenha">
+  <div class="modal">
+    <div class="modal-head"><h3>Alterar senha</h3><button class="x" onclick="fechar('ovUSenha')">×</button></div>
+    <div class="modal-body">
+      <div class="warn" id="usWarn2"></div>
+      <p class="muted" id="usSenhaAlvo" style="margin-bottom:12px"></p>
+      <div><label>Nova senha *</label><input id="us_nova" type="text" placeholder="mínimo 6 caracteres"></div>
+      <div class="field-hint" style="margin-top:6px">Informe a nova senha à pessoa com segurança.</div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="fechar('ovUSenha')">Cancelar</button>
+      <button class="btn-accent" id="usBtn" onclick="uSenhaSalvar()">Definir senha</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL HISTÓRICO (ADMIN) ===== -->
+<div class="overlay" id="ovHistorico">
+  <div class="modal wide">
+    <div class="modal-head"><h3>Histórico de Alterações</h3><button class="x" onclick="fechar('ovHistorico')">×</button></div>
+    <div class="modal-body">
+      <div class="filters" style="margin:0 0 14px">
+        <input class="search" id="histBusca" placeholder="Buscar por empregado, empresa ou usuário…" oninput="renderHistorico()">
+        <select id="histAcao" onchange="renderHistorico()">
+          <option value="">Todas as ações</option>
+          <option value="INSERT">Criação</option>
+          <option value="UPDATE">Edição</option>
+          <option value="DELETE">Exclusão</option>
+        </select>
+        <button class="btn-outline btn-sm" onclick="carregarHistorico()" style="margin-left:auto">↻ Atualizar</button>
+      </div>
+      <div class="field-hint" style="margin-bottom:10px">Registra automaticamente quem alterou, o que mudou e quando — inclusive importações. Visível apenas para administradores.</div>
+      <div class="tscroll">
+        <table><thead><tr><th style="white-space:nowrap">Quando</th><th>Quem</th><th>Ação</th><th>Empregado / Empresa</th><th>O que mudou</th></tr></thead><tbody id="histList"></tbody></table>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="fechar('ovHistorico')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL RELATÓRIOS ===== -->
+<div class="overlay" id="ovRelatorios">
+  <div class="modal wide">
+    <div class="modal-head"><h3>Relatórios</h3><button class="x" onclick="fechar('ovRelatorios')">×</button></div>
+    <div class="modal-body" id="relBody"></div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="fechar('ovRelatorios')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<datalist id="dlEquipe"></datalist>
+<datalist id="dlTipos"></datalist>
+<div id="toasts"></div>
+
+<script>
+/* ====================================================================
+   RESCISÕES PRO v11 — design Artecon (template Carreira Pro)
+   v11: feriados no prazo legal; sugestão de fim do aviso; multa art.477 §8º;
+        coluna/status FGTS Digital; módulo Relatórios; logo externa (logo.webp)
+   HTML single-file + Supabase (PostgREST + Auth) + RLS por tenant
+   ==================================================================== */
+const CONFIG = {
+  url: "https://fbxelwhdiisfmnwrerbl.supabase.co",
+  key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6",
+  tenantCNPJ: "79876769000128"
+};
+const APP = { url:CONFIG.url, key:CONFIG.key, token:null, refresh:null, user:null,
+  tenantId:null, papel:null, nome:null, needsBootstrap:false,
+  dados:[], equipe:[], editId:null, sort:{col:'data_pagamento',dir:'asc'}, imp:null, hist:[],
+  usuarios:[], uAlvo:null };
+
+const store={get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}},
+  del(k){try{localStorage.removeItem(k);}catch(e){}}};
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function toast(msg,type="default",ms=3200){
+  const el=document.createElement("div");el.className="toast"+(type!=="default"?" "+type:"");
+  el.textContent=msg;$("#toasts").appendChild(el);
+  setTimeout(()=>{el.style.opacity="0";el.style.transition="opacity .3s";setTimeout(()=>el.remove(),300);},ms);
+}
+function show(id){["view-login","view-loading","view-bootstrap","view-app"].forEach(v=>
+  document.getElementById(v).classList.toggle("hidden",v!==id));}
+function scrollTopo(){window.scrollTo({top:0,behavior:'smooth'});}
+
+/* ===== SUPABASE ===== */
+let _refreshing=null;
+async function tentarRefresh(){
+  if(!APP.refresh)return false;
+  if(!_refreshing){
+    _refreshing=(async()=>{
+      try{
+        const res=await fetch(APP.url+"/auth/v1/token?grant_type=refresh_token",{
+          method:"POST",headers:{apikey:APP.key,"Content-Type":"application/json"},
+          body:JSON.stringify({refresh_token:APP.refresh})});
+        const d=await res.json();
+        if(!res.ok||!d.access_token)return false;
+        APP.token=d.access_token;APP.refresh=d.refresh_token||APP.refresh;
+        if(d.user)APP.user=d.user;
+        store.set("rp_session",{token:APP.token,refresh:APP.refresh,user:APP.user});
+        return true;
+      }catch(e){return false;}
+    })().finally(()=>{_refreshing=null;});
+  }
+  return _refreshing;
+}
+async function api(path,{method="GET",body,prefer}={}){
+  for(let tent=0;tent<2;tent++){
+    const headers={apikey:APP.key,"Content-Type":"application/json"};
+    if(APP.token)headers.Authorization="Bearer "+APP.token;
+    if(prefer)headers.Prefer=prefer;
+    const res=await fetch(APP.url+"/rest/v1/"+path,{method,headers,body:body!==undefined?JSON.stringify(body):undefined});
+    if(res.status===401){
+      if(tent===0&&await tentarRefresh())continue;
+      doLogout();throw new Error("Sessão expirada. Entre novamente.");
+    }
+    const txt=await res.text();
+    if(!res.ok){let m=txt;try{m=JSON.parse(txt).message||txt;}catch(e){}throw new Error(m||("Erro "+res.status));}
+    return txt?JSON.parse(txt):null;
+  }
+}
+async function login(email,password){
+  const res=await fetch(APP.url+"/auth/v1/token?grant_type=password",{
+    method:"POST",headers:{apikey:APP.key,"Content-Type":"application/json"},
+    body:JSON.stringify({email,password})});
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error_description||data.msg||"E-mail ou senha inválidos.");
+  APP.token=data.access_token;APP.refresh=data.refresh_token;APP.user=data.user;
+  store.set("rp_session",{token:APP.token,refresh:APP.refresh,user:APP.user});
+}
+function doLogout(){store.del("rp_session");APP.token=null;APP.user=null;APP.papel=null;APP.tenantId=null;APP.nome=null;show("view-login");}
+function isAdmin(){return ['diretoria','superadmin','admin'].includes(APP.papel);}
+async function criarUsuarioAuth(nome,email,password,papel){
+  // cria a conta de login SEM trocar a sessão do admin (ignora o token retornado)
+  const res=await fetch(APP.url+"/auth/v1/signup",{
+    method:"POST",headers:{apikey:APP.key,"Content-Type":"application/json"},
+    body:JSON.stringify({email,password,data:{nome,papel}})});
+  const txt=await res.text();let data={};try{data=JSON.parse(txt);}catch(e){}
+  if(!res.ok){
+    let m=data.error_description||data.msg||data.error||data.message||txt||("Erro "+res.status);
+    if(/signups? not allowed/i.test(m))m="Cadastro de novos usuários está desativado no Supabase (Auth → Providers → Email → desmarque \"Disable signups\").";
+    if(/already registered|already been registered/i.test(m))m="Este e-mail já possui login.";
+    throw new Error(m);
+  }
+  if(data.user&&Array.isArray(data.user.identities)&&data.user.identities.length===0)
+    throw new Error("Este e-mail já possui login.");
+  const uid=(data.user&&data.user.id)||data.id;
+  if(!uid)throw new Error("Login criado, mas o Supabase não retornou o ID do usuário.");
+  return uid;
+}
+async function provisionarUsuario(uid,nome,email,papel){
+  // Provisiona colaborador + usuário direto pelo cliente (não depende de trigger). Idempotente.
+  if(!APP.tenantId)throw new Error("Tenant não carregado — saia e entre novamente.");
+  let colabId=null;
+  try{
+    const c=await api("resc_colaboradores",{method:"POST",
+      body:{tenant_id:APP.tenantId,auth_id:uid,nome,email,status:'ativo'},
+      prefer:"return=representation"});
+    colabId=c&&c[0]&&c[0].id;
+  }catch(e){ if(!/duplicate|already exists|23505/i.test(e.message))throw e; }
+  if(!colabId){
+    const rows=await api("resc_colaboradores?select=id&auth_id=eq."+uid);
+    colabId=rows&&rows[0]&&rows[0].id;
+  }
+  if(!colabId)throw new Error("Não consegui criar nem localizar o colaborador (verifique a policy RLS de INSERT em resc_colaboradores).");
+  try{
+    await api("resc_usuarios",{method:"POST",
+      body:{tenant_id:APP.tenantId,auth_id:uid,colaborador_id:colabId,papel}});
+  }catch(e){ if(!/duplicate|already exists|23505/i.test(e.message))throw e; }
+}
+async function loadMe(){
+  const rows=await api("resc_usuarios?select=*,colaborador:resc_colaboradores(nome)");
+  if(!rows||!rows.length){APP.needsBootstrap=true;return false;}
+  const u=rows[0];
+  APP.tenantId=u.tenant_id;APP.papel=u.papel;
+  APP.nome=(u.colaborador&&u.colaborador.nome)||APP.user.email;
+  return true;
+}
+function bootstrapSQL(){
+  const uid=APP.user.id,email=APP.user.email;
+  const nome=email.split("@")[0].replace(/\./g," ").replace(/\b\w/g,c=>c.toUpperCase());
+  return "-- Vincula este login como DIRETORIA (rode no SQL Editor)\n"+
+"insert into resc_colaboradores (tenant_id, auth_id, nome, email, status)\n"+
+"select (select id from resc_tenants where cnpj='"+CONFIG.tenantCNPJ+"'),\n"+
+"       '"+uid+"', '"+nome+"', '"+email+"', 'ativo'\n"+
+"where not exists (select 1 from resc_colaboradores where auth_id='"+uid+"');\n\n"+
+"insert into resc_usuarios (tenant_id, auth_id, colaborador_id, papel)\n"+
+"select (select id from resc_tenants where cnpj='"+CONFIG.tenantCNPJ+"'),\n"+
+"       '"+uid+"',\n"+
+"       (select id from resc_colaboradores where auth_id='"+uid+"'),\n"+
+"       'diretoria'\n"+
+"where not exists (select 1 from resc_usuarios where auth_id='"+uid+"');";
+}
+function copyBootstrap(){navigator.clipboard.writeText($("#bootstrap-sql").textContent).then(()=>toast("Comando copiado!","ok"));}
+
+/* ===== CONSTANTES ===== */
+const TIPOS=['Sem justa causa – aviso trabalhado','Sem justa causa – aviso indenizado','Com justa causa','Término de contrato','Pedido de demissão – aviso trabalhado','Pedido de demissão – aviso indenizado','Acordo entre as partes – aviso indenizado','Acordo entre as partes – aviso trabalhado'];
+const COLS=[{k:'cod_empresa',lbl:'Cód. Empresa'},{k:'empresa',lbl:'Empresa'},{k:'responsavel',lbl:'Responsável'},{k:'cod_empregado',lbl:'Cód. Empregado'},{k:'nome_empregado',lbl:'Empregado'},{k:'tipo_rescisao',lbl:'Tipo de Rescisão'},{k:'data_admissao',lbl:'Data Admissão'},{k:'data_aviso',lbl:'Data Aviso'},{k:'data_fim_aviso',lbl:'Fim do Aviso'},{k:'data_pagamento',lbl:'Data Pgto'},{k:'calculado_por',lbl:'Calculado por'},{k:'observacoes',lbl:'Observações'},{k:'status_rescisao',lbl:'Rescisão'},{k:'status_esocial',lbl:'eSocial'},{k:'status_fgts',lbl:'FGTS Digital'}];
+
+/* ===== DATAS / ALERTAS ===== */
+function hoje0(){const d=new Date();d.setHours(0,0,0,0);return d;}
+function parseDate(s){if(!s)return null;const d=new Date(s+"T00:00:00");return isNaN(d)?null:d;}
+function fmtBR(s){if(!s)return"—";const d=parseDate(s);if(!d)return esc(s);return("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+"/"+d.getFullYear();}
+function diffDias(s){const d=parseDate(s);if(!d)return null;return Math.round((d-hoje0())/86400000);}
+function fmtBRd(d){return ("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+"/"+d.getFullYear();}
+/* ===== FERIADOS (nacionais + bancários FEBRABAN + estadual RS) =====
+   Atualizar anualmente. Formato AAAA-MM-DD. */
+const FERIADOS=new Set([
+  /* 2026 */ '2026-01-01','2026-02-16','2026-02-17','2026-04-03','2026-04-21','2026-05-01',
+  '2026-06-04','2026-09-07','2026-09-20','2026-10-12','2026-11-02','2026-11-15','2026-11-20','2026-12-25',
+  /* 2027 */ '2027-01-01','2027-02-08','2027-02-09','2027-03-26','2027-04-21','2027-05-01',
+  '2027-05-27','2027-09-07','2027-09-20','2027-10-12','2027-11-02','2027-11-15','2027-11-20','2027-12-25'
+  /* municipais de Novo Hamburgo: adicionar aqui se necessário */
+]);
+function _iso(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function ehDiaUtil(d){const w=d.getDay();return w!==0&&w!==6&&!FERIADOS.has(_iso(d));}
+function diaUtilAnterior(d){const x=new Date(d);while(!ehDiaUtil(x))x.setDate(x.getDate()-1);return x;}
+/* Prazo legal único — D+10 corridos do término, antecipado para dia útil:
+   - Pagamento das verbas (art. 477 §6º CLT)
+   - eSocial S-2299
+   - FGTS rescisório / multa (FGTS Digital)
+   Em aviso indenizado, a base é a data da comunicação do aviso. */
+function prazoLegal(r){
+  const indeniz=/indeniz/i.test(r.tipo_rescisao||'');
+  const b=parseDate(indeniz?(r.data_aviso||r.data_fim_aviso):(r.data_fim_aviso||r.data_aviso));
+  if(!b)return null;const d=new Date(b);d.setDate(d.getDate()+10);return diaUtilAnterior(d);}
+const limitePagamento=prazoLegal, limiteESocial=prazoLegal;
+/* aviso prévio proporcional: 30 + 3 dias por ano completo, teto 90 (Lei 12.506/2011) */
+function avisoProporcional(adm,base){
+  const a=parseDate(adm),b=parseDate(base);if(!a||!b||b<a)return null;
+  let anos=b.getFullYear()-a.getFullYear();
+  const mb=b.getMonth(),ma=a.getMonth();
+  if(mb<ma||(mb===ma&&b.getDate()<a.getDate()))anos--;
+  if(anos<0)anos=0;
+  return Math.min(30+3*anos,90);
+}
+/* regras por tipo de rescisão */
+const TIPO_REGRAS=[
+  {cat:'Sem justa causa', re:/sem\s+justa\s+causa/i, multa:'40%', aviso:'integral', saque:'sim (100%)', seguro:'sim'},
+  {cat:'Acordo (art. 484-A)', re:/acordo/i, multa:'20%', aviso:'pela metade', saque:'até 80%', seguro:'não'},
+  {cat:'Pedido de demissão', re:/pedido/i, multa:'—', aviso:'devido pelo empregado', saque:'não', seguro:'não'},
+  {cat:'Término de contrato', re:/t[ée]rmino|prazo determinado|experi/i, multa:'—', aviso:'não há', saque:'sim', seguro:'não'},
+  {cat:'Justa causa', re:/justa\s+causa/i, multa:'—', aviso:'não há', saque:'não', seguro:'não'}
+];
+function regrasTipo(t){if(!t)return null;for(const r of TIPO_REGRAS){if(r.re.test(t))return r;}return null;}
+/* sugestão de fim do aviso (apenas aviso trabalhado):
+   - empregador (sem justa causa / acordo): proporcional Lei 12.506
+   - pedido de demissão: 30 dias fixos (proporcional só beneficia o empregado) */
+function sugestaoFimAviso(tipo,adm,ini){
+  if(!/trabalhado/i.test(tipo||''))return null;
+  const a=parseDate(ini);if(!a)return null;
+  let n;
+  if(/pedido/i.test(tipo))n=30;
+  else{n=avisoProporcional(adm,ini);if(n==null)return null;}
+  const d=new Date(a);d.setDate(d.getDate()+n);
+  return {dias:n,data:d};
+}
+function aplicarFimAviso(iso){document.getElementById('f_data_fim_aviso').value=iso;atualizarCalculos();}
+function atualizarCalculos(){
+  const g=k=>document.getElementById('f_'+k).value.trim();
+  const tipo=g('tipo_rescisao'),adm=g('data_admissao'),ini=g('data_aviso'),fim=g('data_fim_aviso'),pg=g('data_pagamento');
+  /* regras por tipo */
+  const ti=document.getElementById('tipoInfo');const rg=regrasTipo(tipo);
+  if(rg){
+    ti.innerHTML='<b>'+esc(rg.cat)+'</b>'+
+      '<div class="rules">'+
+      '<span class="chip">Multa FGTS: '+rg.multa+'</span>'+
+      '<span class="chip">Aviso prévio: '+rg.aviso+'</span>'+
+      '<span class="chip">Saque FGTS: '+rg.saque+'</span>'+
+      '<span class="chip">Seguro-desemprego: '+rg.seguro+'</span></div>'+
+      '<span class="disc">Referência geral — confira a situação concreta do contrato.</span>';
+    ti.classList.remove('hidden');
+  }else ti.classList.add('hidden');
+  /* prazos legais */
+  const pi=document.getElementById('prazoInfo');const linhas=[];
+  const r={tipo_rescisao:tipo,data_aviso:ini,data_fim_aviso:fim};
+  const lp=prazoLegal(r);
+  if(lp){
+    const dd=Math.round((lp-hoje0())/86400000);
+    let st = dd<0?'<span class="at">prazo vencido</span>' : dd===0?'<span class="at">vence hoje</span>' : 'faltam '+dd+' dia(s)';
+    linhas.push('<div><b>Pagamento (art. 477):</b> até '+fmtBRd(lp)+' — '+st+'</div>');
+    linhas.push('<div><b>eSocial S-2299 e FGTS Digital:</b> até '+fmtBRd(lp)+'</div>');
+    if(pg){const dpg=parseDate(pg);if(dpg&&dpg>lp)linhas.push('<div class="at">⚠ Pagamento previsto ('+fmtBRd(dpg)+') após o prazo legal — sujeito à multa do art. 477 §8º (um salário do empregado).</div>');}
+  }
+  const ap=avisoProporcional(adm,ini||fim); /* anos completos na data da comunicação do aviso (Lei 12.506) */
+  if(ap!=null)linhas.push('<div><b>Aviso prévio proporcional:</b> '+ap+' dias</div>');
+  /* sugestão de fim do aviso */
+  const sg=sugestaoFimAviso(tipo,adm,ini);
+  if(sg){
+    const iso=_iso(sg.data);
+    if(!fim)linhas.push('<div><b>Fim do aviso sugerido:</b> '+fmtBRd(sg.data)+' ('+sg.dias+' dias) <button type="button" class="mini" onclick="aplicarFimAviso(\''+iso+'\')">aplicar</button></div>');
+    else if(fim!==iso)linhas.push('<div class="muted" style="font-size:12px">Fim do aviso calculado seria '+fmtBRd(sg.data)+' ('+sg.dias+' dias). <button type="button" class="mini" onclick="aplicarFimAviso(\''+iso+'\')">aplicar</button></div>');
+  }
+  if(linhas.length){pi.innerHTML=linhas.join('');pi.classList.remove('hidden');}else pi.classList.add('hidden');
+}
+function statusCodigo(r){
+  if(r.status_rescisao&&r.status_esocial&&r.status_fgts)return 'fin';
+  const prazos=[];
+  const l=prazoLegal(r);
+  if(l&&(!r.status_rescisao||!r.status_esocial||!r.status_fgts))prazos.push(l);
+  let dd;
+  if(prazos.length){const min=new Date(Math.min(...prazos.map(d=>d.getTime())));dd=Math.round((min-hoje0())/86400000);}
+  else dd=diffDias(r.data_pagamento);
+  if(dd===null)return 'ok';
+  if(dd<0)return 'atraso';
+  if(dd<=2)return 'critico';
+  if(dd<=7)return 'semana';
+  return 'ok';
+}
+/* pagamento efetuado após o prazo legal → multa art. 477 §8º */
+function multa477(r){
+  if(!r.data_pagamento)return false;
+  const l=prazoLegal(r),p=parseDate(r.data_pagamento);
+  return !!(l&&p&&p>l);
+}
+function classeLinha(r){return {fin:'r-fin',atraso:'r-vermelho',critico:'r-vermelho',semana:'r-amarelo',ok:''}[statusCodigo(r)];}
+
+/* ===== CARGA ===== */
+async function carregar(){
+  try{APP.equipe=await api("resc_colaboradores?select=nome&status=in.(ativo,experiencia)&order=nome")||[];}
+  catch(e){APP.equipe=[];}
+  try{APP.dados=await api("resc_rescisoes?select=*&order=data_pagamento.asc")||[];}
+  catch(e){toast("Erro ao carregar rescisões: "+e.message,"error");console.error(e);APP.dados=[];}
+  syncDatalists();render();
+}
+function syncDatalists(){
+  document.getElementById('dlTipos').innerHTML=TIPOS.map(t=>'<option value="'+esc(t)+'">').join('');
+  document.getElementById('dlEquipe').innerHTML=APP.equipe.map(e=>'<option value="'+esc(e.nome)+'">').join('');
+  const ft=document.getElementById('fTipo');const cur=ft.value;
+  ft.innerHTML='<option value="">Todos os tipos</option>'+TIPOS.map(t=>'<option>'+esc(t)+'</option>').join('');
+  ft.value=cur;
+  const fr=document.getElementById('fResp');const curR=fr.value;
+  const resps=[...new Set(APP.dados.map(r=>(r.responsavel||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  fr.innerHTML='<option value="">Todos os responsáveis</option>'+resps.map(n=>'<option>'+esc(n)+'</option>').join('');
+  fr.value=resps.includes(curR)?curR:'';
+}
+
+/* ===== RENDER ===== */
+function filtrados(){
+  const q=(document.getElementById('fBusca').value||'').toLowerCase().trim();
+  const st=document.getElementById('fStatus').value;
+  const tp=document.getElementById('fTipo').value;
+  const rp=document.getElementById('fResp').value;
+  let arr=APP.dados.filter(r=>{
+    if(q){const blob=[r.cod_empresa,r.empresa,r.cod_empregado,r.nome_empregado,r.responsavel,r.calculado_por].join(' ').toLowerCase();if(blob.indexOf(q)<0)return false;}
+    if(tp&&r.tipo_rescisao!==tp)return false;
+    if(rp&&(r.responsavel||'').trim()!==rp)return false;
+    const sc=statusCodigo(r);
+    if(st==='fin'&&sc!=='fin')return false;
+    if(st==='pend'&&sc==='fin')return false;
+    if(st==='atraso'&&sc!=='atraso')return false;
+    if(st==='alert'&&sc!=='semana')return false;
+    if(st==='crit'&&sc!=='critico')return false;
+    return true;
+  });
+  const o=APP.sort,sg=o.dir==='asc'?1:-1;
+  arr.sort((a,b)=>{let x=a[o.col]??'',y=b[o.col]??'';if(typeof x==='boolean'){x=x?1:0;y=y?1:0;}return x<y?-1*sg:x>y?1*sg:0;});
+  return arr;
+}
+function render(){
+  const arr=filtrados();
+  const heads=[{k:'cod_empresa',l:'Cód.'},{k:'empresa',l:'Empresa'},{k:'cod_empregado',l:'Cód. Emp.'},{k:'nome_empregado',l:'Empregado'},{k:'tipo_rescisao',l:'Tipo de Rescisão'},{k:'data_fim_aviso',l:'Fim Aviso'},{k:'data_pagamento',l:'Pagamento'},{k:'status_rescisao',l:'Rescisão'},{k:'status_esocial',l:'eSocial'},{k:'status_fgts',l:'FGTS'},{k:'',l:''}];
+  document.getElementById('thead').innerHTML=heads.map(h=>{
+    if(!h.k)return '<th class="acoes"></th>';
+    const a=APP.sort.col===h.k?(APP.sort.dir==='asc'?' ▲':' ▼'):'';
+    return '<th onclick="ordenar(\''+h.k+'\')">'+esc(h.l)+a+'</th>';
+  }).join('');
+  const tb=document.getElementById('tbody');
+  if(!arr.length){
+    tb.innerHTML='<tr><td colspan="11"><div class="empty">Nenhuma rescisão encontrada.<br>Clique em <b>＋ Nova Rescisão</b> ou <b>⬆ Importar</b>.</div></td></tr>';
+  }else{
+    const pill=v=>v?'<span class="badge badge-green">✓ OK</span>':'<span class="badge badge-gray">—</span>';
+    tb.innerHTML=arr.map(r=>{
+      const lim=prazoLegal(r);
+      const tit=lim?' title="Prazo legal (art. 477 / eSocial / FGTS): '+fmtBRd(lim)+'"':'';
+      const m477=multa477(r)?' <span title="Pagamento após o prazo legal — sujeito à multa do art. 477 §8º" style="color:var(--red);font-weight:700;cursor:help">§8º⚠</span>':'';
+      return '<tr class="'+classeLinha(r)+'">'+
+      '<td>'+esc(r.cod_empresa)+'</td><td><b>'+esc(r.empresa)+'</b></td><td>'+esc(r.cod_empregado)+'</td>'+
+      '<td>'+esc(r.nome_empregado)+'</td><td>'+esc(r.tipo_rescisao)+'</td>'+
+      '<td class="dt">'+fmtBR(r.data_fim_aviso)+'</td><td class="dt"'+tit+'>'+fmtBR(r.data_pagamento)+m477+'</td>'+
+      '<td>'+pill(r.status_rescisao)+'</td><td>'+pill(r.status_esocial)+'</td><td>'+pill(r.status_fgts)+'</td>'+
+      '<td class="acoes"><button class="iconbtn" title="Editar" onclick="editar(\''+r.id+'\')">✏️</button>'+
+      '<button class="iconbtn" title="Excluir" onclick="excluir(\''+r.id+'\')">🗑️</button></td></tr>';
+    }).join('');
+  }
+  const codes=arr.map(statusCodigo);
+  const fin=codes.filter(c=>c==='fin').length;
+  const atr=codes.filter(c=>c==='atraso').length;
+  const crit=codes.filter(c=>c==='critico').length;
+  const al=codes.filter(c=>c==='semana').length;
+  const cur=document.getElementById('fStatus').value;
+  const kp=[
+    {n:arr.length,t:'Total',c:'a-gray',f:''},
+    {n:arr.length-fin,t:'Pendentes',c:'a-blue',f:'pend'},
+    {n:atr,t:'Em atraso (lei)',c:'a-red',f:'atraso'},
+    {n:crit,t:'Crítico (≤2 dias)',c:'a-red',f:'crit'},
+    {n:al,t:'Vencimento nos próximos 7 dias',c:'a-amber',f:'alert'},
+    {n:fin,t:'Finalizadas',c:'a-green',f:'fin'}
+  ];
+  document.getElementById('kpis').innerHTML=kp.map(k=>'<button class="alert-card '+k.c+(cur===k.f&&k.f?' on':'')+'" onclick="filtrarKpi(\''+k.f+'\')"><div class="ac-n">'+k.n+'</div><div class="ac-t">'+k.t+'</div></button>').join('');
+}
+function ordenar(col){if(APP.sort.col===col){APP.sort.dir=APP.sort.dir==='asc'?'desc':'asc';}else{APP.sort.col=col;APP.sort.dir='asc';}render();}
+function filtrarKpi(f){const s=document.getElementById('fStatus');s.value=(s.value===f)?'':f;render();}
+
+/* ===== CRUD ===== */
+const FCAMPOS=['cod_empresa','empresa','responsavel','cod_empregado','nome_empregado','tipo_rescisao','data_admissao','data_aviso','data_fim_aviso','data_pagamento','calculado_por','observacoes'];
+function novaRescisao(){
+  APP.editId=null;document.getElementById('formTitle').textContent='Nova Rescisão';
+  FCAMPOS.forEach(k=>document.getElementById('f_'+k).value='');
+  document.getElementById('f_status_rescisao').checked=false;document.getElementById('f_status_esocial').checked=false;document.getElementById('f_status_fgts').checked=false;
+  document.getElementById('formWarn').classList.remove('on');atualizarCalculos();abrir('ovForm');
+}
+function editar(id){
+  const r=APP.dados.find(x=>String(x.id)===String(id));if(!r)return;
+  APP.editId=id;document.getElementById('formTitle').textContent='Editar Rescisão';
+  FCAMPOS.forEach(k=>document.getElementById('f_'+k).value=r[k]||'');
+  document.getElementById('f_status_rescisao').checked=!!r.status_rescisao;
+  document.getElementById('f_status_esocial').checked=!!r.status_esocial;
+  document.getElementById('f_status_fgts').checked=!!r.status_fgts;
+  document.getElementById('formWarn').classList.remove('on');atualizarCalculos();abrir('ovForm');
+}
+function formWarn(m){const w=document.getElementById('formWarn');w.textContent=m;w.classList.add('on');}
+async function salvar(){
+  const g=k=>document.getElementById('f_'+k).value.trim();
+  const obj={tenant_id:APP.tenantId,cod_empresa:g('cod_empresa'),empresa:g('empresa'),responsavel:g('responsavel'),
+    cod_empregado:g('cod_empregado'),nome_empregado:g('nome_empregado'),tipo_rescisao:g('tipo_rescisao'),
+    data_aviso:g('data_aviso')||null,data_fim_aviso:g('data_fim_aviso')||null,data_pagamento:g('data_pagamento')||null,
+    data_admissao:g('data_admissao')||null,
+    calculado_por:g('calculado_por'),observacoes:g('observacoes'),
+    status_rescisao:document.getElementById('f_status_rescisao').checked,
+    status_esocial:document.getElementById('f_status_esocial').checked,
+    status_fgts:document.getElementById('f_status_fgts').checked};
+  if(!obj.empresa||!obj.nome_empregado){formWarn('Preencha Empresa e Nome do Empregado.');return;}
+  if((obj.status_rescisao||obj.status_esocial||obj.status_fgts)&&!obj.calculado_por){
+    formWarn('Não é possível concluir Rescisão, eSocial ou FGTS sem informar o campo "Calculado por".');return;}
+  document.getElementById('btnSalvar').disabled=true;
+  try{
+    if(APP.editId){
+      const res=await api("resc_rescisoes?id=eq."+APP.editId,{method:"PATCH",body:obj,prefer:"return=representation"});
+      const i=APP.dados.findIndex(x=>String(x.id)===String(APP.editId));if(i>=0&&res&&res[0])APP.dados[i]=res[0];
+      toast("Rescisão atualizada.","ok");
+    }else{
+      const res=await api("resc_rescisoes",{method:"POST",body:obj,prefer:"return=representation"});
+      if(res&&res[0])APP.dados.push(res[0]);toast("Rescisão cadastrada.","ok");
+    }
+    render();fechar('ovForm');
+  }catch(e){toast("Erro ao salvar: "+e.message,"error");console.error(e);}
+  finally{document.getElementById('btnSalvar').disabled=false;}
+}
+async function excluir(id){
+  const r=APP.dados.find(x=>String(x.id)===String(id));if(!r)return;
+  if(!confirm('Excluir a rescisão de "'+(r.nome_empregado||'')+'"?'))return;
+  try{await api("resc_rescisoes?id=eq."+id,{method:"DELETE",prefer:"return=minimal"});
+    APP.dados=APP.dados.filter(x=>String(x.id)!==String(id));render();toast("Excluída.","ok");
+  }catch(e){toast("Erro ao excluir: "+e.message,"error");}
+}
+
+/* ===== IMPORTAÇÃO ===== */
+function abrirImport(){
+  document.getElementById('impStep1').style.display='block';
+  document.getElementById('impStep2').style.display='none';
+  document.getElementById('btnImportar').style.display='none';
+  document.getElementById('fileInput').value='';APP.imp=null;abrir('ovImport');
+}
+function lerArquivo(file){
+  const rd=new FileReader();
+  rd.onload=ev=>{try{
+    const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
+    let hi=rows.findIndex(r=>r.some(c=>String(c).trim()!==''));
+    if(hi<0){toast('Planilha vazia.','error');return;}
+    const headers=rows[hi].map(h=>String(h).trim());
+    const data=rows.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!==''));
+    APP.imp={headers,data};montarMapa(headers,data);
+  }catch(e){toast('Erro ao ler arquivo: '+e.message,'error');console.error(e);}};
+  rd.readAsArrayBuffer(file);
+}
+function adivinhaCol(headers,campo){
+  const norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const dic={cod_empresa:['cod empresa','codigo empresa','cod. empresa','empresa cod','cod','codigo'],
+    empresa:['empresa','razao','cliente'],responsavel:['responsavel','resp','atende'],
+    cod_empregado:['cod empregado','codigo empregado','cod. empregado','matricula','cod emp'],
+    nome_empregado:['nome do empregado','empregado','funcionario','colaborador','nome empregado','nome'],
+    tipo_rescisao:['tipo de resc','tipo rescisao','tipo de rescisao','tipo','motivo'],
+    data_admissao:['data de admissao','data admissao','admissao','adm'],
+    observacoes:['observacoes','observacao','obs'],
+    data_aviso:['data do aviso','data aviso'],data_fim_aviso:['data fim do aviso','fim do aviso','data fim aviso','fim aviso'],
+    data_pagamento:['data de pgto','data pgto','data de pagamento','pagamento','data pagamento','vencimento'],
+    calculado_por:['calculado por','calculo','calculado'],status_rescisao:['rescisao','status rescisao','resc'],
+    status_esocial:['esocial','status esocial','e-social','social'],
+    status_fgts:['fgts digital','status fgts','fgts','gfd']};
+  const cands=dic[campo]||[];
+  for(const c of cands){const i=headers.findIndex(h=>norm(h)===c);if(i>=0)return i;}
+  for(const c of cands){const i=headers.findIndex(h=>norm(h).includes(c));if(i>=0)return i;}
+  return -1;
+}
+function montarMapa(headers,data){
+  document.getElementById('impStep1').style.display='none';
+  document.getElementById('impStep2').style.display='block';
+  document.getElementById('btnImportar').style.display='inline-flex';
+  const opts='<option value="-1">—</option>'+headers.map((h,i)=>'<option value="'+i+'">'+esc(h||('Coluna '+(i+1)))+'</option>').join('');
+  document.getElementById('mapTable').innerHTML=COLS.map(c=>{
+    const g=adivinhaCol(headers,c.k);
+    return '<tr><td>'+esc(c.lbl)+'</td><td><select id="map_'+c.k+'">'+opts.replace('value="'+g+'"','value="'+g+'" selected')+'</select></td></tr>';
+  }).join('');
+  const prev=data.slice(0,8);
+  document.getElementById('prevCount').textContent=data.length;
+  document.getElementById('prevTable').innerHTML='<thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+
+    prev.map(r=>'<tr>'+headers.map((_,i)=>{const v=r[i];return '<td>'+esc(v instanceof Date&&!isNaN(v)?fmtBRd(v):v)+'</td>';}).join('')+'</tr>').join('')+'</tbody>';
+}
+function valData(v){
+  if(v==null||v==='')return null;
+  if(v instanceof Date&&!isNaN(v))return v.getFullYear()+'-'+('0'+(v.getMonth()+1)).slice(-2)+'-'+('0'+v.getDate()).slice(-2);
+  const s=String(v).trim();
+  let m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if(m){let a=m[3];if(a.length===2)a='20'+a;return a+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);}
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  return null;
+}
+function valBool(v){return ['ok','sim','s','x','true','1','concluido','concluído'].includes(String(v).toLowerCase().trim());}
+async function confirmarImport(){
+  if(!APP.imp)return;
+  const map={};COLS.forEach(c=>map[c.k]=parseInt(document.getElementById('map_'+c.k).value,10));
+  const get=(row,k)=>{const i=map[k];return i>=0?row[i]:'';};
+  const regs=APP.imp.data.map(row=>({tenant_id:APP.tenantId,
+    cod_empresa:String(get(row,'cod_empresa')||'').trim(),empresa:String(get(row,'empresa')||'').trim(),
+    responsavel:String(get(row,'responsavel')||'').trim(),cod_empregado:String(get(row,'cod_empregado')||'').trim(),
+    nome_empregado:String(get(row,'nome_empregado')||'').trim(),tipo_rescisao:String(get(row,'tipo_rescisao')||'').trim(),
+    data_aviso:valData(get(row,'data_aviso')),data_fim_aviso:valData(get(row,'data_fim_aviso')),
+    data_admissao:valData(get(row,'data_admissao')),observacoes:String(get(row,'observacoes')||'').trim(),
+    data_pagamento:valData(get(row,'data_pagamento')),calculado_por:String(get(row,'calculado_por')||'').trim(),
+    status_rescisao:valBool(get(row,'status_rescisao')),status_esocial:valBool(get(row,'status_esocial')),
+    status_fgts:valBool(get(row,'status_fgts'))}))
+    .filter(r=>r.empresa||r.nome_empregado);
+  if(!regs.length){toast('Nenhuma linha válida (precisa de Empresa ou Empregado).','error');return;}
+  regs.forEach(r=>{if(!r.calculado_por){r.status_rescisao=false;r.status_esocial=false;r.status_fgts=false;}});
+  document.getElementById('btnImportar').disabled=true;
+  try{
+    const res=await api("resc_rescisoes",{method:"POST",body:regs,prefer:"return=representation"});
+    if(res)APP.dados=APP.dados.concat(res);
+    render();fechar('ovImport');toast(regs.length+" rescisões importadas.","ok");
+  }catch(e){toast("Erro ao importar: "+e.message,"error");console.error(e);}
+  finally{document.getElementById('btnImportar').disabled=false;}
+}
+
+/* ===== EXPORTAR ===== */
+function exportar(){
+  const arr=filtrados();
+  if(!arr.length){toast('Nada para exportar.','warn');return;}
+  const linhas=arr.map(r=>({'Cód. Empresa':r.cod_empresa,'Empresa':r.empresa,'Responsável':r.responsavel,
+    'Cód. Empregado':r.cod_empregado,'Empregado':r.nome_empregado,'Tipo de Rescisão':r.tipo_rescisao,
+    'Data Aviso':fmtBR(r.data_aviso),'Fim do Aviso':fmtBR(r.data_fim_aviso),'Data Pgto':fmtBR(r.data_pagamento),
+    'Calculado por':r.calculado_por,'Rescisão':r.status_rescisao?'OK':'','eSocial':r.status_esocial?'OK':'','FGTS Digital':r.status_fgts?'OK':'','Observações':r.observacoes}));
+  const ws=XLSX.utils.json_to_sheet(linhas);const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Rescisões');
+  XLSX.writeFile(wb,'controle_rescisoes_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+/* ===== MODAIS ===== */
+function abrir(id){document.getElementById(id).classList.add('on');}
+function fechar(id){document.getElementById(id).classList.remove('on');}
+
+/* ===== USUÁRIOS (ADMIN) ===== */
+const DOMINIO_ARTECON="@artecon.cnt.br";
+async function carregarUsuarios(){
+  const tb=$("#usList");tb.innerHTML='<tr><td colspan="4" style="color:var(--text-3)">Carregando…</td></tr>';
+  try{
+    const rows=await api("resc_usuarios?select=papel,auth_id,colaborador:resc_colaboradores(id,nome,email,status)&order=papel.asc");
+    APP.usuarios=rows||[];
+    if(!APP.usuarios.length){tb.innerHTML='<tr><td colspan="4" style="color:var(--text-3)">Nenhum usuário.</td></tr>';return;}
+    tb.innerHTML=APP.usuarios.map((r,i)=>{
+      const c=r.colaborador||{};
+      const inativo=(c.status&&c.status!=='ativo');
+      const papelTxt=r.papel==='diretoria'?'Diretoria':(r.papel==='usuario'?'Usuário':(r.papel||'—'));
+      const eu=(APP.user&&r.auth_id===APP.user.id);
+      const acoes=eu
+        ? '<span class="muted" style="font-size:12px">(você)</span>'
+        : '<div class="urow-acoes">'
+          +'<button class="mini" title="Editar" onclick="uEditar('+i+')">✏️</button>'
+          +'<button class="mini" title="Alterar senha" onclick="uSenha('+i+')">🔑</button>'
+          +(inativo
+              ?'<button class="mini" title="Reativar acesso" onclick="uReativar('+i+')">▶️</button>'
+              :'<button class="mini" title="Cancelar (inativar)" onclick="uCancelar('+i+')">⏸️</button>')
+          +'<button class="mini danger" title="Excluir" onclick="uExcluir('+i+')">🗑️</button>'
+          +'</div>';
+      return '<tr'+(inativo?' style="opacity:.55"':'')+'>'
+        +'<td>'+esc(c.nome||'—')+(inativo?' <span class="badge badge-red">cancelado</span>':'')+'</td>'
+        +'<td>'+esc(c.email||'—')+'</td>'
+        +'<td>'+esc(papelTxt)+'</td>'
+        +'<td style="text-align:right">'+acoes+'</td></tr>';
+    }).join('');
+  }catch(e){tb.innerHTML='<tr><td colspan="4" style="color:var(--red)">'+esc(e.message)+'</td></tr>';}
+}
+
+/* ===== GESTÃO DE USUÁRIOS (via Edge Function gerir-usuario) ===== */
+const FN_GERIR=CONFIG.url+"/functions/v1/super-service";
+async function gerirUsuario(payload){
+  for(let t=0;t<2;t++){
+    const res=await fetch(FN_GERIR,{method:"POST",
+      headers:{apikey:APP.key,Authorization:"Bearer "+APP.token,"Content-Type":"application/json"},
+      body:JSON.stringify(payload)});
+    if(res.status===401&&t===0&&await tentarRefresh())continue;
+    const txt=await res.text();let d={};try{d=JSON.parse(txt);}catch(e){}
+    if(!res.ok)throw new Error(d.error||txt||("Erro "+res.status));
+    return d;
+  }
+}
+function _uAlvo(i){return APP.usuarios&&APP.usuarios[i];}
+
+function uEditar(i){
+  const r=_uAlvo(i);if(!r)return;const c=r.colaborador||{};
+  APP.uAlvo=i;$("#ueWarn").classList.remove('on');
+  $("#ue_nome").value=c.nome||'';$("#ue_email").value=c.email||'';$("#ue_papel").value=r.papel||'usuario';
+  abrir('ovUEdit');
+}
+async function uEditarSalvar(){
+  const r=_uAlvo(APP.uAlvo);if(!r)return;const c=r.colaborador||{};
+  const nome=$("#ue_nome").value.trim(),email=$("#ue_email").value.trim().toLowerCase(),papel=$("#ue_papel").value;
+  const w=$("#ueWarn");w.classList.remove('on');
+  if(!nome){w.textContent="Informe o nome.";w.classList.add('on');return;}
+  if(!email.endsWith(DOMINIO_ARTECON)){w.textContent="Use um e-mail "+DOMINIO_ARTECON+".";w.classList.add('on');return;}
+  const b=$("#ueBtn");b.disabled=true;
+  try{
+    await gerirUsuario({acao:'editar',auth_id:r.auth_id,colaborador_id:c.id,nome,email,papel});
+    toast("Usuário atualizado.","ok");fechar('ovUEdit');await carregarUsuarios();
+  }catch(e){w.textContent=e.message;w.classList.add('on');}
+  finally{b.disabled=false;}
+}
+
+function uSenha(i){
+  const r=_uAlvo(i);if(!r)return;const c=r.colaborador||{};
+  APP.uAlvo=i;$("#usWarn2").classList.remove('on');$("#us_nova").value='';
+  $("#usSenhaAlvo").textContent="Nova senha para "+(c.email||c.nome||'usuário');
+  abrir('ovUSenha');
+}
+async function uSenhaSalvar(){
+  const r=_uAlvo(APP.uAlvo);if(!r)return;
+  const nova=$("#us_nova").value;const w=$("#usWarn2");w.classList.remove('on');
+  if((nova||'').length<6){w.textContent="A senha precisa ter ao menos 6 caracteres.";w.classList.add('on');return;}
+  const b=$("#usBtn");b.disabled=true;
+  try{
+    await gerirUsuario({acao:'senha',auth_id:r.auth_id,senha:nova});
+    toast("Senha alterada.","ok");fechar('ovUSenha');
+  }catch(e){w.textContent=e.message;w.classList.add('on');}
+  finally{b.disabled=false;}
+}
+
+async function uCancelar(i){
+  const r=_uAlvo(i);if(!r)return;const c=r.colaborador||{};
+  if(!confirm("Cancelar (inativar) o acesso de "+(c.nome||c.email)+"?\n\nO cadastro é mantido e o login fica bloqueado. Pode ser reativado depois."))return;
+  try{await gerirUsuario({acao:'cancelar',auth_id:r.auth_id,colaborador_id:c.id});
+    toast("Usuário cancelado.","ok");await carregarUsuarios();
+  }catch(e){toast("Falha: "+e.message,"error",5000);}
+}
+async function uReativar(i){
+  const r=_uAlvo(i);if(!r)return;const c=r.colaborador||{};
+  try{await gerirUsuario({acao:'reativar',auth_id:r.auth_id,colaborador_id:c.id});
+    toast("Usuário reativado.","ok");await carregarUsuarios();
+  }catch(e){toast("Falha: "+e.message,"error",5000);}
+}
+async function uExcluir(i){
+  const r=_uAlvo(i);if(!r)return;const c=r.colaborador||{};
+  if(!confirm("EXCLUIR definitivamente "+(c.nome||c.email)+"?\n\nIsso remove o login e o cadastro. Não há como desfazer."))return;
+  try{await gerirUsuario({acao:'excluir',auth_id:r.auth_id,colaborador_id:c.id});
+    toast("Usuário excluído.","ok");await carregarUsuarios();
+  }catch(e){toast("Falha: "+e.message,"error",5000);}
+}
+function abrirUsuarios(){
+  if(!isAdmin()){toast("Apenas administradores.","error");return;}
+  $("#usWarn").classList.remove('on');
+  $("#u_nome").value='';$("#u_email").value='';$("#u_senha").value='';$("#u_papel").value='usuario';
+  abrir('ovUsers');carregarUsuarios();
+}
+async function criarUsuario(){
+  if(!isAdmin()){toast("Apenas administradores.","error");return;}
+  const nome=$("#u_nome").value.trim(),email=$("#u_email").value.trim().toLowerCase(),
+        senha=$("#u_senha").value,papel=$("#u_papel").value;
+  const w=$("#usWarn");w.classList.remove('on');
+  if(!nome){w.textContent="Informe o nome.";w.classList.add('on');return;}
+  if(!email.endsWith(DOMINIO_ARTECON)){w.textContent="Use um e-mail "+DOMINIO_ARTECON+".";w.classList.add('on');return;}
+  if(senha.length<6){w.textContent="A senha precisa ter ao menos 6 caracteres.";w.classList.add('on');return;}
+  const btn=$("#btnCriarUser");btn.disabled=true;
+  try{
+    const uid=await criarUsuarioAuth(nome,email,senha,papel);
+    await provisionarUsuario(uid,nome,email,papel);
+    toast("Usuário criado: "+email,"ok",4000);
+    $("#u_nome").value='';$("#u_email").value='';$("#u_senha").value='';
+    await carregarUsuarios();
+  }catch(e){
+    console.error("criarUsuario:",e);
+    w.textContent=e.message||"Falha ao criar usuário.";w.classList.add('on');
+    toast("Falha: "+(e.message||"erro"),"error",5000);
+  }finally{btn.disabled=false;}
+}
+
+/* ===== HISTÓRICO (ADMIN) ===== */
+const HCAMPOS={cod_empresa:'Cód. Empresa',empresa:'Empresa',responsavel:'Responsável',
+  cod_empregado:'Cód. Empregado',nome_empregado:'Empregado',tipo_rescisao:'Tipo de Rescisão',
+  data_admissao:'Data de Admissão',data_aviso:'Data do Aviso',data_fim_aviso:'Fim do Aviso',
+  data_pagamento:'Data de Pagamento',calculado_por:'Calculado por',observacoes:'Observações',
+  status_rescisao:'Rescisão (status)',status_esocial:'eSocial (status)',status_fgts:'FGTS Digital (status)'};
+function fmtDataHora(s){const d=new Date(s);if(isNaN(d))return esc(String(s));const p=n=>('0'+n).slice(-2);
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes());}
+function _valHist(k,v){
+  if(v===null||v===undefined||v==='')return '—';
+  if(k.indexOf('status_')===0)return v?'Sim':'Não';
+  if(k.indexOf('data_')===0)return fmtBR(v);
+  return esc(String(v));
+}
+function _acaoBadge(a){
+  if(a==='INSERT')return '<span class="badge badge-green">Criação</span>';
+  if(a==='UPDATE')return '<span class="badge badge-blue">Edição</span>';
+  if(a==='DELETE')return '<span class="badge badge-red">Exclusão</span>';
+  return esc(a||'—');
+}
+function descreveAlteracao(r){
+  if(r.acao==='INSERT')return '<span class="muted">Cadastro criado</span>';
+  if(r.acao==='DELETE')return '<span class="muted">Registro excluído</span>';
+  const a=r.alteracoes||{};const ks=Object.keys(a);
+  if(!ks.length)return '<span class="muted">—</span>';
+  return ks.map(k=>'<div style="margin:2px 0;font-size:12.5px">'+
+    '<b>'+esc(HCAMPOS[k]||k)+':</b> '+
+    '<span style="color:var(--red)">'+_valHist(k,a[k]&&a[k].de)+'</span> → '+
+    '<span style="color:var(--green)">'+_valHist(k,a[k]&&a[k].para)+'</span></div>').join('');
+}
+async function carregarHistorico(){
+  const tb=$("#histList");
+  tb.innerHTML='<tr><td colspan="5" style="color:var(--text-3)">Carregando…</td></tr>';
+  try{
+    APP.hist=await api("resc_auditoria?select=*&order=criado_em.desc&limit=400")||[];
+    renderHistorico();
+  }catch(e){tb.innerHTML='<tr><td colspan="5" style="color:var(--red)">'+esc(e.message)+'</td></tr>';}
+}
+function renderHistorico(){
+  const tb=$("#histList");const all=APP.hist||[];
+  const q=($("#histBusca").value||'').trim().toLowerCase();
+  const fa=$("#histAcao").value;
+  let arr=all;
+  if(fa)arr=arr.filter(r=>r.acao===fa);
+  if(q)arr=arr.filter(r=>((r.empregado||'')+' '+(r.empresa||'')+' '+(r.quem_nome||'')+' '+(r.quem_email||'')).toLowerCase().includes(q));
+  if(!arr.length){tb.innerHTML='<tr><td colspan="5" style="color:var(--text-3)">Nenhuma alteração registrada.</td></tr>';return;}
+  tb.innerHTML=arr.map(r=>{
+    const quem=esc(r.quem_nome||r.quem_email||'—')+(r.quem_email&&r.quem_nome?'<div style="font-size:11px;color:var(--text-3)">'+esc(r.quem_email)+'</div>':'');
+    return '<tr><td style="white-space:nowrap">'+fmtDataHora(r.criado_em)+'</td>'+
+      '<td>'+quem+'</td>'+
+      '<td>'+_acaoBadge(r.acao)+'</td>'+
+      '<td><b>'+esc(r.empregado||'—')+'</b>'+(r.empresa?'<div style="font-size:11px;color:var(--text-3)">'+esc(r.empresa)+'</div>':'')+'</td>'+
+      '<td>'+descreveAlteracao(r)+'</td></tr>';
+  }).join('');
+}
+function abrirHistorico(){
+  if(!isAdmin()){toast("Apenas administradores.","error");return;}
+  $("#histBusca").value='';$("#histAcao").value='';
+  abrir('ovHistorico');carregarHistorico();
+}
+
+/* ===== RELATÓRIOS ===== */
+function _relDataRef(r){return r.data_fim_aviso||r.data_aviso||r.data_pagamento||null;}
+function _relMesKey(s){const d=parseDate(s);return d?d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2):null;}
+const _MESES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+function _relMesLbl(k){const [a,m]=k.split('-');return _MESES[parseInt(m,10)-1]+'/'+a.slice(2);}
+function abrirRelatorios(){renderRelatorios();abrir('ovRelatorios');}
+function renderRelatorios(){
+  const dados=APP.dados||[];
+  /* últimos 12 meses */
+  const meses=[];const h=hoje0();
+  for(let i=11;i>=0;i--){const d=new Date(h.getFullYear(),h.getMonth()-i,1);meses.push(d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2));}
+  const porMes={};meses.forEach(k=>porMes[k]=0);
+  let total12=0;
+  dados.forEach(r=>{const k=_relMesKey(_relDataRef(r));if(k!=null&&k in porMes){porMes[k]++;total12++;}});
+  /* % no prazo + tempo médio (entre registros com pagamento e prazo calculável) */
+  let comPrazo=0,noPrazo=0,somaDias=0,comDias=0;
+  dados.forEach(r=>{
+    const l=prazoLegal(r),p=parseDate(r.data_pagamento);
+    if(l&&p){comPrazo++;if(p<=l)noPrazo++;}
+    const a=parseDate(r.data_aviso);
+    if(a&&p&&p>=a){somaDias+=Math.round((p-a)/86400000);comDias++;}
+  });
+  const pctPrazo=comPrazo?Math.round(100*noPrazo/comPrazo):null;
+  const tMedio=comDias?Math.round(somaDias/comDias):null;
+  /* por tipo */
+  const porTipo={};dados.forEach(r=>{const t=(r.tipo_rescisao||'(sem tipo)').trim()||'(sem tipo)';porTipo[t]=(porTipo[t]||0)+1;});
+  const tiposOrd=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
+  /* por empresa (top 10) */
+  const porEmp={};dados.forEach(r=>{const e=(r.empresa||'(sem empresa)').trim()||'(sem empresa)';porEmp[e]=(porEmp[e]||0)+1;});
+  const empOrd=Object.entries(porEmp).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  /* gráfico SVG por mês */
+  const W=640,H=180,pad=28,bw=(W-pad*2)/meses.length;
+  const max=Math.max(1,...meses.map(k=>porMes[k]));
+  let svg='<svg viewBox="0 0 '+W+' '+(H+34)+'" style="width:100%;height:auto" xmlns="http://www.w3.org/2000/svg">';
+  meses.forEach((k,i)=>{
+    const v=porMes[k],bh=Math.round((H-10)*v/max),x=pad+i*bw,y=H-bh;
+    svg+='<rect x="'+(x+4)+'" y="'+y+'" width="'+(bw-8)+'" height="'+bh+'" rx="4" fill="var(--gold)" opacity="'+(v?'1':'0.18')+'"/>';
+    if(v)svg+='<text x="'+(x+bw/2)+'" y="'+(y-5)+'" text-anchor="middle" font-size="11" font-weight="700" fill="var(--text)">'+v+'</text>';
+    svg+='<text x="'+(x+bw/2)+'" y="'+(H+16)+'" text-anchor="middle" font-size="10" fill="var(--text-3)">'+_relMesLbl(k)+'</text>';
+  });
+  svg+='</svg>';
+  const kpi=(n,t)=>'<div class="alert-card a-gray" style="cursor:default"><div class="ac-n">'+n+'</div><div class="ac-t">'+t+'</div></div>';
+  const linhaTipo=([t,n])=>'<tr><td>'+esc(t)+'</td><td style="text-align:right">'+n+'</td><td style="text-align:right">'+Math.round(100*n/dados.length)+'%</td></tr>';
+  const linhaEmp=([e,n])=>'<tr><td>'+esc(e)+'</td><td style="text-align:right">'+n+'</td></tr>';
+  document.getElementById('relBody').innerHTML=
+    '<div class="alert-strip" style="margin-bottom:16px">'+
+      kpi(dados.length,'Total cadastrado')+
+      kpi(total12,'Últimos 12 meses')+
+      kpi(pctPrazo==null?'—':pctPrazo+'%','Pagas dentro do prazo legal')+
+      kpi(tMedio==null?'—':tMedio+' d','Tempo médio aviso → pagamento')+
+    '</div>'+
+    '<p style="font-weight:700;margin:0 0 6px">Rescisões por mês (últimos 12 meses)</p>'+
+    '<div class="card" style="padding:14px">'+svg+'</div>'+
+    '<div class="row2" style="margin-top:16px;align-items:start">'+
+      '<div><p style="font-weight:700;margin:0 0 6px">Por tipo de rescisão</p><div class="tscroll"><table><thead><tr><th>Tipo</th><th style="text-align:right">Qtde</th><th style="text-align:right">%</th></tr></thead><tbody>'+
+        (tiposOrd.length?tiposOrd.map(linhaTipo).join(''):'<tr><td colspan="3" class="muted">Sem dados.</td></tr>')+'</tbody></table></div></div>'+
+      '<div><p style="font-weight:700;margin:0 0 6px">Empresas com mais rescisões (top 10)</p><div class="tscroll"><table><thead><tr><th>Empresa</th><th style="text-align:right">Qtde</th></tr></thead><tbody>'+
+        (empOrd.length?empOrd.map(linhaEmp).join(''):'<tr><td colspan="2" class="muted">Sem dados.</td></tr>')+'</tbody></table></div></div>'+
+    '</div>'+
+    '<div class="field-hint" style="margin-top:10px">Mês de referência: fim do aviso (ou data do aviso / pagamento, quando ausente). "% no prazo" considera registros com data de pagamento e prazo legal calculável.</div>';
+}
+
+/* ===== BOOT ===== */
+async function boot(){
+  show("view-loading");
+  try{
+    const ok=await loadMe();
+    if(!ok&&APP.needsBootstrap){$("#bootstrap-sql").textContent=bootstrapSQL();show("view-bootstrap");return;}
+    document.getElementById('me-nome').textContent=APP.nome||'—';
+    document.getElementById('me-papel').textContent=APP.papel||'—';
+    const adm=isAdmin();
+    document.getElementById('nav-admin-sec').classList.toggle('hidden',!adm);
+    document.getElementById('nav-users').classList.toggle('hidden',!adm);
+    document.getElementById('nav-historico').classList.toggle('hidden',!adm);
+    show("view-app");
+    await carregar();
+  }catch(e){toast("Erro: "+e.message,"error");doLogout();}
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  $("#btn-login").addEventListener('click',async()=>{
+    const em=$("#email").value.trim(),pw=$("#senha").value;
+    $("#login-err").textContent='';$("#btn-login").disabled=true;
+    try{await login(em,pw);await boot();}
+    catch(e){$("#login-err").textContent=e.message;}
+    finally{$("#btn-login").disabled=false;}
+  });
+  $("#senha").addEventListener('keydown',e=>{if(e.key==='Enter')$("#btn-login").click();});
+  const dz=document.getElementById('dropzone'),fi=document.getElementById('fileInput');
+  dz.addEventListener('click',()=>fi.click());
+  fi.addEventListener('change',e=>{if(e.target.files[0])lerArquivo(e.target.files[0]);});
+  document.addEventListener('click',e=>{if(e.target.classList.contains('overlay'))e.target.classList.remove('on');});
+  const sess=store.get("rp_session");
+  if(sess&&sess.token){APP.token=sess.token;APP.refresh=sess.refresh;APP.user=sess.user;boot();}
+  else show("view-login");
+});
+</script>
+</body>
+</html>
