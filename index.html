@@ -1032,6 +1032,16 @@ async function extrairLinhasPdf(file,lib){
   return linhas;
 }
 function isoBR(s){const m=String(s||'').match(/(\d{2})\/(\d{2})\/(\d{4})/);return m?(m[3]+'-'+m[2]+'-'+m[1]):null;}
+const MESES_BR={janeiro:1,fevereiro:2,'marco':3,'março':3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12};
+function dataExtenso(txt){
+  /* captura "Cidade, 15 de maio de 2026" (data da assinatura do aviso) — usa a última ocorrência */
+  const ms=[...String(txt||'').matchAll(/,\s*(\d{1,2})\s+de\s+([a-zçã]+)\s+de\s+(\d{4})/gi)];
+  if(!ms.length)return null;
+  const m=ms[ms.length-1];
+  const mes=MESES_BR[m[2].toLowerCase()];
+  if(!mes)return null;
+  return m[3]+'-'+('0'+mes).slice(-2)+'-'+('0'+m[1]).slice(-2);
+}
 function somaDias(iso,n){const d=parseDate(iso);if(!d)return null;d.setDate(d.getDate()+n);
   return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
 function parsePdfRescisao(linhas,arquivo){
@@ -1071,12 +1081,14 @@ function parsePdfRescisao(linhas,arquivo){
       const d=flat.match(/(\d{1,3})\s+dias\s*\(([^)]*trabalhad[^)]*)\)/i);
       if(d)out.observacoes='Aviso de '+d[1]+' dias ('+d[2].trim()+')';
     }else{
-      /* indenizado: "a partir de DATA" + "aviso prévio de N dias ... (Indenizado)" */
+      /* indenizado: data do aviso = data da assinatura "Cidade, DD de mês de AAAA";
+         fallback = "a partir de DATA". Fim = aviso + N dias do aviso prévio. */
+      const ext=dataExtenso(flat);
       const ini=flat.match(/a\s+partir\s+de\s+(\d{2}\/\d{2}\/\d{4})/i);
       const nd=flat.match(/aviso\s+pr[ée]vio\s+de\s+(\d{1,3})\s+dias/i);
       const indeniz=/\(\s*Indenizado\s*\)|ser[áa]\s+Indenizado/i.test(flat);
-      if(ini){
-        out.data_aviso=isoBR(ini[1]);
+      if(ext||ini){
+        out.data_aviso=ext||isoBR(ini[1]);
         if(indeniz||nd){
           out.tipo_rescisao='Sem justa causa – aviso indenizado';
           if(nd){out.data_fim_aviso=somaDias(out.data_aviso,parseInt(nd[1],10));
