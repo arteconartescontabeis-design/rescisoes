@@ -307,7 +307,7 @@ pre.sql{background:#0f172a;color:#e9f0ec;padding:16px;border-radius:10px;font-si
     </div>
 
     <div class="legend">
-      <span><i class="dot" style="background:var(--amber-lt);border:1px solid var(--amber)"></i> Vencimento na mesma semana</span>
+      <span><i class="dot" style="background:var(--amber-lt);border:1px solid var(--amber)"></i> Vencimento nos próximos 7 dias</span>
       <span><i class="dot" style="background:var(--red-lt);border:1px solid var(--red)"></i> Faltam 2 dias ou menos</span>
       <span><i class="dot" style="background:var(--green-lt);border:1px solid var(--green)"></i> Finalizada (Rescisão + eSocial OK)</span>
     </div>
@@ -326,7 +326,11 @@ pre.sql{background:#0f172a;color:#e9f0ec;padding:16px;border-radius:10px;font-si
       </div>
       <div class="row2" style="margin-top:14px">
         <div><label>Responsável pela Empresa</label><input id="f_responsavel" list="dlEquipe" placeholder="Colaborador que atende a conta"></div>
+        <div><label>E-mail da empresa <span style="font-weight:400;color:var(--text-3)">(notificações)</span></label><input id="f_email_empresa" type="email" placeholder="contato@empresa.com.br"></div>
+      </div>
+      <div class="row2" style="margin-top:14px">
         <div><label>Código Empregado</label><input id="f_cod_empregado"></div>
+        <div></div>
       </div>
       <div style="margin-top:14px"><label>Nome do Empregado *</label><input id="f_nome_empregado"></div>
       <div style="margin-top:14px"><label>Tipo de Rescisão</label><input id="f_tipo_rescisao" list="dlTipos" placeholder="Selecione ou digite" oninput="atualizarCalculos()"></div>
@@ -825,7 +829,7 @@ function ordenar(col){if(APP.sort.col===col){APP.sort.dir=APP.sort.dir==='asc'?'
 function filtrarKpi(f){const s=document.getElementById('fStatus');s.value=(s.value===f)?'':f;render();}
 
 /* ===== CRUD ===== */
-const FCAMPOS=['cod_empresa','empresa','responsavel','cod_empregado','nome_empregado','tipo_rescisao','data_admissao','data_aviso','data_fim_aviso','data_pagamento','calculado_por','observacoes'];
+const FCAMPOS=['cod_empresa','empresa','responsavel','email_empresa','cod_empregado','nome_empregado','tipo_rescisao','data_admissao','data_aviso','data_fim_aviso','data_pagamento','calculado_por','observacoes'];
 function novaRescisao(){
   APP.editId=null;document.getElementById('formTitle').textContent='Nova Rescisão';
   FCAMPOS.forEach(k=>document.getElementById('f_'+k).value='');
@@ -845,12 +849,14 @@ async function salvar(){
   const g=k=>document.getElementById('f_'+k).value.trim();
   const obj={tenant_id:APP.tenantId,cod_empresa:g('cod_empresa'),empresa:g('empresa'),responsavel:g('responsavel'),
     cod_empregado:g('cod_empregado'),nome_empregado:g('nome_empregado'),tipo_rescisao:g('tipo_rescisao'),
+    email_empresa:g('email_empresa').toLowerCase()||null,
     data_aviso:g('data_aviso')||null,data_fim_aviso:g('data_fim_aviso')||null,data_pagamento:g('data_pagamento')||null,
     data_admissao:g('data_admissao')||null,
     calculado_por:g('calculado_por'),observacoes:g('observacoes'),
     status_rescisao:document.getElementById('f_status_rescisao').checked,
     status_esocial:document.getElementById('f_status_esocial').checked};
   if(!obj.empresa||!obj.nome_empregado){formWarn('Preencha Empresa e Nome do Empregado.');return;}
+  if(obj.email_empresa&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(obj.email_empresa)){formWarn('E-mail da empresa inválido.');return;}
   if((obj.status_rescisao||obj.status_esocial)&&!obj.calculado_por){
     formWarn('Não é possível concluir Rescisão ou eSocial sem informar o campo "Calculado por".');return;}
   document.getElementById('btnSalvar').disabled=true;
