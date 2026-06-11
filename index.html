@@ -658,24 +658,32 @@ async function criarUsuarioAuth(nome,email,password,papel){
   return uid;
 }
 async function provisionarUsuario(uid,nome,email,papel){
-  // Provisiona colaborador + usuário direto pelo cliente (não depende de trigger). Idempotente.
+  // Idempotente de verdade: SEMPRE verifica antes de inserir (não depende de constraint/trigger).
   if(!APP.tenantId)throw new Error("Tenant não carregado — saia e entre novamente.");
-  let colabId=null;
-  try{
-    const c=await api("resc_colaboradores",{method:"POST",
-      body:{tenant_id:APP.tenantId,auth_id:uid,nome,email,status:'ativo'},
-      prefer:"return=representation"});
-    colabId=c&&c[0]&&c[0].id;
-  }catch(e){ if(!/duplicate|already exists|23505/i.test(e.message))throw e; }
+  /* colaborador: procurar primeiro */
+  let rows=await api("resc_colaboradores?select=id&auth_id=eq."+uid);
+  let colabId=rows&&rows[0]&&rows[0].id;
   if(!colabId){
-    const rows=await api("resc_colaboradores?select=id&auth_id=eq."+uid);
+    try{
+      const c=await api("resc_colaboradores",{method:"POST",
+        body:{tenant_id:APP.tenantId,auth_id:uid,nome,email,status:'ativo'},
+        prefer:"return=representation"});
+      colabId=c&&c[0]&&c[0].id;
+    }catch(e){ if(!/duplicate|already exists|23505/i.test(e.message))throw e; }
+  }
+  if(!colabId){
+    rows=await api("resc_colaboradores?select=id&auth_id=eq."+uid);
     colabId=rows&&rows[0]&&rows[0].id;
   }
   if(!colabId)throw new Error("Não consegui criar nem localizar o colaborador (verifique a policy RLS de INSERT em resc_colaboradores).");
-  try{
-    await api("resc_usuarios",{method:"POST",
-      body:{tenant_id:APP.tenantId,auth_id:uid,colaborador_id:colabId,papel}});
-  }catch(e){ if(!/duplicate|already exists|23505/i.test(e.message))throw e; }
+  /* usuário: procurar primeiro */
+  const us=await api("resc_usuarios?select=auth_id&auth_id=eq."+uid);
+  if(!us||!us.length){
+    try{
+      await api("resc_usuarios",{method:"POST",
+        body:{tenant_id:APP.tenantId,auth_id:uid,colaborador_id:colabId,papel}});
+    }catch(e){ if(!/duplicate|already exists|23505/i.test(e.message))throw e; }
+  }
 }
 async function loadMe(){
   const rows=await api("resc_usuarios?select=*,colaborador:resc_colaboradores(nome)");
@@ -1277,7 +1285,12 @@ async function carregarUsuarios(){
   const tb=$("#usList");tb.innerHTML='<tr><td colspan="4" style="color:var(--text-3)">Carregando…</td></tr>';
   try{
     const rows=await api("resc_usuarios?select=papel,auth_id,colaborador:resc_colaboradores(id,nome,email,status)&order=papel.asc");
-    APP.usuarios=rows||[];
+    /* defesa: remove duplicidades por auth_id na exibição */
+    const vistos=new Set();
+    APP.usuarios=(rows||[]).filter(r=>{
+      if(vistos.has(r.auth_id))return false;
+      vistos.add(r.auth_id);return true;
+    });
     if(!APP.usuarios.length){tb.innerHTML='<tr><td colspan="4" style="color:var(--text-3)">Nenhum usuário.</td></tr>';return;}
     tb.innerHTML=APP.usuarios.map((r,i)=>{
       const c=r.colaborador||{};
