@@ -724,6 +724,8 @@ function diaUtilAnterior(d){
   return x;
 }
 function basePrazo(r){return parseDate(r.data_aviso||r.data_fim_aviso);}
+/* data de pagamento sugerida: aviso + 10 dias corridos, antecipada p/ dia útil (fds + feriados) */
+function calcDataPagamento(r){const d=limitePagamento(r);return d?ymd(d):null;}
 function limitePagamento(r){
   const b=basePrazo(r);
   if(!b)return null;const d=new Date(b);d.setDate(d.getDate()+10);return diaUtilAnterior(d);}
@@ -1018,6 +1020,8 @@ async function confirmarImport(){
     .filter(r=>r.empresa||r.nome_empregado);
   if(!regs.length){toast('Nenhuma linha válida (precisa de Empresa ou Empregado).','error');return;}
   regs.forEach(r=>{if(!r.calculado_por){r.status_rescisao=false;r.status_esocial=false;}});
+  /* data de pagamento: se vazia, aviso + 10 dias corridos, antecipando fds/feriado */
+  regs.forEach(r=>{if(!r.data_pagamento)r.data_pagamento=calcDataPagamento(r);});
   document.getElementById('btnImportar').disabled=true;
   try{
     if(APP.imp&&APP.imp.file){
@@ -1235,7 +1239,8 @@ async function confirmarPdfImport(){
     cod_empresa:r.cod_empresa||'',empresa:r.empresa||'',responsavel:resp,
     cod_empregado:r.cod_empregado||'',nome_empregado:r.nome_empregado||'',
     tipo_rescisao:r.tipo_rescisao||'',data_admissao:r.data_admissao,
-    data_aviso:r.data_aviso,data_fim_aviso:r.data_fim_aviso,data_pagamento:null,
+    data_aviso:r.data_aviso,data_fim_aviso:r.data_fim_aviso,
+    data_pagamento:calcDataPagamento(r),
     calculado_por:'',observacoes:r.observacoes||'',status_rescisao:false,status_esocial:false}));
   const btn=document.getElementById('btnPdfImportar');btn.disabled=true;
   try{
@@ -1287,7 +1292,6 @@ async function carregarUsuarios(){
           +(inativo
               ?'<button class="mini" title="Reativar acesso" onclick="uReativar('+i+')">▶️</button>'
               :'<button class="mini" title="Cancelar (inativar)" onclick="uCancelar('+i+')">⏸️</button>')
-          +'<button class="mini danger" title="Excluir" onclick="uExcluir('+i+')">🗑️</button>'
           +'</div>';
       return '<tr'+(inativo?' style="opacity:.55"':'')+'>'
         +'<td>'+esc(c.nome||'—')+(inativo?' <span class="badge badge-red">cancelado</span>':'')+'</td>'
@@ -1364,13 +1368,7 @@ async function uReativar(i){
     toast("Usuário reativado.","ok");await carregarUsuarios();
   }catch(e){toast("Falha: "+e.message,"error",5000);}
 }
-async function uExcluir(i){
-  const r=_uAlvo(i);if(!r)return;const c=r.colaborador||{};
-  if(!confirm("EXCLUIR definitivamente "+(c.nome||c.email)+"?\n\nIsso remove o login e o cadastro. Não há como desfazer."))return;
-  try{await gerirUsuario({acao:'excluir',auth_id:r.auth_id,colaborador_id:c.id});
-    toast("Usuário excluído.","ok");await carregarUsuarios();
-  }catch(e){toast("Falha: "+e.message,"error",5000);}
-}
+/* Exclusão de usuários desabilitada por política: utilizar Cancelar (inativar). */
 /* ===== FERIADOS ===== */
 const DIAS_SEMANA=['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
 function abrirFeriados(){
