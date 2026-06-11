@@ -259,6 +259,10 @@ pre.sql{background:#0f172a;color:#e9f0ec;padding:16px;border-radius:10px;font-si
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Importar PDF</button>
       <button class="nav-item" onclick="exportar()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg> Exportar Excel</button>
+      <button class="nav-item" onclick="abrirFeriados()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Feriados</button>
+      <button class="nav-item" onclick="abrirArquivos()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Arquivos</button>
       <div class="nav-section hidden" id="nav-admin-sec">Administração</div>
       <button class="nav-item hidden" id="nav-users" onclick="abrirUsuarios()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg> Usuários</button>
@@ -418,6 +422,46 @@ pre.sql{background:#0f172a;color:#e9f0ec;padding:16px;border-radius:10px;font-si
   </div>
 </div>
 
+<!-- ===== MODAL FERIADOS ===== -->
+<div class="overlay" id="ovFeriados">
+  <div class="modal">
+    <div class="modal-head"><h3>Feriados</h3><button class="x" onclick="fechar('ovFeriados')">×</button></div>
+    <div class="modal-body">
+      <div class="warn" id="ferWarn"></div>
+      <div id="ferForm">
+        <p style="font-weight:700;margin-bottom:10px">Cadastrar feriado</p>
+        <div class="row2">
+          <div><label>Data *</label><input id="fer_data" type="date"></div>
+          <div><label>Descrição *</label><input id="fer_desc" placeholder="Ex.: Padroeira do município"></div>
+        </div>
+        <div style="margin-top:14px"><button class="btn-accent" id="btnAddFeriado" onclick="addFeriado()">＋ Adicionar feriado</button></div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:20px 0">
+      </div>
+      <p style="font-weight:700;margin-bottom:10px">Feriados cadastrados</p>
+      <div class="field-hint" style="margin-bottom:8px">Os prazos (pagamento e eSocial) são antecipados automaticamente quando caem em fim de semana ou feriado cadastrado.</div>
+      <div class="tscroll"><table><thead><tr><th>Data</th><th>Dia</th><th>Descrição</th><th style="text-align:right" id="ferAcoesTh">Ações</th></tr></thead><tbody id="ferList"></tbody></table></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="fechar('ovFeriados')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL ARQUIVOS IMPORTADOS ===== -->
+<div class="overlay" id="ovArquivos">
+  <div class="modal wide">
+    <div class="modal-head"><h3>Arquivos importados</h3><button class="x" onclick="fechar('ovArquivos')">×</button></div>
+    <div class="modal-body">
+      <div class="field-hint" style="margin-bottom:10px">Toda planilha ou PDF importado fica salvo aqui automaticamente, junto com quem enviou e quando.</div>
+      <div class="tscroll"><table><thead><tr><th>Data</th><th>Arquivo</th><th>Origem</th><th>Tamanho</th><th>Enviado por</th><th style="text-align:right" id="arqAcoesTh">Ações</th></tr></thead><tbody id="arqList"></tbody></table></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="carregarArquivos()">↻ Atualizar</button>
+      <button class="btn-outline" onclick="fechar('ovArquivos')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== MODAL USUÁRIOS (ADMIN) ===== -->
 <div class="overlay" id="ovUsers">
   <div class="modal wide">
@@ -529,7 +573,9 @@ const CONFIG = {
 const APP = { url:CONFIG.url, key:CONFIG.key, token:null, refresh:null, user:null,
   tenantId:null, papel:null, nome:null, needsBootstrap:false,
   dados:[], equipe:[], editId:null, sort:{col:'data_pagamento',dir:'asc'}, imp:null, hist:[],
-  usuarios:[], uAlvo:null };
+  usuarios:[], uAlvo:null, feriados:[], arquivos:[], pdfFiles:[] };
+let FERIADOS_SET=new Set();
+function rebuildFeriadosSet(){FERIADOS_SET=new Set((APP.feriados||[]).map(f=>f.data));}
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}},
@@ -666,16 +712,24 @@ function parseDate(s){if(!s)return null;const d=new Date(s+"T00:00:00");return i
 function fmtBR(s){if(!s)return"—";const d=parseDate(s);if(!d)return esc(s);return("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+"/"+d.getFullYear();}
 function diffDias(s){const d=parseDate(s);if(!d)return null;return Math.round((d-hoje0())/86400000);}
 function fmtBRd(d){return ("0"+d.getDate()).slice(-2)+"/"+("0"+(d.getMonth()+1)).slice(-2)+"/"+d.getFullYear();}
-/* prazo legal de pagamento: término + 10 dias corridos (art. 477 §6 CLT) */
-function diaUtilAnterior(d){const x=new Date(d);const w=x.getDay();if(w===6)x.setDate(x.getDate()-1);else if(w===0)x.setDate(x.getDate()-2);return x;}
+/* REGRA ÚNICA: 10 dias corridos contados a partir da DATA DO AVISO, antecipa p/ dia útil (fins de semana + feriados cadastrados) */
+function ymd(d){return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function diaUtilAnterior(d){
+  const x=new Date(d);let guard=0;
+  while(guard++<60){
+    const w=x.getDay();
+    if(w===0||w===6||FERIADOS_SET.has(ymd(x))){x.setDate(x.getDate()-1);continue;}
+    break;
+  }
+  return x;
+}
+function basePrazo(r){return parseDate(r.data_aviso||r.data_fim_aviso);}
 function limitePagamento(r){
-  const indeniz=/indeniz/i.test(r.tipo_rescisao||'');
-  const b=parseDate(indeniz?(r.data_aviso||r.data_fim_aviso):(r.data_fim_aviso||r.data_aviso));
+  const b=basePrazo(r);
   if(!b)return null;const d=new Date(b);d.setDate(d.getDate()+10);return diaUtilAnterior(d);}
-/* prazo eSocial S-2299: desligamento + 10 dias corridos (exclui o dia), antecipa p/ dia útil */
+/* prazo eSocial S-2299: mesma regra (aviso + 10 dias corridos) */
 function limiteESocial(r){
-  const indeniz=/indeniz/i.test(r.tipo_rescisao||'');
-  const b=parseDate(indeniz?(r.data_aviso||r.data_fim_aviso):(r.data_fim_aviso||r.data_aviso));
+  const b=basePrazo(r);
   if(!b)return null;const d=new Date(b);d.setDate(d.getDate()+10);return diaUtilAnterior(d);
 }
 /* aviso prévio proporcional: 30 + 3 dias por ano completo, teto 90 (Lei 12.506/2011) */
@@ -747,6 +801,9 @@ function classeLinha(r){return {fin:'r-fin',atraso:'r-vermelho',critico:'r-verme
 async function carregar(){
   try{APP.equipe=await api("resc_colaboradores?select=nome&status=in.(ativo,experiencia)&order=nome")||[];}
   catch(e){APP.equipe=[];}
+  try{APP.feriados=await api("resc_feriados?select=*&order=data")||[];}
+  catch(e){APP.feriados=[];}
+  rebuildFeriadosSet();
   try{APP.dados=await api("resc_rescisoes?select=*&order=data_pagamento.asc")||[];}
   catch(e){toast("Erro ao carregar rescisões: "+e.message,"error");console.error(e);APP.dados=[];}
   syncDatalists();render();
@@ -804,7 +861,9 @@ function render(){
       '<td>'+esc(r.nome_empregado)+'</td><td>'+esc(r.tipo_rescisao)+'</td>'+
       '<td class="dt">'+fmtBR(r.data_fim_aviso)+'</td><td class="dt">'+fmtBR(r.data_pagamento)+'</td>'+
       '<td>'+pill(r.status_rescisao)+'</td><td>'+pill(r.status_esocial)+'</td>'+
-      '<td class="acoes"><button class="iconbtn" title="Editar" onclick="editar(\''+r.id+'\')">✏️</button>'+
+      '<td class="acoes">'+
+      (r.arquivo_id?'<button class="iconbtn" title="Baixar arquivo importado" onclick="baixarArquivoPorId(\''+esc(String(r.arquivo_id))+'\')">📎</button>':'')+
+      '<button class="iconbtn" title="Editar" onclick="editar(\''+r.id+'\')">✏️</button>'+
       '<button class="iconbtn" title="Excluir" onclick="excluir(\''+r.id+'\')">🗑️</button></td></tr>';
     }).join('');
   }
@@ -898,7 +957,7 @@ function lerArquivo(file){
     if(hi<0){toast('Planilha vazia.','error');return;}
     const headers=rows[hi].map(h=>String(h).trim());
     const data=rows.slice(hi+1).filter(r=>r.some(c=>String(c).trim()!==''));
-    APP.imp={headers,data};montarMapa(headers,data);
+    APP.imp={headers,data,file};montarMapa(headers,data);
   }catch(e){toast('Erro ao ler arquivo: '+e.message,'error');console.error(e);}};
   rd.readAsArrayBuffer(file);
 }
@@ -961,6 +1020,11 @@ async function confirmarImport(){
   regs.forEach(r=>{if(!r.calculado_por){r.status_rescisao=false;r.status_esocial=false;}});
   document.getElementById('btnImportar').disabled=true;
   try{
+    if(APP.imp&&APP.imp.file){
+      const mapa=await uploadArquivosImportados([APP.imp.file],'planilha');
+      const aid=mapa[APP.imp.file.name];
+      if(aid)regs.forEach(r=>r.arquivo_id=aid);
+    }
     const res=await api("resc_rescisoes",{method:"POST",body:regs,prefer:"return=representation"});
     if(res)APP.dados=APP.dados.concat(res);
     render();fechar('ovImport');toast(regs.length+" rescisões importadas.","ok");
@@ -1105,7 +1169,7 @@ function parsePdfRescisao(linhas,arquivo){
   return out;
 }
 function abrirPdfImport(){
-  APP.pdfRegs=[];
+  APP.pdfRegs=[];APP.pdfFiles=[];
   document.getElementById('pdfInput').value='';
   document.getElementById('pdfStatus').textContent='';
   document.getElementById('pdfStatus').style.color='';
@@ -1117,6 +1181,7 @@ function abrirPdfImport(){
 async function lerPdfs(files){
   if(!files||!files.length)return;
   const lista=Array.from(files);
+  APP.pdfFiles=lista;
   document.getElementById('pdfInput').value='';
   const st=document.getElementById('pdfStatus');
   st.style.color='';
@@ -1174,6 +1239,8 @@ async function confirmarPdfImport(){
     calculado_por:'',observacoes:r.observacoes||'',status_rescisao:false,status_esocial:false}));
   const btn=document.getElementById('btnPdfImportar');btn.disabled=true;
   try{
+    const mapa=await uploadArquivosImportados(APP.pdfFiles,'pdf');
+    body.forEach((b,i)=>{const nomeArq=regs[i]&&regs[i].arquivo;if(nomeArq&&mapa[nomeArq])b.arquivo_id=mapa[nomeArq];});
     const res=await api("resc_rescisoes",{method:"POST",body,prefer:"return=representation"});
     if(res)APP.dados=APP.dados.concat(res);
     syncDatalists();render();fechar('ovPdf');
@@ -1304,6 +1371,168 @@ async function uExcluir(i){
     toast("Usuário excluído.","ok");await carregarUsuarios();
   }catch(e){toast("Falha: "+e.message,"error",5000);}
 }
+/* ===== FERIADOS ===== */
+const DIAS_SEMANA=['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+function abrirFeriados(){
+  const adm=isAdmin();
+  $("#ferWarn").classList.remove('on');
+  $("#ferForm").style.display=adm?'':'none';
+  $("#ferAcoesTh").style.display=adm?'':'none';
+  $("#fer_data").value='';$("#fer_desc").value='';
+  renderFeriados();abrir('ovFeriados');
+}
+function renderFeriados(){
+  const tb=$("#ferList");const adm=isAdmin();
+  const arr=(APP.feriados||[]).slice().sort((a,b)=>a.data<b.data?-1:1);
+  if(!arr.length){tb.innerHTML='<tr><td colspan="4" style="color:var(--text-3)">Nenhum feriado cadastrado.</td></tr>';return;}
+  const hj=ymd(hoje0());
+  tb.innerHTML=arr.map(f=>{
+    const d=parseDate(f.data);const passado=f.data<hj;
+    return '<tr'+(passado?' style="opacity:.55"':'')+'><td style="white-space:nowrap">'+fmtBR(f.data)+'</td>'+
+      '<td>'+(d?DIAS_SEMANA[d.getDay()]:'—')+'</td>'+
+      '<td>'+esc(f.descricao||'—')+'</td>'+
+      (adm?'<td style="text-align:right"><button class="btn-outline btn-sm" onclick="delFeriado(\''+esc(String(f.id))+'\')">Excluir</button></td>':'')+
+      '</tr>';
+  }).join('');
+}
+async function addFeriado(){
+  if(!isAdmin()){toast("Apenas administradores.","error");return;}
+  const data=$("#fer_data").value,desc=$("#fer_desc").value.trim();
+  const w=$("#ferWarn");w.classList.remove('on');
+  if(!data){w.textContent="Informe a data.";w.classList.add('on');return;}
+  if(!desc){w.textContent="Informe a descrição.";w.classList.add('on');return;}
+  if(FERIADOS_SET.has(data)){w.textContent="Já existe feriado nessa data.";w.classList.add('on');return;}
+  const btn=$("#btnAddFeriado");btn.disabled=true;
+  try{
+    const res=await api("resc_feriados",{method:"POST",
+      body:{tenant_id:APP.tenantId,data,descricao:desc},prefer:"return=representation"});
+    if(res&&res[0])APP.feriados.push(res[0]);
+    rebuildFeriadosSet();
+    $("#fer_data").value='';$("#fer_desc").value='';
+    renderFeriados();render();
+    toast("Feriado cadastrado.","ok");
+  }catch(e){
+    let m=e.message||"Falha ao cadastrar.";
+    if(/duplicate|23505/i.test(m))m="Já existe feriado nessa data.";
+    if(/relation .*resc_feriados.* does not exist|42P01/i.test(m))m="Tabela resc_feriados não existe — rode o SQL de criação no SQL Editor do Supabase.";
+    w.textContent=m;w.classList.add('on');
+  }finally{btn.disabled=false;}
+}
+async function delFeriado(id){
+  if(!isAdmin()){toast("Apenas administradores.","error");return;}
+  const f=(APP.feriados||[]).find(x=>String(x.id)===String(id));if(!f)return;
+  if(!confirm("Excluir o feriado de "+fmtBR(f.data)+" ("+(f.descricao||'')+")?"))return;
+  try{
+    await api("resc_feriados?id=eq."+encodeURIComponent(id),{method:"DELETE"});
+    APP.feriados=APP.feriados.filter(x=>String(x.id)!==String(id));
+    rebuildFeriadosSet();renderFeriados();render();
+    toast("Feriado excluído.","ok");
+  }catch(e){toast("Falha: "+e.message,"error",5000);}
+}
+
+/* ===== ARQUIVOS IMPORTADOS (Supabase Storage) ===== */
+const BUCKET_ARQUIVOS='resc-arquivos';
+function _slugArq(n){return String(n||'arquivo').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(-90);}
+function fmtBytes(b){if(b==null)return'—';if(b<1024)return b+' B';if(b<1048576)return (b/1024).toFixed(1)+' KB';return (b/1048576).toFixed(1)+' MB';}
+async function uploadArquivo(file,origem){
+  const path=APP.tenantId+'/'+Date.now()+'_'+_slugArq(file.name);
+  const res=await fetch(APP.url+'/storage/v1/object/'+BUCKET_ARQUIVOS+'/'+path,{
+    method:'POST',
+    headers:{apikey:APP.key,Authorization:'Bearer '+APP.token,
+      'Content-Type':file.type||'application/octet-stream','x-upsert':'false'},
+    body:file});
+  if(!res.ok){const t=await res.text();let m=t;try{m=JSON.parse(t).message||t;}catch(e){}
+    if(/bucket not found/i.test(m))m='Bucket "'+BUCKET_ARQUIVOS+'" não existe — rode o SQL de criação no Supabase.';
+    throw new Error(m||('Erro '+res.status));}
+  const rows=await api('resc_arquivos',{method:'POST',
+    body:{tenant_id:APP.tenantId,nome:file.name,path,tamanho:file.size,
+      tipo:file.type||'',origem,enviado_por:APP.nome||(APP.user&&APP.user.email)||''},
+    prefer:'return=representation'});
+  return rows&&rows[0]?rows[0]:null;
+}
+/* faz upload ANTES do insert e devolve mapa nomeArquivo -> arquivo_id (para vincular às rescisões) */
+async function uploadArquivosImportados(files,origem){
+  const mapa={};
+  for(const f of (files||[])){
+    try{const a=await uploadArquivo(f,origem);if(a)mapa[f.name]=a.id;}
+    catch(e){console.error('upload',f.name,e);
+      toast('O arquivo "'+f.name+'" não pôde ser salvo no app: '+e.message,'warn',7000);}
+  }
+  return mapa;
+}
+function abrirArquivos(){
+  abrir('ovArquivos');carregarArquivos();
+}
+async function carregarArquivos(){
+  const tb=$("#arqList");
+  tb.innerHTML='<tr><td colspan="6" style="color:var(--text-3)">Carregando…</td></tr>';
+  try{
+    APP.arquivos=await api("resc_arquivos?select=*&order=criado_em.desc")||[];
+    renderArquivos();
+  }catch(e){
+    let m=e.message;
+    if(/relation .*resc_arquivos.* does not exist|42P01/i.test(m))m='Tabela resc_arquivos não existe — rode o SQL de criação no Supabase.';
+    tb.innerHTML='<tr><td colspan="6" style="color:var(--red)">'+esc(m)+'</td></tr>';
+  }
+}
+function _origemBadge(o){
+  if(o==='pdf')return '<span class="badge badge-red">PDF</span>';
+  if(o==='planilha')return '<span class="badge badge-green">Planilha</span>';
+  return esc(o||'—');
+}
+function renderArquivos(){
+  const tb=$("#arqList");const arr=APP.arquivos||[];const adm=isAdmin();
+  $("#arqAcoesTh").style.display=adm?'':'none';
+  if(!arr.length){tb.innerHTML='<tr><td colspan="6" style="color:var(--text-3)">Nenhum arquivo salvo. Os arquivos das próximas importações ficarão guardados aqui.</td></tr>';return;}
+  tb.innerHTML=arr.map(a=>'<tr>'+
+    '<td style="white-space:nowrap">'+fmtDataHora(a.criado_em)+'</td>'+
+    '<td><b>'+esc(a.nome)+'</b></td>'+
+    '<td>'+_origemBadge(a.origem)+'</td>'+
+    '<td style="white-space:nowrap">'+fmtBytes(a.tamanho)+'</td>'+
+    '<td>'+esc(a.enviado_por||'—')+'</td>'+
+    '<td style="text-align:right;white-space:nowrap">'+
+      '<button class="btn-outline btn-sm" onclick="baixarArquivo(\''+esc(String(a.id))+'\')">Baixar</button>'+
+      (adm?' <button class="btn-outline btn-sm" onclick="excluirArquivo(\''+esc(String(a.id))+'\')">Excluir</button>':'')+
+    '</td></tr>').join('');
+}
+async function _abrirSigned(a){
+  const res=await fetch(APP.url+'/storage/v1/object/sign/'+BUCKET_ARQUIVOS+'/'+a.path,{
+    method:'POST',headers:{apikey:APP.key,Authorization:'Bearer '+APP.token,'Content-Type':'application/json'},
+    body:JSON.stringify({expiresIn:3600})});
+  const d=await res.json();
+  if(!res.ok||!d.signedURL)throw new Error(d.message||('Erro '+res.status));
+  window.open(APP.url+'/storage/v1'+d.signedURL,'_blank');
+}
+async function baixarArquivo(id){
+  const a=(APP.arquivos||[]).find(x=>String(x.id)===String(id));if(!a)return;
+  try{await _abrirSigned(a);}
+  catch(e){toast('Falha ao gerar link: '+e.message,'error',5000);}
+}
+async function baixarArquivoPorId(id){
+  try{
+    let a=(APP.arquivos||[]).find(x=>String(x.id)===String(id));
+    if(!a){
+      const rows=await api('resc_arquivos?select=*&id=eq.'+encodeURIComponent(id));
+      a=rows&&rows[0];
+    }
+    if(!a){toast('Arquivo não encontrado (pode ter sido excluído).','warn',5000);return;}
+    await _abrirSigned(a);
+  }catch(e){toast('Falha ao baixar: '+e.message,'error',5000);}
+}
+async function excluirArquivo(id){
+  if(!isAdmin()){toast("Apenas administradores.","error");return;}
+  const a=(APP.arquivos||[]).find(x=>String(x.id)===String(id));if(!a)return;
+  if(!confirm('Excluir definitivamente o arquivo "'+a.nome+'"?'))return;
+  try{
+    const res=await fetch(APP.url+'/storage/v1/object/'+BUCKET_ARQUIVOS+'/'+a.path,{
+      method:'DELETE',headers:{apikey:APP.key,Authorization:'Bearer '+APP.token}});
+    if(!res.ok&&res.status!==404){const t=await res.text();let m=t;try{m=JSON.parse(t).message||t;}catch(e){}throw new Error(m);}
+    await api('resc_arquivos?id=eq.'+encodeURIComponent(id),{method:'DELETE'});
+    APP.arquivos=APP.arquivos.filter(x=>String(x.id)!==String(id));
+    renderArquivos();toast('Arquivo excluído.','ok');
+  }catch(e){toast('Falha: '+e.message,'error',5000);}
+}
+
 function abrirUsuarios(){
   if(!isAdmin()){toast("Apenas administradores.","error");return;}
   $("#usWarn").classList.remove('on');
