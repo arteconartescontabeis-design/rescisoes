@@ -836,11 +836,12 @@ function diaUtilAnterior(d){
 /* base do prazo: 10 dias a contar do FIM do aviso (indenizado ou trabalhado);
    fallback para a data do aviso quando o fim não estiver preenchido — art. 477 §6 CLT */
 function basePrazo(r){return parseDate(r.data_fim_aviso||r.data_aviso);}
-/* data de pagamento sugerida: aviso + 10 dias corridos, antecipada p/ dia útil (fds + feriados) */
+/* data de pagamento sugerida: 10 dias corridos CONTADOS DO ÚLTIMO DIA do aviso (último dia = dia 1),
+   ou seja, fim do aviso + 9 dias, antecipada p/ dia útil (fds + feriados) */
 function calcDataPagamento(r){const d=limitePagamento(r);return d?ymd(d):null;}
 function limitePagamento(r){
   const b=basePrazo(r);
-  if(!b)return null;const d=new Date(b);d.setDate(d.getDate()+10);return diaUtilAnterior(d);}
+  if(!b)return null;const d=new Date(b);d.setDate(d.getDate()+9);return diaUtilAnterior(d);}
 /* prazo eSocial S-2299: mesma regra (fim do aviso + 10 dias corridos) */
 function limiteESocial(r){
   const b=basePrazo(r);
