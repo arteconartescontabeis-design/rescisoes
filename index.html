@@ -260,8 +260,6 @@ pre.sql{background:#0f172a;color:#e9f0ec;padding:16px;border-radius:10px;font-si
       <div id="acoes-resc">
       <button class="nav-item" onclick="novaRescisao()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg> Nova rescisão</button>
-      <button class="nav-item" onclick="abrirImport()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5-5 5 5M12 5v12"/></svg> Importar</button>
       <button class="nav-item" onclick="abrirPdfImport()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Importar PDF</button>
       <button class="nav-item" onclick="exportar()">
@@ -299,7 +297,6 @@ pre.sql{background:#0f172a;color:#e9f0ec;padding:16px;border-radius:10px;font-si
       <div><h1>Controle de Rescisões</h1><div class="sub">Gestão de desligamentos — Artecon Artes Contábeis</div></div>
       <div class="flex">
         <button class="btn-accent" onclick="novaRescisao()">＋ Nova Rescisão</button>
-        <button class="btn-outline" onclick="abrirImport()">⬆ Importar</button>
       </div>
     </div>
 
@@ -1130,7 +1127,7 @@ function render(){
   }).join('');
   const tb=document.getElementById('tbody');
   if(!arr.length){
-    tb.innerHTML='<tr><td colspan="10"><div class="empty">Nenhuma rescisão encontrada.<br>Clique em <b>＋ Nova Rescisão</b> ou <b>⬆ Importar</b>.</div></td></tr>';
+    tb.innerHTML='<tr><td colspan="10"><div class="empty">Nenhuma rescisão encontrada.<br>Clique em <b>＋ Nova Rescisão</b> ou <b>Importar PDF</b>.</div></td></tr>';
   }else{
     const pill=v=>v?'<span class="badge badge-green">✓ OK</span>':'<span class="badge badge-gray">—</span>';
     tb.innerHTML=arr.map(r=>{
