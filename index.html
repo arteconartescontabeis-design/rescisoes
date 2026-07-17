@@ -2065,6 +2065,17 @@ document.addEventListener('DOMContentLoaded',()=>{
   dz.addEventListener('click',()=>fi.click());
   fi.addEventListener('change',e=>{if(e.target.files[0])lerArquivo(e.target.files[0]);});
   document.addEventListener('click',e=>{if(e.target.classList.contains('overlay'))e.target.classList.remove('on');});
+  /* datalists: ao focar, esvazia temporariamente para abrir a LISTA COMPLETA mesmo com valor
+     preenchido; se sair sem digitar/escolher nada, o valor original volta. Para limpar de
+     verdade: digitar algo, apagar tudo e sair do campo. */
+  document.querySelectorAll('input[list]').forEach(inp=>{
+    inp.addEventListener('focus',function(){this._dlPrev=this.value;this._dlTyped=false;if(this.value)this.value='';});
+    inp.addEventListener('input',function(){this._dlTyped=true;});
+    inp.addEventListener('blur',function(){
+      if(this.value===''&&!this._dlTyped&&this._dlPrev){this.value=this._dlPrev;}
+      this._dlPrev=null;this._dlTyped=false;
+    });
+  });
   const sess=store.get("rp_session");
   if(sess&&sess.token){APP.token=sess.token;APP.refresh=sess.refresh;APP.user=sess.user;boot();}
   else show("view-login");
