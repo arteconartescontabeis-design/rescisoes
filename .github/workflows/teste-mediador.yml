@@ -1,0 +1,56 @@
+name: Teste Mediador (CCT)
+
+on:
+  workflow_dispatch:
+    inputs:
+      cnpj:
+        description: "CNPJ do sindicato (só dígitos)"
+        required: true
+        default: "84307370000166"
+      tipo:
+        description: "Tipo de instrumento"
+        required: false
+        default: "Convenção Coletiva"
+      vigencia:
+        description: "Vigência"
+        required: false
+        default: "Vigentes"
+      uf:
+        description: "UF de registro (vazio = sem filtro)"
+        required: false
+        default: ""
+
+jobs:
+  consultar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar Playwright e navegador
+        run: |
+          pip install playwright beautifulsoup4 lxml
+          playwright install --with-deps chromium
+          sudo apt-get install -y xvfb
+
+      - name: Executar consulta (navegador com tela virtual)
+        working-directory: robo
+        run: |
+          xvfb-run -a python teste_mediador.py --cnpj "${{ inputs.cnpj }}" \
+            --tipo "${{ inputs.tipo }}" --vigencia "${{ inputs.vigencia }}" --uf "${{ inputs.uf }}"
+
+      - name: Guardar resultado, resposta bruta e screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-mediador-${{ inputs.cnpj }}
+          path: |
+            robo/resultado_*.json
+            robo/resposta_*.txt
+            robo/extrato_*
+            robo/*.png
+          if-no-files-found: warn
