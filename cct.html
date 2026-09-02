@@ -3,153 +3,356 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CCT Monitor — Teste de Consulta ao Mediador</title>
+<title>CCT Monitor — Artecon</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <style>
-  :root{--azul:#1a5276;--azul-esc:#123a55;--cinza:#5b6b7a;--borda:#d9e1e8;--fundo:#f4f7fa;--ok:#1e8449;--alerta:#b9770e;--erro:#a93226;}
-  *{box-sizing:border-box}
-  body{margin:0;font-family:'DM Sans',sans-serif;background:var(--fundo);color:#1f2d3a}
-  header{background:var(--azul);color:#fff;padding:18px 28px;display:flex;align-items:center;justify-content:space-between}
-  header h1{font-family:'Playfair Display',serif;font-size:22px;margin:0;font-weight:600}
-  header small{opacity:.85;display:block;font-size:13px;margin-top:2px}
-  .badge{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);border-radius:14px;padding:3px 11px;font-size:12px;font-weight:600}
-  main{max-width:1100px;margin:26px auto;padding:0 20px}
-  .card{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:22px;margin-bottom:20px}
-  .card h2{font-family:'Playfair Display',serif;color:var(--azul);font-size:18px;margin:0 0 14px}
-  .grid{display:grid;grid-template-columns:2fr 1.4fr 1fr .7fr;gap:12px}
-  label{display:block;font-size:12.5px;color:var(--cinza);margin-bottom:4px;font-weight:500}
-  input,select{width:100%;padding:9px 11px;border:1px solid var(--borda);border-radius:7px;font:inherit;font-size:14px}
-  input:focus,select:focus{outline:none;border-color:var(--azul)}
-  .acoes{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center}
-  button{background:var(--azul);color:#fff;border:0;border-radius:7px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer}
-  button.sec{background:#fff;color:var(--azul);border:1px solid var(--azul)}
-  button:hover{background:var(--azul-esc)} button.sec:hover{background:#eaf1f7}
-  button:disabled{opacity:.55;cursor:wait}
-  .status{padding:12px 16px;border-radius:8px;font-weight:600;margin-bottom:14px;display:none}
-  .status.ok{background:#e8f6ee;color:var(--ok);display:block}
-  .status.alerta{background:#fdf3e2;color:var(--alerta);display:block}
-  .status.erro{background:#fbe9e7;color:var(--erro);display:block}
-  .status span{display:block;font-weight:400;font-size:13px;margin-top:4px}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th{background:#eef3f7;color:var(--azul);text-align:left;padding:8px 10px;border-bottom:2px solid var(--borda)}
-  td{padding:8px 10px;border-bottom:1px solid var(--borda);vertical-align:top}
-  tr:hover td{background:#f8fafc}
-  pre{background:#0f1c26;color:#d6e2ec;padding:14px;border-radius:8px;font-size:12px;max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word}
-  .regra{font-size:12.5px;color:var(--cinza);border-left:3px solid var(--azul);padding:8px 12px;background:#f8fafc;margin-top:12px}
-  .cfg{font-size:12px;color:var(--cinza);margin-top:8px}
-  .cfg code{background:#eef3f7;padding:2px 5px;border-radius:4px}
-  .etapas{font-size:12.5px;color:var(--cinza);margin:0 0 12px 18px}
-  a{color:var(--azul)}
+  :root{--azul:#1a5276;--azul-esc:#123a55;--cinza:#5b6b7a;--borda:#d9e1e8;--fundo:#f4f7fa;--ok:#1e8449;--alerta:#b9770e;--erro:#a93226;--info:#2471a3}
+  *{box-sizing:border-box} body{margin:0;font-family:'DM Sans',sans-serif;background:var(--fundo);color:#1f2d3a;font-size:14px}
+  header{background:var(--azul);color:#fff;padding:14px 26px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+  header h1{font-family:'Playfair Display',serif;font-size:21px;margin:0;font-weight:600}
+  header small{opacity:.85;display:block;font-size:12.5px;margin-top:2px}
+  .badge{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);border-radius:14px;padding:3px 11px;font-size:12px;font-weight:600;white-space:nowrap}
+  nav{background:#fff;border-bottom:1px solid var(--borda);padding:0 26px;display:flex;gap:4px;overflow-x:auto}
+  nav button{background:none;border:0;border-bottom:3px solid transparent;padding:12px 14px;font:inherit;font-weight:600;color:var(--cinza);cursor:pointer;white-space:nowrap}
+  nav button.on{color:var(--azul);border-bottom-color:var(--azul)}
+  main{max-width:1200px;margin:22px auto;padding:0 20px}
+  .card{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:20px;margin-bottom:18px}
+  .card h2{font-family:'Playfair Display',serif;color:var(--azul);font-size:17px;margin:0 0 12px}
+  .topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .grid{display:grid;gap:10px}.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
+  label{display:block;font-size:12px;color:var(--cinza);margin-bottom:3px;font-weight:500}
+  input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--borda);border-radius:7px;font:inherit;font-size:13.5px;background:#fff}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--azul)}
+  button.b{background:var(--azul);color:#fff;border:0;border-radius:7px;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+  button.b:hover{background:var(--azul-esc)} button.b.sec{background:#fff;color:var(--azul);border:1px solid var(--azul)} button.b.sec:hover{background:#eaf1f7}
+  button.b.sm{padding:5px 10px;font-size:12px} button.b:disabled{opacity:.5}
+  table{width:100%;border-collapse:collapse;font-size:13px} th{background:#eef3f7;color:var(--azul);text-align:left;padding:8px 9px;border-bottom:2px solid var(--borda);font-size:12px}
+  td{padding:7px 9px;border-bottom:1px solid var(--borda);vertical-align:top} tr:hover td{background:#f8fafc} td.r,th.r{text-align:right}
+  .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11.5px;font-weight:600}
+  .tag.ok{background:#e8f6ee;color:var(--ok)}.tag.alerta{background:#fdf3e2;color:var(--alerta)}.tag.erro{background:#fbe9e7;color:var(--erro)}.tag.info{background:#e8f0f8;color:var(--info)}.tag.cinza{background:#eef1f4;color:var(--cinza)}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+  .kpi{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:14px 16px} .kpi b{font-size:26px;color:var(--azul);display:block;font-family:'Playfair Display',serif} .kpi span{font-size:12px;color:var(--cinza)}
+  .kpi.erro b{color:var(--erro)} .kpi.alerta b{color:var(--alerta)}
+  .aviso{font-size:12.5px;color:var(--cinza);border-left:3px solid var(--azul);padding:8px 12px;background:#f8fafc;margin:10px 0}
+  .modal{position:fixed;inset:0;background:rgba(15,28,38,.55);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:10}
+  .modal.on{display:flex} .modal .card{width:100%;max-width:900px}
+  .cl{border:1px solid var(--borda);border-radius:8px;padding:10px 12px;margin-bottom:8px} .cl h4{margin:0 0 4px;font-size:13.5px;color:var(--azul)} .cl small{color:var(--cinza)} .cl p{margin:6px 0 0;white-space:pre-wrap;font-size:13px}
+  #login{max-width:420px;margin:60px auto}
+  .msg{padding:10px 14px;border-radius:8px;font-weight:600;margin:10px 0;display:none}.msg.on{display:block}.msg.ok{background:#e8f6ee;color:var(--ok)}.msg.erro{background:#fbe9e7;color:var(--erro)}
+  pre{background:#0f1c26;color:#d6e2ec;padding:12px;border-radius:8px;font-size:11.5px;max-height:300px;overflow:auto;white-space:pre-wrap}
+  @media(max-width:800px){.g4,.g3,.g2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <header>
-  <div><h1>CCT Monitor</h1><small>Teste de consulta ao Sistema Mediador · Artecon Artes Contábeis</small></div>
-  <span class="badge">v0.1.3 · protótipo</span>
+  <div><h1>CCT Monitor</h1><small>Monitoramento de Convenções Coletivas · Sistema Mediador · Artecon Artes Contábeis</small></div>
+  <div style="display:flex;gap:10px;align-items:center"><span id="usuario" style="font-size:12.5px;opacity:.9"></span><button class="b sec sm" id="btnSair" style="display:none;background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">Sair</button><span class="badge" id="versao"></span></div>
 </header>
+<nav id="nav" style="display:none">
+  <button data-aba="painel" class="on">Painel</button><button data-aba="sindicatos">Sindicatos</button><button data-aba="instrumentos">Convenções</button>
+  <button data-aba="consultas">Consultas</button><button data-aba="erros">Central de Erros</button><button data-aba="destinatarios">Destinatários</button><button data-aba="versoes">Versões</button>
+</nav>
 <main>
-  <div class="card">
-    <h2>Consulta por sindicato</h2>
-    <div class="grid">
-      <div><label>CNPJ do sindicato (laboral ou patronal)</label><input id="cnpj" placeholder="00.000.000/0000-00" maxlength="18"></div>
-      <div><label>Tipo de instrumento</label>
-        <select id="tipo"><option>Convenção Coletiva</option><option>Termo Aditivo</option><option>Acordo Coletivo</option></select></div>
-      <div><label>Vigência</label><select id="vig"><option>Vigentes</option><option>Todos</option></select></div>
-      <div><label>UF de registro</label><select id="uf"><option value="">(sem filtro)</option></select></div>
-    </div>
-    <div class="acoes">
-      <button id="btnConsultar">Consultar Mediador</button>
-      <button id="btnInspecionar" class="sec">Inspecionar página (campos e botões)</button>
-      <span id="tempo" style="font-size:12.5px;color:var(--cinza)"></span>
-    </div>
-    <div class="regra">Regra do protótipo: falha de acesso nunca é registrada como "não existe CCT". Cada consulta termina em
-      <b>CONSULTA CONFIRMADA</b>, <b>CONSULTA COM ALERTA</b> (site respondeu vazio) ou <b>CONSULTA NÃO CONCLUÍDA</b> (erro).</div>
-    <div class="cfg">Edge Function: <code id="fnUrl"></code></div>
+  <div id="login" class="card">
+    <h2>Entrar</h2>
+    <div class="grid"><div><label>E-mail</label><input id="lEmail" type="email" autocomplete="username"></div><div><label>Senha</label><input id="lSenha" type="password" autocomplete="current-password"></div></div>
+    <div style="margin-top:12px;display:flex;gap:10px;align-items:center"><button class="b" id="btnEntrar">Entrar</button><span id="lMsg" style="font-size:12.5px;color:var(--erro)"></span></div>
+    <div class="aviso">Mesmos usuários do Rescisões Pro (vínculo de tenant em <code>resc_usuarios</code>).</div>
   </div>
+  <div id="app" style="display:none">
+    <div class="msg" id="msg"></div>
 
-  <div class="card" id="cardRes" style="display:none">
-    <h2>Resultado</h2>
-    <div id="status" class="status"></div>
-    <ul id="etapas" class="etapas"></ul>
-    <div id="tabela"></div>
-    <details style="margin-top:14px"><summary style="cursor:pointer;color:var(--azul);font-weight:600">Resposta completa (JSON)</summary><pre id="json"></pre></details>
+    <section data-sec="painel">
+      <div class="kpis" id="kpis"></div>
+      <div class="card" style="margin-top:16px"><h2>Últimas convenções detectadas</h2><div id="painelNovos"></div></div>
+      <div class="card"><h2>Como funciona</h2>
+        <div class="aviso">O robô roda nos dias úteis às 06h (GitHub Actions), consulta o Mediador para cada sindicato marcado como "monitorar", baixa e importa as Convenções e Termos Aditivos vigentes que ainda não constam aqui, e registra incidentes quando qualquer etapa falha. Falha de acesso <b>nunca</b> é registrada como "não existe CCT".</div>
+      </div>
+    </section>
+
+    <section data-sec="sindicatos" style="display:none">
+      <div class="card"><div class="topo"><h2>Sindicatos monitorados</h2><button class="b" onclick="abrirSind()">+ Novo sindicato</button></div><div id="tabSind"></div></div>
+    </section>
+
+    <section data-sec="instrumentos" style="display:none">
+      <div class="card"><div class="topo"><h2>Convenções e Termos Aditivos</h2><div style="display:flex;gap:8px"><input id="fInst" placeholder="filtrar por registro, sindicato, categoria…" style="width:280px" oninput="renderInst()"></div></div><div id="tabInst"></div></div>
+    </section>
+
+    <section data-sec="consultas" style="display:none">
+      <div class="card"><h2>Histórico de consultas ao Mediador</h2><div id="tabCons"></div></div>
+    </section>
+
+    <section data-sec="erros" style="display:none">
+      <div class="card"><div class="topo"><h2>Central de Erros e Incidentes</h2><select id="fInc" style="width:220px" onchange="renderInc()"><option value="abertos">Abertos</option><option value="todos">Todos</option></select></div><div id="tabInc"></div></div>
+    </section>
+
+    <section data-sec="destinatarios" style="display:none">
+      <div class="card"><div class="topo"><h2>Responsáveis por alertas</h2><button class="b" onclick="abrirDest()">+ Novo destinatário</button></div><div id="tabDest"></div>
+        <div class="aviso">Tipos: <b>NOVA_CCT</b> (convenção nova), <b>MEDIADOR</b>, <b>DOWNLOAD</b>, <b>IMPORTACAO</b>, <b>ARMAZENAMENTO</b>, <b>APLICATIVO</b>, <b>EMAIL</b> ou <b>TODOS</b>.</div>
+        <div class="card" style="margin-top:12px"><h2>Notificações registradas</h2><div id="tabNotif"></div></div>
+      </div>
+    </section>
+
+    <section data-sec="versoes" style="display:none">
+      <div class="card"><h2>Versões</h2>
+        <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.2.0</td><td>02/09/2026</td><td>Fase 1: login, cadastro de sindicatos, lista de convenções com cláusulas e download do extrato, histórico de consultas, Central de Erros (status manual), destinatários e notificações. Banco <code>setup_cct_v0.2.0.sql</code> validado em PostgreSQL local; robô <code>monitor_cct.py</code> agendado no GitHub Actions.</td></tr>
+          <tr><td>v0.1.3</td><td>02/09/2026</td><td>Protótipo: domínio mediador.trabalho.gov.br confirmado; inspeção de campos via Edge Function; identificação do reCAPTCHA e do endpoint getConsultaAvancada.</td></tr>
+          <tr><td>v0.1.0</td><td>02/09/2026</td><td>Protótipo inicial de teste de consulta.</td></tr>
+        </table>
+      </div>
+    </section>
   </div>
 </main>
 
+<div class="modal" id="mSind"><div class="card"><h2 id="mSindTit">Sindicato</h2>
+  <input type="hidden" id="sId">
+  <div class="grid g2"><div><label>CNPJ</label><input id="sCnpj" maxlength="18"></div><div><label>Nome</label><input id="sNome"></div>
+    <div><label>Tipo</label><select id="sTipo"><option value="laboral">Laboral (empregados)</option><option value="patronal">Patronal</option></select></div>
+    <div><label>UF (referência)</label><input id="sUf" maxlength="2" placeholder="SC"></div>
+    <div><label>Categoria</label><input id="sCat" placeholder="ex.: Comerciários"></div>
+    <div><label>Monitorar</label><select id="sMon"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
+  <div style="margin-top:8px"><label>Observações</label><textarea id="sObs" rows="2"></textarea></div>
+  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mSind')">Cancelar</button><button class="b" onclick="salvarSind()">Salvar</button></div>
+</div></div>
+
+<div class="modal" id="mDest"><div class="card" style="max-width:560px"><h2>Destinatário de alertas</h2>
+  <input type="hidden" id="dId">
+  <div class="grid g2"><div><label>Nome</label><input id="dNome"></div><div><label>E-mail</label><input id="dEmail" type="email"></div>
+    <div><label>Grupo</label><select id="dGrupo"><option>ADMINISTRADOR</option><option>RESPONSAVEL_TECNICO</option><option>GERENTE</option><option>TI</option><option>DP</option></select></div>
+    <div><label>Tipos (separados por vírgula)</label><input id="dTipos" value="TODOS"></div></div>
+  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mDest')">Cancelar</button><button class="b" onclick="salvarDest()">Salvar</button></div>
+</div></div>
+
+<div class="modal" id="mInst"><div class="card"><div class="topo"><h2 id="mInstTit">Convenção</h2><div style="display:flex;gap:8px"><button class="b sec sm" id="btnBaixar">Baixar extrato (.doc)</button><button class="b sec sm" onclick="fechar('mInst')">Fechar</button></div></div>
+  <div id="mInstCab" style="font-size:13px;margin-bottom:10px"></div>
+  <input id="fCl" placeholder="buscar nas cláusulas…" oninput="renderCl()" style="margin-bottom:10px">
+  <div id="mInstCl"></div>
+</div></div>
+
+<div class="modal" id="mInc"><div class="card" style="max-width:640px"><h2>Incidente</h2>
+  <input type="hidden" id="iId"><div id="iDet" style="font-size:13px;margin-bottom:10px"></div>
+  <div class="grid g2"><div><label>Novo status</label><select id="iStatus"><option>EM_ANALISE</option><option>RESOLVIDO_MANUALMENTE</option><option>IGNORADO_COM_JUSTIFICATIVA</option></select></div><div><label>Analisado por</label><input id="iPor"></div></div>
+  <div style="margin-top:8px"><label>Observações / justificativa</label><textarea id="iObs" rows="3"></textarea></div>
+  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mInc')">Cancelar</button><button class="b" onclick="salvarInc()">Salvar</button></div>
+</div></div>
+
 <script>
-/* ===== CONFIGURAÇÃO — mesma chave publicável do index.html do Rescisões Pro ===== */
-const SUPABASE_URL = "https://fbxelwhdiisfmnwrerbl.supabase.co";
-const SUPABASE_ANON = "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6";
-/* ================================================================ */
-const FN = SUPABASE_URL + "/functions/v1/mediador-consulta";
-document.getElementById("fnUrl").textContent = FN;
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.2.0" };
+document.getElementById("versao").textContent = CONFIG.versao;
+const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtCnpj = c => (c||"").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+const fmtD = d => d ? d.split("-").reverse().join("/") : "—";
+const fmtDT = d => d ? new Date(d).toLocaleString("pt-BR", {dateStyle:"short", timeStyle:"short"}) : "—";
+const tagStatus = s => { const m = {CONSULTA_CONFIRMADA:"ok", IMPORTADO:"ok", ENVIADA:"ok", CONSULTA_COM_ALERTA:"alerta", PENDENTE:"alerta", NOTIFICADO:"info", CIENTE:"ok",
+  CONSULTA_NAO_CONCLUIDA:"erro", IMPORTACAO_NAO_CONCLUIDA:"erro", NAO_ENVIADA:"erro", NOVO:"erro", PERSISTENTE:"erro", EM_NOVA_TENTATIVA:"alerta", EM_ANALISE:"info",
+  RESOLVIDO_AUTOMATICAMENTE:"ok", RESOLVIDO_MANUALMENTE:"ok", IGNORADO_COM_JUSTIFICATIVA:"cinza", CRITICO:"erro", ALTO:"erro", ATENCAO:"alerta", INFORMATIVO:"info"};
+  return `<span class="tag ${m[s]||"cinza"}">${esc((s||"").replace(/_/g," "))}</span>`; };
+function msg(t, tipo="ok"){ const m=$("msg"); m.className="msg on "+tipo; m.textContent=t; setTimeout(()=>m.className="msg",4000); }
+function fechar(id){ $(id).classList.remove("on"); }
 
-const UFS = "AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO".split(" ");
-const selUf = document.getElementById("uf");
-UFS.forEach(u => { const o = document.createElement("option"); o.textContent = u; selUf.appendChild(o); });
+// ---------- API ----------
+async function api(path, opt={}) {
+  const h = { apikey: CONFIG.key, "Content-Type": "application/json", Authorization: "Bearer " + APP.token, ...(opt.headers||{}) };
+  const r = await fetch(CONFIG.url + "/rest/v1/" + path, { ...opt, headers: h });
+  if (r.status === 401) { sair(); throw new Error("Sessão expirada"); }
+  const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; }
+  if (!r.ok) throw new Error((j && j.message) || t || ("HTTP " + r.status));
+  return j;
+}
+const get = p => api(p);
+const post = (t, d, prefer="return=representation") => api(t, { method:"POST", body: JSON.stringify(d), headers:{Prefer:prefer} });
+const patch = (t, q, d) => api(t + "?" + q, { method:"PATCH", body: JSON.stringify(d), headers:{Prefer:"return=representation"} });
+const del = (t, q) => api(t + "?" + q, { method:"DELETE" });
 
-document.getElementById("cnpj").addEventListener("input", e => {
-  let v = e.target.value.replace(/\D/g, "").slice(0, 14);
-  e.target.value = v.replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
-                    .replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
-});
-
-async function chamar(body) {
-  const btns = document.querySelectorAll("button"); btns.forEach(b => b.disabled = true);
-  document.getElementById("tempo").textContent = "consultando…";
-  const t0 = performance.now();
+// ---------- login ----------
+async function entrar() {
+  $("lMsg").textContent = "";
   try {
-    const r = await fetch(FN, { method: "POST",
-      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON },
-      body: JSON.stringify(body) });
-    const txt = await r.text(); let data;
-    try { data = JSON.parse(txt); } catch { data = { ok: false, erro: "Resposta não-JSON (HTTP " + r.status + ")", bruto: txt.slice(0, 2000) }; }
-    if (!r.ok && !data.erro) data.erro = "HTTP " + r.status;
-    return data;
-  } catch (e) {
-    return { ok: false, status: "CONSULTA_NAO_CONCLUIDA", erro: "Falha ao chamar a Edge Function: " + e.message };
-  } finally {
-    btns.forEach(b => b.disabled = false);
-    document.getElementById("tempo").textContent = ((performance.now() - t0) / 1000).toFixed(1) + " s";
-  }
+    const r = await fetch(CONFIG.url + "/auth/v1/token?grant_type=password", { method:"POST", headers:{ apikey: CONFIG.key, "Content-Type":"application/json" },
+      body: JSON.stringify({ email: $("lEmail").value.trim(), password: $("lSenha").value }) });
+    const d = await r.json();
+    if (!r.ok || !d.access_token) throw new Error(d.error_description || d.msg || "Login inválido");
+    APP.token = d.access_token; APP.uid = d.user.id; APP.email = d.user.email;
+    sessionStorage.setItem("cct_sess", JSON.stringify({ token: APP.token, uid: APP.uid, email: APP.email }));
+    await iniciar();
+  } catch (e) { $("lMsg").textContent = e.message; }
+}
+async function iniciar() {
+  const u = await get(`resc_usuarios?select=tenant_id&auth_id=eq.${APP.uid}&limit=1`);
+  if (!u.length) { $("lMsg").textContent = "Usuário sem vínculo de tenant (resc_usuarios)."; return; }
+  APP.tenantId = u[0].tenant_id;
+  $("login").style.display = "none"; $("app").style.display = "block"; $("nav").style.display = "flex";
+  $("usuario").textContent = APP.email; $("btnSair").style.display = "inline-block";
+  await carregarTudo(); mostrar("painel");
+}
+function sair() { sessionStorage.removeItem("cct_sess"); location.reload(); }
+$("btnEntrar").onclick = entrar; $("lSenha").addEventListener("keydown", e => e.key === "Enter" && entrar()); $("btnSair").onclick = sair;
+
+// ---------- navegação ----------
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => mostrar(b.dataset.aba));
+function mostrar(aba) {
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.aba === aba));
+  document.querySelectorAll("section[data-sec]").forEach(s => s.style.display = s.dataset.sec === aba ? "block" : "none");
 }
 
-function mostrar(data, modo) {
-  document.getElementById("cardRes").style.display = "block";
-  document.getElementById("json").textContent = JSON.stringify(data, null, 2);
-  const st = document.getElementById("status"), tab = document.getElementById("tabela"), et = document.getElementById("etapas");
-  et.innerHTML = (data.etapas || []).map(x => "<li>" + x + "</li>").join("");
-  tab.innerHTML = "";
-  if (modo === "inspecionar") {
-    if (!data.ok) { st.className = "status erro"; st.innerHTML = "PÁGINA NÃO CARREGADA<span>" + (data.erro || "") + (data.http ? " (HTTP " + data.http + ")" : "") + "</span>"; return; }
-    const bloq = (data.sinais_bloqueio || []).length;
-    st.className = "status " + (bloq ? "alerta" : "ok");
-    st.innerHTML = (bloq ? "PÁGINA CARREGADA COM SINAIS DE BLOQUEIO: " + data.sinais_bloqueio.join(", ") : "PÁGINA CARREGADA") +
-      "<span>" + data.titulo + " · " + data.total_campos + " controles · form " + (data.form_method || "?") + " " + (data.form_action || "") + " · " + data.ms + " ms</span>";
-    const linhas = (data.campos || []).map(c => "<tr><td>" + c.tag + (c.type ? " [" + c.type + "]" : "") + "</td><td>" + c.name + "</td><td>" + c.id + "</td><td>" + (c.label || c.texto || c.value) +
-      "</td><td>" + (c.opcoes ? c.opcoes.map(o => o.text).join(" · ") : "") + "</td></tr>").join("");
-    tab.innerHTML = "<table><tr><th>Tag</th><th>name</th><th>id</th><th>Rótulo/texto</th><th>Opções</th></tr>" + linhas + "</table>";
-    return;
-  }
-  const s = data.status || "CONSULTA_NAO_CONCLUIDA";
-  st.className = "status " + (s === "CONSULTA_CONFIRMADA" ? "ok" : s === "CONSULTA_COM_ALERTA" ? "alerta" : "erro");
-  st.innerHTML = s.replace(/_/g, " ") + "<span>" + (data.erro || ((data.registros || []).length + " instrumento(s) localizado(s)")) + " · " + (data.ms || "?") + " ms</span>";
-  const regs = data.registros || [];
-  if (regs.length) {
-    const cols = Object.keys(regs[0]).filter(k => !k.endsWith("_link"));
-    tab.innerHTML = "<table><tr>" + cols.map(c => "<th>" + c + "</th>").join("") + "</tr>" +
-      regs.map(r => "<tr>" + cols.map(c => "<td>" + (r[c + "_link"] ? '<a href="' + r[c + "_link"] + '" target="_blank">' + r[c] + "</a>" : r[c])
-        + "</td>").join("") + "</tr>").join("") + "</table>";
-  }
+// ---------- dados ----------
+async function carregarTudo() {
+  const t = APP.tenantId;
+  const [sind, inst, cons, inc, dest, notif] = await Promise.all([
+    get(`cct_sindicatos?tenant_id=eq.${t}&order=nome`),
+    get(`cct_instrumentos?tenant_id=eq.${t}&select=*,sindicato:cct_sindicatos(nome)&order=detectado_em.desc`),
+    get(`cct_consultas?tenant_id=eq.${t}&select=*,sindicato:cct_sindicatos(nome,cnpj)&order=executada_em.desc&limit=300`),
+    get(`cct_incidentes?tenant_id=eq.${t}&select=*,sindicato:cct_sindicatos(nome)&order=ultima_ocorrencia.desc&limit=300`),
+    get(`cct_alertas_destinatarios?tenant_id=eq.${t}&order=nome`),
+    get(`cct_notificacoes?tenant_id=eq.${t}&order=created_at.desc&limit=100`)]);
+  APP.dados = { sind, inst, cons, inc, dest, notif };
+  renderPainel(); renderSind(); renderInst(); renderCons(); renderInc(); renderDest(); renderNotif();
 }
 
-document.getElementById("btnInspecionar").onclick = async () => mostrar(await chamar({ modo: "inspecionar" }), "inspecionar");
-document.getElementById("btnConsultar").onclick = async () => {
-  const cnpj = document.getElementById("cnpj").value.replace(/\D/g, "");
-  if (cnpj.length !== 14) { alert("Informe o CNPJ completo do sindicato."); return; }
-  mostrar(await chamar({ modo: "consultar", cnpj, tipo: document.getElementById("tipo").value,
-    vigencia: document.getElementById("vig").value, uf: document.getElementById("uf").value }), "consultar");
-};
+function renderPainel() {
+  const d = APP.dados, h24 = Date.now() - 864e5, abertos = d.inc.filter(i => ["NOVO","EM_NOVA_TENTATIVA","PERSISTENTE","EM_ANALISE"].includes(i.status));
+  const ult = d.cons[0];
+  const k = [["Sindicatos monitorados", d.sind.filter(s => s.monitorar && s.ativo).length, ""],
+    ["Convenções na base", d.inst.length, ""],
+    ["Novas nos últimos 7 dias", d.inst.filter(i => new Date(i.detectado_em) > Date.now() - 7*864e5).length, "alerta"],
+    ["Importações não concluídas", d.inst.filter(i => i.status_importacao !== "IMPORTADO").length, "erro"],
+    ["Erros nas últimas 24h", d.inc.filter(i => new Date(i.ultima_ocorrencia) > h24).length, "erro"],
+    ["Incidentes abertos", abertos.length, "erro"],
+    ["Críticos abertos", abertos.filter(i => i.gravidade === "CRITICO").length, "erro"],
+    ["Falhas no Mediador (abertas)", abertos.filter(i => i.modulo === "MEDIADOR").length, "erro"],
+    ["Notificações não enviadas", d.notif.filter(n => n.status === "NAO_ENVIADA").length, "alerta"],
+    ["Última consulta", ult ? fmtDT(ult.executada_em) : "—", ""]];
+  $("kpis").innerHTML = k.map(([l, v, c]) => `<div class="kpi ${v && c ? c : ""}"><b>${esc(v)}</b><span>${l}</span></div>`).join("");
+  $("painelNovos").innerHTML = tabInst(d.inst.slice(0, 8));
+}
+
+function renderSind() {
+  $("tabSind").innerHTML = `<table><tr><th>CNPJ</th><th>Nome</th><th>Tipo</th><th>UF</th><th>Monitorar</th><th>Última consulta</th><th>Status</th><th></th></tr>` +
+    APP.dados.sind.map(s => `<tr><td>${fmtCnpj(s.cnpj)}</td><td>${esc(s.nome)}<br><small style="color:var(--cinza)">${esc(s.categoria||"")}</small></td><td>${s.tipo}</td><td>${s.uf||""}</td>
+      <td>${s.monitorar && s.ativo ? '<span class="tag ok">sim</span>' : '<span class="tag cinza">não</span>'}</td><td>${fmtDT(s.ultima_consulta)}</td><td>${s.ultimo_status ? tagStatus(s.ultimo_status) : "—"}</td>
+      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirSind('${s.id}')">Editar</button> <button class="b sec sm" onclick="excluirSind('${s.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
+    (APP.dados.sind.length ? "" : `<div class="aviso">Nenhum sindicato cadastrado. Cadastre o sindicato laboral (e, se quiser, o patronal) de cada cliente.</div>`);
+}
+function abrirSind(id) {
+  const s = APP.dados.sind.find(x => x.id === id) || {};
+  $("mSindTit").textContent = id ? "Editar sindicato" : "Novo sindicato";
+  $("sId").value = id || ""; $("sCnpj").value = s.cnpj ? fmtCnpj(s.cnpj) : ""; $("sNome").value = s.nome || ""; $("sTipo").value = s.tipo || "laboral";
+  $("sUf").value = s.uf || ""; $("sCat").value = s.categoria || ""; $("sMon").value = String(s.monitorar ?? true); $("sObs").value = s.observacoes || "";
+  $("mSind").classList.add("on");
+}
+async function salvarSind() {
+  const cnpj = $("sCnpj").value.replace(/\D/g, "");
+  if (cnpj.length !== 14 || !$("sNome").value.trim()) return msg("Informe CNPJ (14 dígitos) e nome.", "erro");
+  const d = { tenant_id: APP.tenantId, cnpj, nome: $("sNome").value.trim(), tipo: $("sTipo").value, uf: $("sUf").value.trim().toUpperCase() || null,
+    categoria: $("sCat").value.trim() || null, monitorar: $("sMon").value === "true", observacoes: $("sObs").value.trim() || null };
+  try { if ($("sId").value) await patch("cct_sindicatos", "id=eq." + $("sId").value, d); else await post("cct_sindicatos", d);
+    fechar("mSind"); msg("Sindicato salvo."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
+}
+async function excluirSind(id) {
+  if (!confirm("Excluir o sindicato? As convenções já importadas permanecem na base (sem vínculo).")) return;
+  try { await del("cct_sindicatos", "id=eq." + id); msg("Excluído."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
+}
+
+function tabInst(lista) {
+  if (!lista.length) return `<div class="aviso">Nenhuma convenção na base ainda — o robô preenche na próxima execução.</div>`;
+  return `<table><tr><th>Registro</th><th>Tipo</th><th>Sindicato</th><th>Categoria</th><th>Vigência</th><th>Registro MTE</th><th>Detectada</th><th>Importação</th><th>Ciência</th><th class="r">Cláus.</th><th></th></tr>` +
+    lista.map(i => `<tr><td><b>${esc(i.numero_registro)}</b></td><td>${esc(i.tipo||"")}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.categoria||"")}</td>
+      <td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${fmtD(i.data_registro)}</td><td>${fmtDT(i.detectado_em)}</td><td>${tagStatus(i.status_importacao)}</td>
+      <td>${tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td><button class="b sec sm" onclick="abrirInst('${i.id}')">Abrir</button></td></tr>`).join("") + `</table>`;
+}
+function renderInst() {
+  const f = ($("fInst").value || "").toLowerCase();
+  $("tabInst").innerHTML = tabInst(APP.dados.inst.filter(i => !f || [i.numero_registro, i.sindicato?.nome, i.categoria, i.tipo, i.abrangencia].join(" ").toLowerCase().includes(f)));
+}
+async function abrirInst(id) {
+  const i = APP.dados.inst.find(x => x.id === id); APP.instAtual = i;
+  $("mInstTit").textContent = `${i.tipo || "Instrumento"} ${i.numero_registro}`;
+  $("mInstCab").innerHTML = `<b>Partes:</b> ${(i.partes||[]).map(p => esc(p.nome || p)).join(" × ")}<br><b>Categoria:</b> ${esc(i.categoria||"—")} · <b>Abrangência:</b> ${esc(i.abrangencia||"—")}<br>
+    <b>Vigência:</b> ${fmtD(i.vigencia_inicio)} a ${fmtD(i.vigencia_fim)} · <b>Data-base:</b> ${esc(i.data_base||"—")} · <b>Registro MTE:</b> ${fmtD(i.data_registro)} · <b>Processo:</b> ${esc(i.numero_processo||"—")}<br>
+    ${tagStatus(i.status_importacao)} ${tagStatus(i.status_ciencia)} ${i.status_ciencia !== "CIENTE" ? `<button class="b sm" onclick="darCiencia('${i.id}')">Registrar ciência</button>` : ""} ${i.observacoes ? `<br><small style="color:var(--erro)">${esc(i.observacoes)}</small>` : ""}`;
+  $("btnBaixar").style.display = i.arquivo_path ? "inline-block" : "none";
+  $("btnBaixar").onclick = () => baixar(i.arquivo_path);
+  $("fCl").value = ""; $("mInstCl").innerHTML = "carregando…"; $("mInst").classList.add("on");
+  try { APP.clAtual = await get(`cct_clausulas?instrumento_id=eq.${id}&select=ordem,numero_extenso,titulo,grupo,subgrupo,texto&order=ordem`); renderCl(); }
+  catch (e) { $("mInstCl").innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
+}
+function renderCl() {
+  const f = ($("fCl").value || "").toLowerCase(); let g = "";
+  $("mInstCl").innerHTML = (APP.clAtual || []).filter(c => !f || (c.titulo + " " + c.texto).toLowerCase().includes(f)).map(c => {
+    const cab = c.grupo && c.grupo !== g ? (g = c.grupo, `<div style="margin:12px 0 6px;font-weight:700;color:var(--cinza);font-size:12px;text-transform:uppercase">${esc(c.grupo)}</div>`) : "";
+    return cab + `<div class="cl"><h4>Cláusula ${esc(c.numero_extenso||c.ordem)} — ${esc(c.titulo)}</h4><small>${esc(c.subgrupo||"")}</small><p>${esc(c.texto)}</p></div>`; }).join("") || `<div class="aviso">Nenhuma cláusula.</div>`;
+}
+async function darCiencia(id) {
+  try { await patch("cct_instrumentos", "id=eq." + id, { status_ciencia: "CIENTE", observacoes: `Ciência registrada por ${APP.email} em ${new Date().toLocaleString("pt-BR")}` });
+    fechar("mInst"); msg("Ciência registrada."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
+}
+async function baixar(path) {
+  try {
+    const r = await fetch(`${CONFIG.url}/storage/v1/object/sign/cct-arquivos/${path}`, { method:"POST", headers:{ apikey: CONFIG.key, Authorization:"Bearer "+APP.token, "Content-Type":"application/json" }, body: JSON.stringify({ expiresIn: 600 }) });
+    const d = await r.json(); if (!r.ok) throw new Error(d.message || "não foi possível assinar a URL");
+    window.open(CONFIG.url + "/storage/v1" + d.signedURL, "_blank");
+  } catch (e) { msg(e.message, "erro"); }
+}
+
+function renderCons() {
+  $("tabCons").innerHTML = `<table><tr><th>Quando</th><th>Sindicato</th><th>Origem</th><th>Status</th><th class="r">Encontrados</th><th class="r">Novos</th><th class="r">ms</th><th>Erro / etapas</th></tr>` +
+    APP.dados.cons.map(c => `<tr><td>${fmtDT(c.executada_em)}</td><td>${esc(c.sindicato?.nome||"")}<br><small style="color:var(--cinza)">${fmtCnpj(c.sindicato?.cnpj)}</small></td><td>${esc(c.origem)}</td><td>${tagStatus(c.status)}</td>
+      <td class="r">${c.qtd_encontrados}</td><td class="r">${c.qtd_novos}</td><td class="r">${c.duracao_ms ?? ""}</td>
+      <td>${c.erro ? `<span style="color:var(--erro)">${esc(c.erro)}</span><br>` : ""}<details><summary style="cursor:pointer;color:var(--azul);font-size:12px">etapas</summary><small>${(c.etapas||[]).map(esc).join("<br>")}</small></details></td></tr>`).join("") + `</table>` +
+    (APP.dados.cons.length ? "" : `<div class="aviso">Nenhuma consulta registrada ainda.</div>`);
+}
+function renderInc() {
+  const so = $("fInc").value === "abertos", ab = ["NOVO","EM_NOVA_TENTATIVA","PERSISTENTE","EM_ANALISE"];
+  const l = APP.dados.inc.filter(i => !so || ab.includes(i.status));
+  $("tabInc").innerHTML = `<table><tr><th>Última ocorrência</th><th>Módulo</th><th>Sindicato</th><th>Erro</th><th>Gravidade</th><th class="r">Ocorr.</th><th>Status</th><th></th></tr>` +
+    l.map(i => `<tr><td>${fmtDT(i.ultima_ocorrencia)}<br><small style="color:var(--cinza)">1ª: ${fmtDT(i.primeira_ocorrencia)}</small></td><td>${esc(i.modulo)}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.mensagem)}</td>
+      <td>${tagStatus(i.gravidade)}</td><td class="r">${i.ocorrencias}</td><td>${tagStatus(i.status)}${i.resolvido_em ? `<br><small>${fmtDT(i.resolvido_em)}</small>` : ""}</td>
+      <td>${ab.includes(i.status) ? `<button class="b sec sm" onclick="abrirInc('${i.id}')">Tratar</button>` : ""}</td></tr>`).join("") + `</table>` +
+    (l.length ? "" : `<div class="aviso">Nenhum incidente ${so ? "aberto" : "registrado"}.</div>`);
+}
+function abrirInc(id) {
+  const i = APP.dados.inc.find(x => x.id === id);
+  $("iId").value = id; $("iDet").innerHTML = `<b>${esc(i.modulo)}</b> · ${tagStatus(i.gravidade)} · ${i.ocorrencias} ocorrência(s)<br>${esc(i.mensagem)}<br><small>${esc(JSON.stringify(i.detalhes||{})).slice(0,600)}</small>`;
+  $("iPor").value = APP.email; $("iObs").value = i.observacoes || ""; $("mInc").classList.add("on");
+}
+async function salvarInc() {
+  const st = $("iStatus").value, d = { status: st, observacoes: $("iObs").value.trim() || null, resolvido_por: $("iPor").value.trim() || APP.email };
+  if (st === "IGNORADO_COM_JUSTIFICATIVA" && !d.observacoes) return msg("Ignorar exige justificativa.", "erro");
+  if (st !== "EM_ANALISE") d.resolvido_em = new Date().toISOString();
+  try { await patch("cct_incidentes", "id=eq." + $("iId").value, d); fechar("mInc"); msg("Incidente atualizado."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
+}
+function renderDest() {
+  $("tabDest").innerHTML = `<table><tr><th>Nome</th><th>E-mail</th><th>Grupo</th><th>Tipos</th><th>Ativo</th><th></th></tr>` +
+    APP.dados.dest.map(d => `<tr><td>${esc(d.nome)}</td><td>${esc(d.email)}</td><td>${esc(d.grupo||"")}</td><td>${(d.tipos||[]).map(esc).join(", ")}</td><td>${d.ativo ? "sim" : "não"}</td>
+      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirDest('${d.id}')">Editar</button> <button class="b sec sm" onclick="excluirDest('${d.id}')">Excluir</button></td></tr>`).join("") + `</table>`;
+}
+function abrirDest(id) {
+  const d = APP.dados.dest.find(x => x.id === id) || {};
+  $("dId").value = id || ""; $("dNome").value = d.nome || ""; $("dEmail").value = d.email || ""; $("dGrupo").value = d.grupo || "ADMINISTRADOR"; $("dTipos").value = (d.tipos || ["TODOS"]).join(", ");
+  $("mDest").classList.add("on");
+}
+async function salvarDest() {
+  const d = { tenant_id: APP.tenantId, nome: $("dNome").value.trim(), email: $("dEmail").value.trim().toLowerCase(), grupo: $("dGrupo").value,
+    tipos: $("dTipos").value.split(",").map(s => s.trim().toUpperCase()).filter(Boolean), ativo: true };
+  if (!d.nome || !d.email.includes("@")) return msg("Informe nome e e-mail válido.", "erro");
+  try { if ($("dId").value) await patch("cct_alertas_destinatarios", "id=eq." + $("dId").value, d); else await post("cct_alertas_destinatarios", d);
+    fechar("mDest"); msg("Destinatário salvo."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
+}
+async function excluirDest(id) { if (!confirm("Excluir destinatário?")) return; try { await del("cct_alertas_destinatarios", "id=eq." + id); await carregarTudo(); } catch (e) { msg(e.message, "erro"); } }
+function renderNotif() {
+  $("tabNotif").innerHTML = `<table><tr><th>Quando</th><th>Tipo</th><th>Assunto</th><th>Destinatários</th><th>Status</th><th>Erro</th></tr>` +
+    APP.dados.notif.map(n => `<tr><td>${fmtDT(n.created_at)}</td><td>${esc(n.tipo)}</td><td>${esc(n.assunto)}</td><td>${(n.destinatarios||[]).map(esc).join(", ")}</td><td>${tagStatus(n.status)}</td><td><small>${esc(n.erro||"")}</small></td></tr>`).join("") + `</table>` +
+    (APP.dados.notif.length ? "" : `<div class="aviso">Nenhuma notificação registrada.</div>`);
+}
+
+// ---------- boot ----------
+(async () => {
+  const s = sessionStorage.getItem("cct_sess");
+  if (s) { try { Object.assign(APP, JSON.parse(s)); await iniciar(); } catch { sessionStorage.removeItem("cct_sess"); } }
+})();
 </script>
 </body>
 </html>
