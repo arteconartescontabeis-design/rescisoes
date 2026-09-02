@@ -98,7 +98,11 @@ def consultar(page, cnpj: str, tipo="Convenção Coletiva", vigencia="Vigentes",
         r["html"] = corpo
         et.append(f"{ENDPOINT} HTTP {resp.status}, {len(corpo)} bytes")
         if resp.status != 200:
+            texto_erro = re.sub(r"<[^>]+>", " ", re.sub(r"<(script|style).*?</\1>", "", corpo, flags=re.S | re.I))
+            texto_erro = re.sub(r"\s+", " ", _h.unescape(texto_erro)).strip()[:300]
             r["erro"] = f"Mediador respondeu HTTP {resp.status} na pesquisa"
+            r["trecho_erro"] = texto_erro
+            et.append(f"corpo do erro: {texto_erro[:200]}")
             return r
         r["registros"] = parse_registros(corpo)
         r["total_site"], _, r["paginas"] = total_e_paginas(corpo)
@@ -121,6 +125,24 @@ def consultar(page, cnpj: str, tipo="Convenção Coletiva", vigencia="Vigentes",
             pass
         r["duracao_ms"] = int((time.time() - t0) * 1000)
     return r
+
+
+def consultar_com_retry(page, cnpj, tipo="Convenção Coletiva", vigencia="Vigentes", uf="", tentativas=3, pausa_s=20):
+    """Seção 92 da spec: nova tentativa automática em falha (HTTP 5xx, timeout, sem resposta)."""
+    ultimo = None
+    for n in range(1, tentativas + 1):
+        r = consultar(page, cnpj, tipo, vigencia, uf)
+        r["tentativa"] = n
+        if r["status"] != "CONSULTA_NAO_CONCLUIDA":
+            if ultimo is not None:
+                r["etapas"].insert(0, f"tentativa {n} concluída após falha(s) anterior(es): {ultimo['erro']}")
+            return r
+        ultimo = r
+        if n < tentativas:
+            r["etapas"].append(f"tentativa {n} falhou ({r['erro']}); aguardando {pausa_s}s")
+            time.sleep(pausa_s)
+    ultimo["etapas"].append(f"{tentativas} tentativas sem sucesso")
+    return ultimo
 
 
 def baixar_extrato(page, solicitacao: str):
