@@ -96,6 +96,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.2.2</td><td>02/09/2026</td><td>Robô: extratos baixados imediatamente após a pesquisa que os encontrou (o Mediador nega o download — HTTP 403 — quando a última pesquisa da sessão não contém o registro); registro da consulta criado no início e concluído ao final; incidente antigo do Mediador resolvido quando a pesquisa de Convenção volta a funcionar.</td></tr>
           <tr><td>v0.2.1</td><td>02/09/2026</td><td>Robô: cada tipo (Convenção / Termo Aditivo) consultado de forma independente — falha em um não descarta os resultados do outro; nova tentativa automática (3x, 20 s) em HTTP 5xx/timeout (seção 92); texto do erro do Mediador guardado no incidente; incidente por tipo. Consulta com um tipo falho fica como CONSULTA COM ALERTA.</td></tr>
           <tr><td>v0.2.0</td><td>02/09/2026</td><td>Fase 1: login, cadastro de sindicatos, lista de convenções com cláusulas e download do extrato, histórico de consultas, Central de Erros (status manual), destinatários e notificações. Banco <code>setup_cct_v0.2.0.sql</code> validado em PostgreSQL local; robô <code>monitor_cct.py</code> agendado no GitHub Actions.</td></tr>
           <tr><td>v0.1.3</td><td>02/09/2026</td><td>Protótipo: domínio mediador.trabalho.gov.br confirmado; inspeção de campos via Edge Function; identificação do reCAPTCHA e do endpoint getConsultaAvancada.</td></tr>
@@ -139,7 +140,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.2.1" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.2.2" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const $ = id => document.getElementById(id);
