@@ -27,7 +27,7 @@ from playwright.sync_api import sync_playwright
 import mediador
 from extrair_cct import extrair
 
-VERSAO = "0.2.1"
+VERSAO = "0.2.2"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -233,9 +233,11 @@ def importar(tenant, sind, reg, page, consulta_id):
 def processar_sindicato(tenant, sind, page, existentes):
     cnpj = sind["cnpj"]
     log(f"== {sind['nome']} ({cnpj})")
-    novos, etapas, http = [], [], None
     t0 = time.time()
-    regs_total, por_tipo = [], {}
+    # registro da consulta criado ANTES (status provisório) para vincular os instrumentos; atualizado ao final
+    consulta = sb_insert("cct_consultas", {"tenant_id": tenant, "sindicato_id": sind["id"], "origem": ORIGEM,
+                                           "status": "CONSULTA_NAO_CONCLUIDA", "erro": "em execução", "etapas": []})[0]
+    novos, etapas, http, por_tipo, total_encontrados = [], [], None, {}, 0
     for tipo in TIPOS_MONITORADOS:
         r = mediador.consultar_com_retry(page, cnpj, tipo=tipo, vigencia="Vigentes")
         etapas += [f"[{tipo}] {e}" for e in r["etapas"]]
@@ -246,16 +248,26 @@ def processar_sindicato(tenant, sind, page, existentes):
             incidente(tenant, f"MEDIADOR:consulta:{cnpj}:{tipo}", "MEDIADOR", "ALTO",
                       f"CONSULTA NÃO CONCLUÍDA – {tipo} – {sind['nome']}: {r['erro']}", sind["id"],
                       detalhes={"tipo": tipo, "http": r["http"], "trecho_erro": r.get("trecho_erro"), "etapas": r["etapas"]})
-        else:
-            resolver(tenant, f"MEDIADOR:consulta:{cnpj}:{tipo}")
-            if r["status"] == "CONSULTA_COM_ALERTA":
-                etapas.append(f"[{tipo}] {r['erro']}")
-            regs_total += r["registros"]
+            time.sleep(2)
+            continue
+        resolver(tenant, f"MEDIADOR:consulta:{cnpj}:{tipo}")
+        resolver(tenant, f"MEDIADOR:consulta:{cnpj}")  # fingerprint da v0.2.0 (compatibilidade)
+        if r["status"] == "CONSULTA_COM_ALERTA":
+            etapas.append(f"[{tipo}] {r['erro']}")
+        total_encontrados += len(r["registros"])
+        # importar AGORA, enquanto a sessão do Mediador ainda tem este resultado (o extrato é negado — 403 — fora dele)
+        for reg in r["registros"]:
+            if reg["registro"] in existentes:
+                continue
+            log(f"  NOVO registro {reg['registro']} ({reg['tipo']}) — {reg.get('vigencia')}")
+            row, ok = importar(tenant, sind, reg, page, consulta["id"])
+            existentes.add(reg["registro"])
+            novos.append((reg, row, ok))
+            etapas.append(f"[{tipo}] {reg['registro']}: {'importado' if ok else 'IMPORTAÇÃO NÃO CONCLUÍDA'}")
+            time.sleep(1)
         time.sleep(2)
 
     falhas = [t for t, (st, _) in por_tipo.items() if st == "CONSULTA_NAO_CONCLUIDA"]
-    if not falhas:
-        resolver(tenant, f"MEDIADOR:consulta:{cnpj}")  # fingerprint da v0.2.0 (compatibilidade)
     if len(falhas) == len(TIPOS_MONITORADOS):
         status_geral = "CONSULTA_NAO_CONCLUIDA"
         erro_geral = "; ".join(f"{t}: {e}" for t, (_, e) in por_tipo.items())
@@ -265,36 +277,19 @@ def processar_sindicato(tenant, sind, page, existentes):
     else:
         status_geral, erro_geral = "CONSULTA_CONFIRMADA", None
 
-    consulta = sb_insert("cct_consultas", {
-        "tenant_id": tenant, "sindicato_id": sind["id"], "origem": ORIGEM, "status": status_geral, "http": http,
-        "qtd_encontrados": len(regs_total), "qtd_novos": 0, "duracao_ms": int((time.time() - t0) * 1000),
-        "erro": erro_geral, "etapas": etapas})[0]
+    sb_patch("cct_consultas", {"id": f"eq.{consulta['id']}"}, {
+        "status": status_geral, "http": http, "qtd_encontrados": total_encontrados, "qtd_novos": len(novos),
+        "duracao_ms": int((time.time() - t0) * 1000), "erro": erro_geral, "etapas": etapas})
 
-    if status_geral == "CONSULTA_NAO_CONCLUIDA":
-        sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"ultima_consulta": consulta["executada_em"], "ultimo_status": status_geral})
-        return status_geral, 0
-
-    for reg in regs_total:
-        if reg["registro"] in existentes:
-            continue
-        log(f"  NOVO registro {reg['registro']} ({reg['tipo']}) — {reg.get('vigencia')}")
-        row, ok = importar(tenant, sind, reg, page, consulta["id"])
-        existentes.add(reg["registro"])
-        novos.append((reg, row, ok))
-        time.sleep(1)
-
-    if novos:
-        sb_patch("cct_consultas", {"id": f"eq.{consulta['id']}"}, {"qtd_novos": len(novos)})
-        for reg, row, ok in novos:
-            partes = "<br>".join(p["nome"] if isinstance(p, dict) else p for p in (row.get("partes") or []))
-            html = (f"<p><b>{reg['tipo']}</b> registrada no Mediador para <b>{sind['nome']}</b>.</p>"
-                    f"<p><b>Registro:</b> {reg['registro']}<br><b>Solicitação:</b> {reg.get('solicitacao')}<br>"
-                    f"<b>Vigência:</b> {reg.get('vigencia')}<br><b>Partes:</b><br>{partes}</p>"
-                    f"<p><b>Importação:</b> {'concluída' if ok else 'NÃO CONCLUÍDA — verificar na Central de Erros'}</p>")
-            st = notificar(tenant, "NOVA_CCT", f"NOVA {reg['tipo'].upper()} – {sind['nome']} – {reg['registro']}", html,
-                           instrumento_id=row["id"])
-            sb_patch("cct_instrumentos", {"id": f"eq.{row['id']}"},
-                     {"status_ciencia": "NOTIFICADO" if st == "ENVIADA" else "PENDENTE"})
+    for reg, row, ok in novos:
+        partes = "<br>".join(p["nome"] if isinstance(p, dict) else p for p in (row.get("partes") or []))
+        html = (f"<p><b>{reg['tipo']}</b> registrada no Mediador para <b>{sind['nome']}</b>.</p>"
+                f"<p><b>Registro:</b> {reg['registro']}<br><b>Solicitação:</b> {reg.get('solicitacao')}<br>"
+                f"<b>Vigência:</b> {reg.get('vigencia')}<br><b>Partes:</b><br>{partes}</p>"
+                f"<p><b>Importação:</b> {'concluída' if ok else 'NÃO CONCLUÍDA — verificar na Central de Erros'}</p>")
+        st = notificar(tenant, "NOVA_CCT", f"NOVA {reg['tipo'].upper()} – {sind['nome']} – {reg['registro']}", html,
+                       instrumento_id=row["id"])
+        sb_patch("cct_instrumentos", {"id": f"eq.{row['id']}"}, {"status_ciencia": "NOTIFICADO" if st == "ENVIADA" else "PENDENTE"})
     sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"ultima_consulta": consulta["executada_em"], "ultimo_status": status_geral})
     return status_geral, len(novos)
 
@@ -312,7 +307,9 @@ def main():
     if filtro:
         sinds = [s for s in sinds if s["cnpj"] == filtro]
     log(f"{len(sinds)} sindicato(s) a monitorar")
-    existentes = {r["numero_registro"] for r in sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "select": "numero_registro"})}
+    # já importados de fato; os com IMPORTACAO_NAO_CONCLUIDA voltam a ser tentados (seção 92)
+    existentes = {r["numero_registro"] for r in sb_get("cct_instrumentos",
+                  {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "select": "numero_registro"})}
     resumo = {"CONSULTA_CONFIRMADA": 0, "CONSULTA_COM_ALERTA": 0, "CONSULTA_NAO_CONCLUIDA": 0, "novos": 0}
 
     with sync_playwright() as p:
