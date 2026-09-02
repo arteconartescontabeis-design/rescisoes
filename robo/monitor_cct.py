@@ -27,7 +27,7 @@ from playwright.sync_api import sync_playwright
 import mediador
 from extrair_cct import extrair
 
-VERSAO = "0.2.0"
+VERSAO = "0.2.1"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -233,21 +233,37 @@ def importar(tenant, sind, reg, page, consulta_id):
 def processar_sindicato(tenant, sind, page, existentes):
     cnpj = sind["cnpj"]
     log(f"== {sind['nome']} ({cnpj})")
-    novos, etapas, status_geral, erro_geral, http = [], [], "CONSULTA_CONFIRMADA", None, None
+    novos, etapas, http = [], [], None
     t0 = time.time()
-    regs_total = []
+    regs_total, por_tipo = [], {}
     for tipo in TIPOS_MONITORADOS:
-        r = mediador.consultar(page, cnpj, tipo=tipo, vigencia="Vigentes")
+        r = mediador.consultar_com_retry(page, cnpj, tipo=tipo, vigencia="Vigentes")
         etapas += [f"[{tipo}] {e}" for e in r["etapas"]]
         http = r["http"] or http
+        por_tipo[tipo] = (r["status"], r["erro"])
         if r["status"] == "CONSULTA_NAO_CONCLUIDA":
-            status_geral, erro_geral = "CONSULTA_NAO_CONCLUIDA", r["erro"]
             etapas.append(f"[{tipo}] ERRO: {r['erro']}")
-            break
-        if r["status"] == "CONSULTA_COM_ALERTA" and status_geral != "CONSULTA_NAO_CONCLUIDA":
-            etapas.append(f"[{tipo}] {r['erro']}")
-        regs_total += r["registros"]
+            incidente(tenant, f"MEDIADOR:consulta:{cnpj}:{tipo}", "MEDIADOR", "ALTO",
+                      f"CONSULTA NÃO CONCLUÍDA – {tipo} – {sind['nome']}: {r['erro']}", sind["id"],
+                      detalhes={"tipo": tipo, "http": r["http"], "trecho_erro": r.get("trecho_erro"), "etapas": r["etapas"]})
+        else:
+            resolver(tenant, f"MEDIADOR:consulta:{cnpj}:{tipo}")
+            if r["status"] == "CONSULTA_COM_ALERTA":
+                etapas.append(f"[{tipo}] {r['erro']}")
+            regs_total += r["registros"]
         time.sleep(2)
+
+    falhas = [t for t, (st, _) in por_tipo.items() if st == "CONSULTA_NAO_CONCLUIDA"]
+    if not falhas:
+        resolver(tenant, f"MEDIADOR:consulta:{cnpj}")  # fingerprint da v0.2.0 (compatibilidade)
+    if len(falhas) == len(TIPOS_MONITORADOS):
+        status_geral = "CONSULTA_NAO_CONCLUIDA"
+        erro_geral = "; ".join(f"{t}: {e}" for t, (_, e) in por_tipo.items())
+    elif falhas or any(st == "CONSULTA_COM_ALERTA" for st, _ in por_tipo.values()):
+        status_geral = "CONSULTA_COM_ALERTA"
+        erro_geral = "; ".join(f"{t}: {e}" for t, (st, e) in por_tipo.items() if e) or None
+    else:
+        status_geral, erro_geral = "CONSULTA_CONFIRMADA", None
 
     consulta = sb_insert("cct_consultas", {
         "tenant_id": tenant, "sindicato_id": sind["id"], "origem": ORIGEM, "status": status_geral, "http": http,
@@ -255,13 +271,9 @@ def processar_sindicato(tenant, sind, page, existentes):
         "erro": erro_geral, "etapas": etapas})[0]
 
     if status_geral == "CONSULTA_NAO_CONCLUIDA":
-        incidente(tenant, f"MEDIADOR:consulta:{cnpj}", "MEDIADOR", "ALTO",
-                  f"CONSULTA NÃO CONCLUÍDA – erro no acesso ao Mediador para {sind['nome']}: {erro_geral}", sind["id"],
-                  detalhes={"etapas": etapas})
         sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"ultima_consulta": consulta["executada_em"], "ultimo_status": status_geral})
         return status_geral, 0
 
-    resolver(tenant, f"MEDIADOR:consulta:{cnpj}")
     for reg in regs_total:
         if reg["registro"] in existentes:
             continue
