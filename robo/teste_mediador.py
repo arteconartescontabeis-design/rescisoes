@@ -1,5 +1,5 @@
 """
-Protótipo de teste v0.2 — consulta ao Sistema Mediador (MTE) via navegador real
+Protótipo de teste v0.3 — consulta ao Sistema Mediador (MTE) via navegador real
 Captura a resposta AJAX getConsultaAvancada (inclui reCAPTCHA gerado pela própria página)
 Uso:
   pip install playwright && playwright install chromium
@@ -16,6 +16,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
 URL = "https://mediador.trabalho.gov.br/sistemas/mediador/ConsultarInstColetivo"
 ENDPOINT = "getConsultaAvancada"
+BASE = "https://mediador.trabalho.gov.br"
 TIMEOUT_MS = 60_000
 
 
@@ -54,6 +55,32 @@ def _select_por_texto(page, rotulo_regex, texto):
     """Seleciona opção em um <select> localizado pelo label (case-insensitive)."""
     sel = page.get_by_label(re.compile(rotulo_regex, re.I))
     sel.select_option(label=texto)
+
+
+def parse_registros(html_resp):
+    """Extrai os blocos de resultado da resposta HTML de getConsultaAvancada."""
+    import html as _h
+    txt = re.sub(r"<script.*?</script>", "", html_resp, flags=re.S | re.I)
+    txt = re.sub(r"<[^>]+>", "\n", txt); txt = _h.unescape(txt)
+    txt = re.sub(r"[ \t\xa0]+", " ", txt); txt = re.sub(r"\n\s*\n+", "\n", txt)
+    regs = []
+    blocos = re.split(r"Nº do Registro\n", txt)[1:]
+    for b in blocos:
+        linhas = [l.strip() for l in b.split("\n") if l.strip()]
+        def apos(rotulo, n=1):
+            if rotulo in linhas:
+                i = linhas.index(rotulo); return " ".join(linhas[i + 1:i + 1 + n])
+            return None
+        try:
+            ip = linhas.index("Partes"); fim = linhas.index("Download") if "Download" in linhas else len(linhas)
+            partes = " ".join(linhas[ip + 1:fim]).replace(" e Outros", " e Outros")
+            partes = [x.strip() for x in re.split(r"(?<=[A-ZÇ]) (?=SIND)", partes)]
+        except ValueError:
+            partes = []
+        regs.append({"registro": linhas[0], "solicitacao": apos("Nº da Solicitação"),
+                     "tipo": apos("Tipo do Instrumento"), "vigencia": apos("Vigência", 2),
+                     "partes": partes})
+    return regs
 
 
 def consultar(page, cnpj, tipo, vigencia, uf):
@@ -112,43 +139,38 @@ def consultar(page, cnpj, tipo, vigencia, uf):
             page.screenshot(path=f"mediador_resultado_{cnpj}.png", full_page=True)
             resultado["status"] = "CONSULTA_CONFIRMADA" if re.search(r"registro|vig[êe]ncia", corpo, re.I) else "CONSULTA_COM_ALERTA"
             resultado["erro"] = None if resultado["status"] == "CONSULTA_CONFIRMADA" else "resposta não reconhecida — ver arquivo e screenshot"
-        # ---- download do extrato (.doc = HTML) via link "Download" (abre pop-up) ----
-        if resultado["status"] == "CONSULTA_CONFIRMADA":
+        # ---- registros a partir do HTML da resposta ----
+        resultado["registros"] = parse_registros(corpo)
+        if resultado["registros"]:
+            resultado["status"] = "CONSULTA_CONFIRMADA"; resultado["erro"] = None
+            resultado.pop("trecho", None)
+        et.append(f"{len(resultado['registros'])} registro(s) identificados no HTML")
+
+        # ---- download direto do extrato (.doc = HTML), sem pop-up, mesma sessão ----
+        for r in resultado["registros"]:
             try:
-                page.wait_for_timeout(1500)
-                links = page.locator("a:has-text('Download')")
-                n = links.count()
-                et.append(f"{n} link(s) Download na tela")
-                if n:
-                    ctx = page.context
-                    with ctx.expect_page(timeout=30000) as pop_info:
-                        links.first.click()
-                    pop = pop_info.value
-                    try:
-                        with pop.expect_download(timeout=60000) as dl_info:
-                            pass
-                        dl = dl_info.value
-                    except Exception:
-                        with page.expect_download(timeout=60000) as dl_info:
-                            pass
-                        dl = dl_info.value
-                    nome = f"extrato_{cnpj}_{dl.suggested_filename}"
-                    dl.save_as(nome)
-                    et.append(f"download salvo: {nome} ({os.path.getsize(nome)} bytes)")
-                    resultado["arquivo"] = nome
+                url_doc = f"{BASE}/sistemas/mediador/Resumo/resumoVisualizarSalvarMsWordDoc?NrSolicitacao={r['solicitacao']}"
+                resp = page.request.get(url_doc, timeout=60000)
+                corpo_doc = resp.body()
+                nome = "extrato_" + r["registro"].replace("/", "-") + ".doc"
+                with open(nome, "wb") as f: f.write(corpo_doc)
+                r["arquivo"] = nome; r["download_http"] = resp.status; r["bytes"] = len(corpo_doc)
+                et.append(f"download {r['registro']}: HTTP {resp.status}, {len(corpo_doc)} bytes")
+                if resp.status == 200 and len(corpo_doc) > 5000:
                     try:
                         from extrair_cct import extrair
                         dados = extrair(nome)
-                        resultado["extrato"] = {k: v for k, v in dados.items() if k != "clausulas"}
-                        with open(f"extrato_{cnpj}.json", "w", encoding="utf-8") as f:
+                        with open(nome.replace(".doc", ".json"), "w", encoding="utf-8") as f:
                             json.dump(dados, f, ensure_ascii=False, indent=2)
-                        et.append(f"extração OK: {dados['total_clausulas']} cláusulas, registro {dados['metadados']['numero_registro']}")
+                        r["extrato"] = {k: v for k, v in dados.items() if k not in ("clausulas",)}
+                        et.append(f"extração {r['registro']}: {dados['total_clausulas']} cláusulas, "
+                                  f"registro no doc = {dados['metadados']['numero_registro']}")
                     except Exception as e:
-                        et.append(f"extração falhou: {type(e).__name__}: {e}")
+                        et.append(f"extração {r['registro']} falhou: {type(e).__name__}: {e}")
+                else:
+                    et.append(f"AVISO: download {r['registro']} suspeito (status/tamanho) — conferir arquivo")
             except Exception as e:
-                et.append(f"download falhou: {type(e).__name__}: {e}")
-                try: page.screenshot(path=f"mediador_download_{cnpj}.png", full_page=True)
-                except Exception: pass
+                et.append(f"download {r.get('registro')} falhou: {type(e).__name__}: {e}")
     except PWTimeout as e:
         resultado["erro"] = f"TIMEOUT: {e}"
     except Exception as e:
