@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CCT Monitor — Teste de Consulta ao Mediador</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--azul:#1a5276;--azul-esc:#123a55;--cinza:#5b6b7a;--borda:#d9e1e8;--fundo:#f4f7fa;--ok:#1e8449;--alerta:#b9770e;--erro:#a93226;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'DM Sans',sans-serif;background:var(--fundo);color:#1f2d3a}
+  header{background:var(--azul);color:#fff;padding:18px 28px;display:flex;align-items:center;justify-content:space-between}
+  header h1{font-family:'Playfair Display',serif;font-size:22px;margin:0;font-weight:600}
+  header small{opacity:.85;display:block;font-size:13px;margin-top:2px}
+  .badge{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);border-radius:14px;padding:3px 11px;font-size:12px;font-weight:600}
+  main{max-width:1100px;margin:26px auto;padding:0 20px}
+  .card{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:22px;margin-bottom:20px}
+  .card h2{font-family:'Playfair Display',serif;color:var(--azul);font-size:18px;margin:0 0 14px}
+  .grid{display:grid;grid-template-columns:2fr 1.4fr 1fr .7fr;gap:12px}
+  label{display:block;font-size:12.5px;color:var(--cinza);margin-bottom:4px;font-weight:500}
+  input,select{width:100%;padding:9px 11px;border:1px solid var(--borda);border-radius:7px;font:inherit;font-size:14px}
+  input:focus,select:focus{outline:none;border-color:var(--azul)}
+  .acoes{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center}
+  button{background:var(--azul);color:#fff;border:0;border-radius:7px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer}
+  button.sec{background:#fff;color:var(--azul);border:1px solid var(--azul)}
+  button:hover{background:var(--azul-esc)} button.sec:hover{background:#eaf1f7}
+  button:disabled{opacity:.55;cursor:wait}
+  .status{padding:12px 16px;border-radius:8px;font-weight:600;margin-bottom:14px;display:none}
+  .status.ok{background:#e8f6ee;color:var(--ok);display:block}
+  .status.alerta{background:#fdf3e2;color:var(--alerta);display:block}
+  .status.erro{background:#fbe9e7;color:var(--erro);display:block}
+  .status span{display:block;font-weight:400;font-size:13px;margin-top:4px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#eef3f7;color:var(--azul);text-align:left;padding:8px 10px;border-bottom:2px solid var(--borda)}
+  td{padding:8px 10px;border-bottom:1px solid var(--borda);vertical-align:top}
+  tr:hover td{background:#f8fafc}
+  pre{background:#0f1c26;color:#d6e2ec;padding:14px;border-radius:8px;font-size:12px;max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+  .regra{font-size:12.5px;color:var(--cinza);border-left:3px solid var(--azul);padding:8px 12px;background:#f8fafc;margin-top:12px}
+  .cfg{font-size:12px;color:var(--cinza);margin-top:8px}
+  .cfg code{background:#eef3f7;padding:2px 5px;border-radius:4px}
+  .etapas{font-size:12.5px;color:var(--cinza);margin:0 0 12px 18px}
+  a{color:var(--azul)}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>CCT Monitor</h1><small>Teste de consulta ao Sistema Mediador · Artecon Artes Contábeis</small></div>
+  <span class="badge">v0.1.0 · protótipo</span>
+</header>
+<main>
+  <div class="card">
+    <h2>Consulta por sindicato</h2>
+    <div class="grid">
+      <div><label>CNPJ do sindicato (laboral ou patronal)</label><input id="cnpj" placeholder="00.000.000/0000-00" maxlength="18"></div>
+      <div><label>Tipo de instrumento</label>
+        <select id="tipo"><option>Convenção Coletiva</option><option>Termo Aditivo</option><option>Acordo Coletivo</option></select></div>
+      <div><label>Vigência</label><select id="vig"><option>Vigentes</option><option>Todos</option></select></div>
+      <div><label>UF de registro</label><select id="uf"><option value="">(sem filtro)</option></select></div>
+    </div>
+    <div class="acoes">
+      <button id="btnConsultar">Consultar Mediador</button>
+      <button id="btnInspecionar" class="sec">Inspecionar página (campos e botões)</button>
+      <span id="tempo" style="font-size:12.5px;color:var(--cinza)"></span>
+    </div>
+    <div class="regra">Regra do protótipo: falha de acesso nunca é registrada como "não existe CCT". Cada consulta termina em
+      <b>CONSULTA CONFIRMADA</b>, <b>CONSULTA COM ALERTA</b> (site respondeu vazio) ou <b>CONSULTA NÃO CONCLUÍDA</b> (erro).</div>
+    <div class="cfg">Edge Function: <code id="fnUrl"></code></div>
+  </div>
+
+  <div class="card" id="cardRes" style="display:none">
+    <h2>Resultado</h2>
+    <div id="status" class="status"></div>
+    <ul id="etapas" class="etapas"></ul>
+    <div id="tabela"></div>
+    <details style="margin-top:14px"><summary style="cursor:pointer;color:var(--azul);font-weight:600">Resposta completa (JSON)</summary><pre id="json"></pre></details>
+  </div>
+</main>
+
+<script>
+/* ===== CONFIGURAÇÃO — mesma chave publicável do index.html do Rescisões Pro ===== */
+const SUPABASE_URL = "https://fbxelwhdiisfmnwrerbl.supabase.co";
+const SUPABASE_ANON = "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6";
+/* ================================================================ */
+const FN = SUPABASE_URL + "/functions/v1/mediador-consulta";
+document.getElementById("fnUrl").textContent = FN;
+
+const UFS = "AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO".split(" ");
+const selUf = document.getElementById("uf");
+UFS.forEach(u => { const o = document.createElement("option"); o.textContent = u; selUf.appendChild(o); });
+
+document.getElementById("cnpj").addEventListener("input", e => {
+  let v = e.target.value.replace(/\D/g, "").slice(0, 14);
+  e.target.value = v.replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+                    .replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
+});
+
+async function chamar(body) {
+  const btns = document.querySelectorAll("button"); btns.forEach(b => b.disabled = true);
+  document.getElementById("tempo").textContent = "consultando…";
+  const t0 = performance.now();
+  try {
+    const r = await fetch(FN, { method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON },
+      body: JSON.stringify(body) });
+    const txt = await r.text(); let data;
+    try { data = JSON.parse(txt); } catch { data = { ok: false, erro: "Resposta não-JSON (HTTP " + r.status + ")", bruto: txt.slice(0, 2000) }; }
+    if (!r.ok && !data.erro) data.erro = "HTTP " + r.status;
+    return data;
+  } catch (e) {
+    return { ok: false, status: "CONSULTA_NAO_CONCLUIDA", erro: "Falha ao chamar a Edge Function: " + e.message };
+  } finally {
+    btns.forEach(b => b.disabled = false);
+    document.getElementById("tempo").textContent = ((performance.now() - t0) / 1000).toFixed(1) + " s";
+  }
+}
+
+function mostrar(data, modo) {
+  document.getElementById("cardRes").style.display = "block";
+  document.getElementById("json").textContent = JSON.stringify(data, null, 2);
+  const st = document.getElementById("status"), tab = document.getElementById("tabela"), et = document.getElementById("etapas");
+  et.innerHTML = (data.etapas || []).map(x => "<li>" + x + "</li>").join("");
+  tab.innerHTML = "";
+  if (modo === "inspecionar") {
+    if (!data.ok) { st.className = "status erro"; st.innerHTML = "PÁGINA NÃO CARREGADA<span>" + (data.erro || "") + (data.http ? " (HTTP " + data.http + ")" : "") + "</span>"; return; }
+    const bloq = (data.sinais_bloqueio || []).length;
+    st.className = "status " + (bloq ? "alerta" : "ok");
+    st.innerHTML = (bloq ? "PÁGINA CARREGADA COM SINAIS DE BLOQUEIO: " + data.sinais_bloqueio.join(", ") : "PÁGINA CARREGADA") +
+      "<span>" + data.titulo + " · " + data.total_campos + " controles · form " + (data.form_method || "?") + " " + (data.form_action || "") + " · " + data.ms + " ms</span>";
+    const linhas = (data.campos || []).map(c => "<tr><td>" + c.tag + (c.type ? " [" + c.type + "]" : "") + "</td><td>" + c.name + "</td><td>" + c.id + "</td><td>" + (c.label || c.texto || c.value) +
+      "</td><td>" + (c.opcoes ? c.opcoes.map(o => o.text).join(" · ") : "") + "</td></tr>").join("");
+    tab.innerHTML = "<table><tr><th>Tag</th><th>name</th><th>id</th><th>Rótulo/texto</th><th>Opções</th></tr>" + linhas + "</table>";
+    return;
+  }
+  const s = data.status || "CONSULTA_NAO_CONCLUIDA";
+  st.className = "status " + (s === "CONSULTA_CONFIRMADA" ? "ok" : s === "CONSULTA_COM_ALERTA" ? "alerta" : "erro");
+  st.innerHTML = s.replace(/_/g, " ") + "<span>" + (data.erro || ((data.registros || []).length + " instrumento(s) localizado(s)")) + " · " + (data.ms || "?") + " ms</span>";
+  const regs = data.registros || [];
+  if (regs.length) {
+    const cols = Object.keys(regs[0]).filter(k => !k.endsWith("_link"));
+    tab.innerHTML = "<table><tr>" + cols.map(c => "<th>" + c + "</th>").join("") + "</tr>" +
+      regs.map(r => "<tr>" + cols.map(c => "<td>" + (r[c + "_link"] ? '<a href="' + r[c + "_link"] + '" target="_blank">' + r[c] + "</a>" : r[c])
+        + "</td>").join("") + "</tr>").join("") + "</table>";
+  }
+}
+
+document.getElementById("btnInspecionar").onclick = async () => mostrar(await chamar({ modo: "inspecionar" }), "inspecionar");
+document.getElementById("btnConsultar").onclick = async () => {
+  const cnpj = document.getElementById("cnpj").value.replace(/\D/g, "");
+  if (cnpj.length !== 14) { alert("Informe o CNPJ completo do sindicato."); return; }
+  mostrar(await chamar({ modo: "consultar", cnpj, tipo: document.getElementById("tipo").value,
+    vigencia: document.getElementById("vig").value, uf: document.getElementById("uf").value }), "consultar");
+};
+</script>
+</body>
+</html>
