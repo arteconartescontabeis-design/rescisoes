@@ -289,7 +289,7 @@ def processar_sindicato(tenant, sind, page, existentes):
 
 def main():
     log(f"CCT Monitor robô v{VERSAO} — origem {ORIGEM}")
-    tenants = sb_get("tenants", {"cnpj": f"eq.{TENANT_CNPJ}", "select": "id,nome"})
+    tenants = sb_get("resc_tenants", {"cnpj": f"eq.{TENANT_CNPJ}", "select": "id,nome"})
     if not tenants:
         log(f"tenant {TENANT_CNPJ} não encontrado — abortando");
         sys.exit(2)
