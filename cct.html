@@ -49,7 +49,7 @@
   <div style="display:flex;gap:10px;align-items:center"><span id="usuario" style="font-size:12.5px;opacity:.9"></span><button class="b sec sm" id="btnSair" style="display:none;background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">Sair</button><span class="badge" id="versao"></span></div>
 </header>
 <nav id="nav" style="display:none">
-  <button data-aba="painel" class="on">Painel</button><button data-aba="sindicatos">Sindicatos</button><button data-aba="instrumentos">Convenções</button>
+  <button data-aba="painel" class="on">Painel</button><button data-aba="sindicatos">Sindicatos</button><button data-aba="empresas">Empresas</button><button data-aba="instrumentos">Convenções</button><button data-aba="confirmacoes">Confirmações</button>
   <button data-aba="consultas">Consultas</button><button data-aba="erros">Central de Erros</button><button data-aba="destinatarios">Destinatários</button><button data-aba="versoes">Versões</button>
 </nav>
 <main>
@@ -74,6 +74,21 @@
       <div class="card"><div class="topo"><h2>Sindicatos monitorados</h2><button class="b" onclick="abrirSind()">+ Novo sindicato</button></div><div id="tabSind"></div></div>
     </section>
 
+    <section data-sec="empresas" style="display:none">
+      <div class="card"><div class="topo"><h2>Empresas e enquadramento sindical</h2><button class="b" onclick="abrirEmp()">+ Nova empresa</button></div><div id="tabEmp"></div>
+        <div class="aviso">O responsável da empresa recebe o aviso de convenção nova e os lembretes; o gerente recebe o escalonamento quando o prazo vence. "Monitorar ACT" faz o robô consultar também os Acordos Coletivos da própria empresa no Mediador.</div></div>
+    </section>
+
+    <section data-sec="confirmacoes" style="display:none">
+      <div class="card"><div class="topo"><h2>Central de Confirmações de Ciência</h2><select id="fConf" style="width:220px" onchange="renderConf()"><option value="pendentes">Pendentes</option><option value="atrasadas">Atrasadas</option><option value="todas">Todas</option></select></div>
+        <div class="kpis" id="kpisConf" style="margin-bottom:12px"></div><div id="tabConf"></div></div>
+      <div class="card"><h2>Parâmetros de ciência</h2>
+        <div class="grid g3"><div><label>Prazo para ciência (dias úteis)</label><input id="cfgPrazo" type="number" min="1" max="30"></div>
+          <div><label>Lembrete diário</label><select id="cfgLemb"><option value="true">Sim</option><option value="false">Não</option></select></div>
+          <div><label>Escalonar ao gerente após o prazo</label><select id="cfgEsc"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
+        <div style="margin-top:10px"><button class="b" onclick="salvarConfig()">Salvar parâmetros</button></div></div>
+    </section>
+
     <section data-sec="instrumentos" style="display:none">
       <div class="card"><div class="topo"><h2>Convenções e Termos Aditivos</h2><div style="display:flex;gap:8px"><input id="fInst" placeholder="filtrar por registro, sindicato, categoria…" style="width:280px" oninput="renderInst()"></div></div><div id="tabInst"></div></div>
     </section>
@@ -96,6 +111,9 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.4.0</td><td>03/09/2026</td><td>Bloco 3 — Análise: extração determinística de valores por cláusula (piso, reajuste, contribuições, feriados, intervalo, banco de horas…) com referência à cláusula e confiança; comparação automática com a CCT anterior do mesmo par de sindicatos (cláusulas novas, excluídas, alteradas com diff e variação dos valores); parecer por IA (resumo, destaques, providências, alertas) com validação das cláusulas citadas — sem chave de API fica ANÁLISE POR IA NÃO CONCLUÍDA mantendo valores e comparação. Aba Análise na convenção, valores no Painel, reprocessamento sob demanda. Banco <code>setup_cct_v0.4.0.sql</code> validado localmente.</td></tr>
+          <tr><td>v0.3.0</td><td>03/09/2026</td><td>Bloco 2 — Ciência: cadastro de Empresas com responsável, gerente, CNAE e vínculo com sindicatos; Central de Confirmações (prazo em dias úteis via <code>resc_feriados</code>, atrasadas, registro de ciência por empresa); parâmetros de prazo/lembrete/escalonamento; responsável e gerente padrão por sindicato; monitoramento opcional de ACT por empresa. Robô: cria ciências ao importar, envia aviso ao responsável, lembrete diário e escalonamento ao gerente após o prazo; heartbeat (pg_cron) abre incidente crítico se o robô não rodar. Banco <code>setup_cct_v0.3.0.sql</code> validado localmente.</td></tr>
+          <tr><td>v0.2.3</td><td>02/09/2026</td><td>Robô: download do extrato feito de dentro da página do Mediador (fetch same-origin, com os cabeçalhos do navegador), com fallback; texto da resposta do site (403/erro) guardado no incidente e na observação da convenção.</td></tr>
           <tr><td>v0.2.2</td><td>02/09/2026</td><td>Robô: extratos baixados imediatamente após a pesquisa que os encontrou (o Mediador nega o download — HTTP 403 — quando a última pesquisa da sessão não contém o registro); registro da consulta criado no início e concluído ao final; incidente antigo do Mediador resolvido quando a pesquisa de Convenção volta a funcionar.</td></tr>
           <tr><td>v0.2.1</td><td>02/09/2026</td><td>Robô: cada tipo (Convenção / Termo Aditivo) consultado de forma independente — falha em um não descarta os resultados do outro; nova tentativa automática (3x, 20 s) em HTTP 5xx/timeout (seção 92); texto do erro do Mediador guardado no incidente; incidente por tipo. Consulta com um tipo falho fica como CONSULTA COM ALERTA.</td></tr>
           <tr><td>v0.2.0</td><td>02/09/2026</td><td>Fase 1: login, cadastro de sindicatos, lista de convenções com cláusulas e download do extrato, histórico de consultas, Central de Erros (status manual), destinatários e notificações. Banco <code>setup_cct_v0.2.0.sql</code> validado em PostgreSQL local; robô <code>monitor_cct.py</code> agendado no GitHub Actions.</td></tr>
@@ -114,8 +132,19 @@
     <div><label>UF (referência)</label><input id="sUf" maxlength="2" placeholder="SC"></div>
     <div><label>Categoria</label><input id="sCat" placeholder="ex.: Comerciários"></div>
     <div><label>Monitorar</label><select id="sMon"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
+  <div class="grid g2" style="margin-top:8px"><div><label>E-mail do responsável padrão (ciência)</label><input id="sResp" type="email" placeholder="usado quando a empresa não tem o seu"></div><div><label>E-mail do gerente (escalonamento)</label><input id="sGer" type="email"></div></div>
   <div style="margin-top:8px"><label>Observações</label><textarea id="sObs" rows="2"></textarea></div>
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mSind')">Cancelar</button><button class="b" onclick="salvarSind()">Salvar</button></div>
+</div></div>
+
+<div class="modal" id="mEmp"><div class="card"><h2 id="mEmpTit">Empresa</h2>
+  <input type="hidden" id="eId">
+  <div class="grid g3"><div><label>CNPJ</label><input id="eCnpj" maxlength="18"></div><div style="grid-column:span 2"><label>Razão social</label><input id="eNome"></div>
+    <div><label>UF</label><input id="eUf" maxlength="2"></div><div><label>Município</label><input id="eMun"></div><div><label>CNAE principal</label><input id="eCnae" placeholder="0000-0/00"></div>
+    <div><label>Responsável (nome)</label><input id="eRespN"></div><div><label>Responsável (e-mail)</label><input id="eRespE" type="email"></div><div><label>Monitorar ACT da empresa</label><select id="eAct"><option value="false">Não</option><option value="true">Sim</option></select></div>
+    <div><label>Gerente (nome)</label><input id="eGerN"></div><div><label>Gerente (e-mail)</label><input id="eGerE" type="email"></div><div><label>Ativa</label><select id="eAtivo"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
+  <div style="margin-top:10px"><label>Sindicatos vinculados (enquadramento)</label><div id="eSinds" style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;font-size:13px"></div></div>
+  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mEmp')">Cancelar</button><button class="b" onclick="salvarEmp()">Salvar</button></div>
 </div></div>
 
 <div class="modal" id="mDest"><div class="card" style="max-width:560px"><h2>Destinatário de alertas</h2>
@@ -128,8 +157,9 @@
 
 <div class="modal" id="mInst"><div class="card"><div class="topo"><h2 id="mInstTit">Convenção</h2><div style="display:flex;gap:8px"><button class="b sec sm" id="btnBaixar">Baixar extrato (.doc)</button><button class="b sec sm" onclick="fechar('mInst')">Fechar</button></div></div>
   <div id="mInstCab" style="font-size:13px;margin-bottom:10px"></div>
-  <input id="fCl" placeholder="buscar nas cláusulas…" oninput="renderCl()" style="margin-bottom:10px">
-  <div id="mInstCl"></div>
+  <div style="display:flex;gap:6px;margin-bottom:10px"><button class="b sm" id="tabAn" onclick="abaInst('an')">Análise</button><button class="b sec sm" id="tabCl" onclick="abaInst('cl')">Cláusulas</button><button class="b sec sm" onclick="reprocessar()">Reprocessar análise</button></div>
+  <div id="mInstAn"></div>
+  <div id="mInstClWrap" style="display:none"><input id="fCl" placeholder="buscar nas cláusulas…" oninput="renderCl()" style="margin-bottom:10px"><div id="mInstCl"></div></div>
 </div></div>
 
 <div class="modal" id="mInc"><div class="card" style="max-width:640px"><h2>Incidente</h2>
@@ -140,7 +170,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.2.2" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.4.0" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const $ = id => document.getElementById(id);
@@ -203,15 +233,18 @@ function mostrar(aba) {
 // ---------- dados ----------
 async function carregarTudo() {
   const t = APP.tenantId;
-  const [sind, inst, cons, inc, dest, notif] = await Promise.all([
+  const [sind, inst, cons, inc, dest, notif, emp, conf, cfg] = await Promise.all([
     get(`cct_sindicatos?tenant_id=eq.${t}&order=nome`),
     get(`cct_instrumentos?tenant_id=eq.${t}&select=*,sindicato:cct_sindicatos(nome)&order=detectado_em.desc`),
     get(`cct_consultas?tenant_id=eq.${t}&select=*,sindicato:cct_sindicatos(nome,cnpj)&order=executada_em.desc&limit=300`),
     get(`cct_incidentes?tenant_id=eq.${t}&select=*,sindicato:cct_sindicatos(nome)&order=ultima_ocorrencia.desc&limit=300`),
     get(`cct_alertas_destinatarios?tenant_id=eq.${t}&order=nome`),
-    get(`cct_notificacoes?tenant_id=eq.${t}&order=created_at.desc&limit=100`)]);
-  APP.dados = { sind, inst, cons, inc, dest, notif };
-  renderPainel(); renderSind(); renderInst(); renderCons(); renderInc(); renderDest(); renderNotif();
+    get(`cct_notificacoes?tenant_id=eq.${t}&order=created_at.desc&limit=100`),
+    get(`cct_empresas?tenant_id=eq.${t}&select=*,vinculos:cct_empresa_sindicato(id,sindicato_id,papel)&order=razao_social`),
+    get(`cct_v_confirmacoes?tenant_id=eq.${t}&order=prazo`),
+    get(`cct_config?tenant_id=eq.${t}`)]);
+  APP.dados = { sind, inst, cons, inc, dest, notif, emp, conf, cfg: cfg[0] || { prazo_ciencia_dias_uteis: 2, lembrete_diario: true, escalonar_apos_prazo: true } };
+  renderPainel(); renderSind(); renderInst(); renderCons(); renderInc(); renderDest(); renderNotif(); renderEmp(); renderConf();
 }
 
 function renderPainel() {
@@ -221,10 +254,13 @@ function renderPainel() {
     ["Convenções na base", d.inst.length, ""],
     ["Novas nos últimos 7 dias", d.inst.filter(i => new Date(i.detectado_em) > Date.now() - 7*864e5).length, "alerta"],
     ["Importações não concluídas", d.inst.filter(i => i.status_importacao !== "IMPORTADO").length, "erro"],
+    ["Análises por IA não concluídas", d.inst.filter(i => i.analise_status === "ANALISE_IA_NAO_CONCLUIDA").length, "alerta"],
     ["Erros nas últimas 24h", d.inc.filter(i => new Date(i.ultima_ocorrencia) > h24).length, "erro"],
     ["Incidentes abertos", abertos.length, "erro"],
     ["Críticos abertos", abertos.filter(i => i.gravidade === "CRITICO").length, "erro"],
     ["Falhas no Mediador (abertas)", abertos.filter(i => i.modulo === "MEDIADOR").length, "erro"],
+    ["Ciências pendentes", (d.conf||[]).filter(c => ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(c.status)).length, "alerta"],
+    ["Ciências atrasadas", (d.conf||[]).filter(c => c.situacao === "ATRASADA").length, "erro"],
     ["Notificações não enviadas", d.notif.filter(n => n.status === "NAO_ENVIADA").length, "alerta"],
     ["Última consulta", ult ? fmtDT(ult.executada_em) : "—", ""]];
   $("kpis").innerHTML = k.map(([l, v, c]) => `<div class="kpi ${v && c ? c : ""}"><b>${esc(v)}</b><span>${l}</span></div>`).join("");
@@ -243,13 +279,15 @@ function abrirSind(id) {
   $("mSindTit").textContent = id ? "Editar sindicato" : "Novo sindicato";
   $("sId").value = id || ""; $("sCnpj").value = s.cnpj ? fmtCnpj(s.cnpj) : ""; $("sNome").value = s.nome || ""; $("sTipo").value = s.tipo || "laboral";
   $("sUf").value = s.uf || ""; $("sCat").value = s.categoria || ""; $("sMon").value = String(s.monitorar ?? true); $("sObs").value = s.observacoes || "";
+  $("sResp").value = s.responsavel_email || ""; $("sGer").value = s.gerente_email || "";
   $("mSind").classList.add("on");
 }
 async function salvarSind() {
   const cnpj = $("sCnpj").value.replace(/\D/g, "");
   if (cnpj.length !== 14 || !$("sNome").value.trim()) return msg("Informe CNPJ (14 dígitos) e nome.", "erro");
   const d = { tenant_id: APP.tenantId, cnpj, nome: $("sNome").value.trim(), tipo: $("sTipo").value, uf: $("sUf").value.trim().toUpperCase() || null,
-    categoria: $("sCat").value.trim() || null, monitorar: $("sMon").value === "true", observacoes: $("sObs").value.trim() || null };
+    categoria: $("sCat").value.trim() || null, monitorar: $("sMon").value === "true", observacoes: $("sObs").value.trim() || null,
+    responsavel_email: $("sResp").value.trim().toLowerCase() || null, gerente_email: $("sGer").value.trim().toLowerCase() || null };
   try { if ($("sId").value) await patch("cct_sindicatos", "id=eq." + $("sId").value, d); else await post("cct_sindicatos", d);
     fechar("mSind"); msg("Sindicato salvo."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
@@ -260,9 +298,9 @@ async function excluirSind(id) {
 
 function tabInst(lista) {
   if (!lista.length) return `<div class="aviso">Nenhuma convenção na base ainda — o robô preenche na próxima execução.</div>`;
-  return `<table><tr><th>Registro</th><th>Tipo</th><th>Sindicato</th><th>Categoria</th><th>Vigência</th><th>Registro MTE</th><th>Detectada</th><th>Importação</th><th>Ciência</th><th class="r">Cláus.</th><th></th></tr>` +
+  return `<table><tr><th>Registro</th><th>Tipo</th><th>Sindicato</th><th>Categoria</th><th>Vigência</th><th>Registro MTE</th><th>Detectada</th><th>Importação</th><th>Análise</th><th>Ciência</th><th class="r">Cláus.</th><th></th></tr>` +
     lista.map(i => `<tr><td><b>${esc(i.numero_registro)}</b></td><td>${esc(i.tipo||"")}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.categoria||"")}</td>
-      <td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${fmtD(i.data_registro)}</td><td>${fmtDT(i.detectado_em)}</td><td>${tagStatus(i.status_importacao)}</td>
+      <td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${fmtD(i.data_registro)}</td><td>${fmtDT(i.detectado_em)}</td><td>${tagStatus(i.status_importacao)}</td><td>${i.analise_status ? tagStatus(i.analise_status === "CONCLUIDA" ? "IMPORTADO" : "ATENCAO").replace(/>[^<]+</, ">" + (i.analise_status === "CONCLUIDA" ? "concluída" : "IA pendente") + "<") : "—"}</td>
       <td>${tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td><button class="b sec sm" onclick="abrirInst('${i.id}')">Abrir</button></td></tr>`).join("") + `</table>`;
 }
 function renderInst() {
@@ -275,17 +313,22 @@ async function abrirInst(id) {
   $("mInstCab").innerHTML = `<b>Partes:</b> ${(i.partes||[]).map(p => esc(p.nome || p)).join(" × ")}<br><b>Categoria:</b> ${esc(i.categoria||"—")} · <b>Abrangência:</b> ${esc(i.abrangencia||"—")}<br>
     <b>Vigência:</b> ${fmtD(i.vigencia_inicio)} a ${fmtD(i.vigencia_fim)} · <b>Data-base:</b> ${esc(i.data_base||"—")} · <b>Registro MTE:</b> ${fmtD(i.data_registro)} · <b>Processo:</b> ${esc(i.numero_processo||"—")}<br>
     ${tagStatus(i.status_importacao)} ${tagStatus(i.status_ciencia)} ${i.status_ciencia !== "CIENTE" ? `<button class="b sm" onclick="darCiencia('${i.id}')">Registrar ciência</button>` : ""} ${i.observacoes ? `<br><small style="color:var(--erro)">${esc(i.observacoes)}</small>` : ""}`;
+  const cis = (APP.dados.conf||[]).filter(c => c.instrumento_id === id);
+  if (cis.length) $("mInstCab").innerHTML += `<div style="margin-top:8px"><b>Ciências:</b> ` + cis.map(c => `${esc(c.empresa||"sindicato")}: ${tagStatus(c.status)} (prazo ${fmtD(c.prazo)})`).join(" · ") + `</div>`;
   $("btnBaixar").style.display = i.arquivo_path ? "inline-block" : "none";
   $("btnBaixar").onclick = () => baixar(i.arquivo_path);
-  $("fCl").value = ""; $("mInstCl").innerHTML = "carregando…"; $("mInst").classList.add("on");
-  try { APP.clAtual = await get(`cct_clausulas?instrumento_id=eq.${id}&select=ordem,numero_extenso,titulo,grupo,subgrupo,texto&order=ordem`); renderCl(); }
-  catch (e) { $("mInstCl").innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
+  $("fCl").value = ""; $("mInstCl").innerHTML = "carregando…"; $("mInstAn").innerHTML = "carregando…"; abaInst("an"); $("mInst").classList.add("on");
+  try {
+    const [cl, an, val] = await Promise.all([get(`cct_clausulas?instrumento_id=eq.${id}&select=ordem,numero_extenso,titulo,grupo,subgrupo,texto&order=ordem`),
+      get(`cct_analises?instrumento_id=eq.${id}&order=versao.desc&limit=1`), get(`cct_valores?instrumento_id=eq.${id}&order=clausula_ordem`)]);
+    APP.clAtual = cl; renderCl(); renderAn(an[0], val);
+  } catch (e) { $("mInstCl").innerHTML = $("mInstAn").innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
 }
 function renderCl() {
   const f = ($("fCl").value || "").toLowerCase(); let g = "";
   $("mInstCl").innerHTML = (APP.clAtual || []).filter(c => !f || (c.titulo + " " + c.texto).toLowerCase().includes(f)).map(c => {
     const cab = c.grupo && c.grupo !== g ? (g = c.grupo, `<div style="margin:12px 0 6px;font-weight:700;color:var(--cinza);font-size:12px;text-transform:uppercase">${esc(c.grupo)}</div>`) : "";
-    return cab + `<div class="cl"><h4>Cláusula ${esc(c.numero_extenso||c.ordem)} — ${esc(c.titulo)}</h4><small>${esc(c.subgrupo||"")}</small><p>${esc(c.texto)}</p></div>`; }).join("") || `<div class="aviso">Nenhuma cláusula.</div>`;
+    return cab + `<div class="cl" id="cl-${c.ordem}"><h4>Cláusula ${esc(c.numero_extenso||c.ordem)} — ${esc(c.titulo)}</h4><small>${esc(c.subgrupo||"")}</small><p>${esc(c.texto)}</p></div>`; }).join("") || `<div class="aviso">Nenhuma cláusula.</div>`;
 }
 async function darCiencia(id) {
   try { await patch("cct_instrumentos", "id=eq." + id, { status_ciencia: "CIENTE", observacoes: `Ciência registrada por ${APP.email} em ${new Date().toLocaleString("pt-BR")}` });
@@ -348,6 +391,110 @@ function renderNotif() {
   $("tabNotif").innerHTML = `<table><tr><th>Quando</th><th>Tipo</th><th>Assunto</th><th>Destinatários</th><th>Status</th><th>Erro</th></tr>` +
     APP.dados.notif.map(n => `<tr><td>${fmtDT(n.created_at)}</td><td>${esc(n.tipo)}</td><td>${esc(n.assunto)}</td><td>${(n.destinatarios||[]).map(esc).join(", ")}</td><td>${tagStatus(n.status)}</td><td><small>${esc(n.erro||"")}</small></td></tr>`).join("") + `</table>` +
     (APP.dados.notif.length ? "" : `<div class="aviso">Nenhuma notificação registrada.</div>`);
+}
+
+// ---------- análise ----------
+function abaInst(a) { $("mInstAn").style.display = a === "an" ? "block" : "none"; $("mInstClWrap").style.display = a === "cl" ? "block" : "none"; $("tabAn").className = "b sm" + (a === "an" ? "" : " sec"); $("tabCl").className = "b sm" + (a === "cl" ? "" : " sec"); }
+function renderAn(an, val) {
+  const cl = o => `<a href="#" onclick="abaInst('cl');$('fCl').value='';renderCl();document.getElementById('cl-'+${o})?.scrollIntoView();return false" style="font-size:12px">cl. ${o}</a>`;
+  let h = "";
+  if (!an) h += `<div class="aviso">Ainda sem análise — o robô gera na próxima execução (ou use "Reprocessar análise").</div>`;
+  else {
+    h += `<div style="font-size:12.5px;color:var(--cinza);margin-bottom:8px">Análise v${an.versao} · ${fmtDT(an.gerado_em)} · ${tagStatus(an.status === "CONCLUIDA" ? "IMPORTADO" : "IMPORTACAO_NAO_CONCLUIDA").replace(/>[^<]+</, ">" + (an.status === "CONCLUIDA" ? "parecer por IA concluído" : "ANÁLISE POR IA NÃO CONCLUÍDA") + "<")}${an.modelo ? " · " + esc(an.modelo) : ""}${an.erro_ia ? ` · <small style="color:var(--erro)">${esc(an.erro_ia)}</small>` : ""}</div>`;
+    if (an.resumo) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Resumo</h2><p style="margin:0;white-space:pre-wrap">${esc(an.resumo)}</p></div>`;
+    if ((an.destaques||[]).length) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Destaques</h2>` + an.destaques.map(d => `<div class="cl"><h4>${esc(d.tema)} ${d.confianca === "NECESSITA_VALIDACAO" ? '<span class="tag alerta">necessita validação</span>' : '<span class="tag ok">conferido</span>'}</h4><p>${esc(d.texto)}</p><small>${(d.clausulas||[]).map(cl).join(" · ")}</small></div>`).join("") + `</div>`;
+    if ((an.providencias||[]).length) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Providências para o DP</h2><table><tr><th>Ação</th><th>Prazo</th><th>Cláusulas</th><th></th></tr>` + an.providencias.map(p => `<tr><td>${esc(p.acao)}</td><td>${esc(p.prazo||"")}</td><td>${(p.clausulas||[]).map(cl).join(" ")}</td><td>${p.confianca === "NECESSITA_VALIDACAO" ? '<span class="tag alerta">validar</span>' : ""}</td></tr>`).join("") + `</table></div>`;
+    if ((an.alertas||[]).length || (an.pontos_incertos||[]).length) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Alertas e pontos incertos</h2><ul style="margin:0;padding-left:18px">${(an.alertas||[]).map(a => `<li>${esc(a)}</li>`).join("")}${(an.pontos_incertos||[]).map(a => `<li style="color:var(--cinza)">(incerto) ${esc(a)}</li>`).join("")}</ul></div>`;
+  }
+  if ((val||[]).length) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Valores extraídos (localizados no texto)</h2><table><tr><th>Tema</th><th>Descrição</th><th class="r">Valor</th><th>Cláusula</th></tr>` +
+    val.map(v => `<tr><td>${esc(v.tema)}</td><td>${esc(v.descricao)}<br><small style="color:var(--cinza)">${esc(v.trecho||"")}</small></td><td class="r"><b>${esc(v.valor_texto)}</b></td><td>${cl(v.clausula_ordem)}<br><small>${esc(v.clausula_titulo||"")}</small></td></tr>`).join("") + `</table></div>`;
+  const c = an && an.comparacao;
+  if (c) {
+    h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Comparação com a anterior (${esc(c.anterior)})</h2>
+      <div class="kpis" style="margin-bottom:10px"><div class="kpi"><b>${c.novas.length}</b><span>cláusulas novas</span></div><div class="kpi"><b>${c.alteradas.length}</b><span>alteradas</span></div><div class="kpi"><b>${c.excluidas.length}</b><span>excluídas</span></div><div class="kpi"><b>${c.inalteradas}</b><span>inalteradas</span></div></div>`;
+    if (c.valores.length) h += `<table style="margin-bottom:10px"><tr><th>Tema</th><th>Descrição</th><th class="r">Anterior</th><th class="r">Atual</th><th class="r">Variação</th></tr>` + c.valores.map(v => `<tr><td>${esc(v.tema)}</td><td>${esc(v.descricao)}</td><td class="r">${esc(v.anterior)}</td><td class="r"><b>${esc(v.atual)}</b></td><td class="r">${v.variacao_pct != null ? v.variacao_pct + "%" : ""}</td></tr>`).join("") + `</table>`;
+    h += c.alteradas.map(a => `<details class="cl"><summary style="cursor:pointer"><b>${esc(a.titulo)}</b> <small>(${Math.round(a.similaridade*100)}% igual · ${cl(a.ordem_atual)})</small></summary><pre style="max-height:220px">${a.diff.map(l => esc(l)).join("\n")}</pre></details>`).join("");
+    h += c.novas.map(n => `<div class="cl"><h4><span class="tag ok">nova</span> ${esc(n.titulo)} ${cl(n.ordem)}</h4><p>${esc(n.texto)}</p></div>`).join("");
+    h += c.excluidas.map(n => `<div class="cl"><h4><span class="tag erro">excluída</span> ${esc(n.titulo)}</h4><p style="color:var(--cinza)">${esc(n.texto)}</p></div>`).join("") + `</div>`;
+  } else if (an) h += `<div class="aviso">Sem versão anterior desta CCT na base (mesmo par de sindicatos) — a comparação passa a existir a partir da próxima renovação.</div>`;
+  $("mInstAn").innerHTML = h;
+}
+async function reprocessar() {
+  if (!APP.instAtual || !confirm("Marcar para nova análise na próxima execução do robô?")) return;
+  try { await patch("cct_instrumentos", "id=eq." + APP.instAtual.id, { analise_status: null }); msg("Marcada para reprocessamento."); } catch (e) { msg(e.message, "erro"); }
+}
+
+// ---------- empresas ----------
+function renderEmp() {
+  const nomeS = id => (APP.dados.sind.find(s => s.id === id) || {}).nome || "?";
+  $("tabEmp").innerHTML = `<table><tr><th>CNPJ</th><th>Razão social</th><th>Sindicatos</th><th>Responsável</th><th>Gerente</th><th>ACT</th><th>Ativa</th><th></th></tr>` +
+    (APP.dados.emp||[]).map(e => `<tr><td>${fmtCnpj(e.cnpj)}</td><td>${esc(e.razao_social)}<br><small style="color:var(--cinza)">${esc([e.municipio,e.uf].filter(Boolean).join("/"))} ${esc(e.cnae||"")}</small></td>
+      <td>${(e.vinculos||[]).map(v => esc(nomeS(v.sindicato_id))).join("<br>") || '<span class="tag alerta">sem vínculo</span>'}</td>
+      <td>${esc(e.responsavel_nome||"")}<br><small>${esc(e.responsavel_email||"")}</small></td><td>${esc(e.gerente_nome||"")}<br><small>${esc(e.gerente_email||"")}</small></td>
+      <td>${e.monitorar_act ? '<span class="tag ok">sim</span>' : ""}</td><td>${e.ativo ? "sim" : "não"}</td>
+      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirEmp('${e.id}')">Editar</button> <button class="b sec sm" onclick="excluirEmp('${e.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
+    ((APP.dados.emp||[]).length ? "" : `<div class="aviso">Nenhuma empresa cadastrada. Cadastre as empresas dos clientes e vincule ao sindicato laboral (e patronal) de cada uma.</div>`);
+}
+function abrirEmp(id) {
+  const e = (APP.dados.emp||[]).find(x => x.id === id) || {};
+  $("mEmpTit").textContent = id ? "Editar empresa" : "Nova empresa";
+  $("eId").value = id || ""; $("eCnpj").value = e.cnpj ? fmtCnpj(e.cnpj) : ""; $("eNome").value = e.razao_social || ""; $("eUf").value = e.uf || ""; $("eMun").value = e.municipio || ""; $("eCnae").value = e.cnae || "";
+  $("eRespN").value = e.responsavel_nome || ""; $("eRespE").value = e.responsavel_email || ""; $("eGerN").value = e.gerente_nome || ""; $("eGerE").value = e.gerente_email || "";
+  $("eAct").value = String(e.monitorar_act ?? false); $("eAtivo").value = String(e.ativo ?? true);
+  const vinc = new Set((e.vinculos||[]).map(v => v.sindicato_id));
+  $("eSinds").innerHTML = APP.dados.sind.map(s => `<label style="display:flex;gap:6px;align-items:center;font-size:13px;color:inherit"><input type="checkbox" style="width:auto" data-sid="${s.id}" ${vinc.has(s.id) ? "checked" : ""}> ${esc(s.nome)} <small style="color:var(--cinza)">(${s.tipo})</small></label>`).join("") || `<small>Cadastre sindicatos primeiro.</small>`;
+  $("mEmp").classList.add("on");
+}
+async function salvarEmp() {
+  const cnpj = $("eCnpj").value.replace(/\D/g, "");
+  if (cnpj.length !== 14 || !$("eNome").value.trim()) return msg("Informe CNPJ (14 dígitos) e razão social.", "erro");
+  const d = { tenant_id: APP.tenantId, cnpj, razao_social: $("eNome").value.trim(), uf: $("eUf").value.trim().toUpperCase() || null, municipio: $("eMun").value.trim() || null, cnae: $("eCnae").value.trim() || null,
+    responsavel_nome: $("eRespN").value.trim() || null, responsavel_email: $("eRespE").value.trim().toLowerCase() || null, gerente_nome: $("eGerN").value.trim() || null, gerente_email: $("eGerE").value.trim().toLowerCase() || null,
+    monitorar_act: $("eAct").value === "true", ativo: $("eAtivo").value === "true" };
+  try {
+    let id = $("eId").value;
+    if (id) await patch("cct_empresas", "id=eq." + id, d); else id = (await post("cct_empresas", d))[0].id;
+    const marcados = [...document.querySelectorAll("#eSinds input:checked")].map(i => i.dataset.sid);
+    const atuais = ((APP.dados.emp||[]).find(x => x.id === id) || {}).vinculos || [];
+    for (const v of atuais) if (!marcados.includes(v.sindicato_id)) await del("cct_empresa_sindicato", "id=eq." + v.id);
+    for (const sid of marcados) if (!atuais.find(v => v.sindicato_id === sid)) {
+      const s = APP.dados.sind.find(x => x.id === sid);
+      await post("cct_empresa_sindicato", { tenant_id: APP.tenantId, empresa_id: id, sindicato_id: sid, papel: s ? s.tipo : "laboral" });
+    }
+    fechar("mEmp"); msg("Empresa salva."); await carregarTudo();
+  } catch (e) { msg(e.message, "erro"); }
+}
+async function excluirEmp(id) { if (!confirm("Excluir a empresa e seus vínculos?")) return; try { await del("cct_empresas", "id=eq." + id); await carregarTudo(); } catch (e) { msg(e.message, "erro"); } }
+
+// ---------- confirmações de ciência ----------
+function renderConf() {
+  const all = APP.dados.conf || [], f = $("fConf").value;
+  const ab = c => ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(c.status);
+  const l = all.filter(c => f === "todas" || (f === "pendentes" ? ab(c) : c.situacao === "ATRASADA"));
+  $("kpisConf").innerHTML = [["Pendentes", all.filter(ab).length, "alerta"], ["Vencem hoje", all.filter(c => c.situacao === "VENCE_HOJE").length, "alerta"], ["Atrasadas", all.filter(c => c.situacao === "ATRASADA").length, "erro"], ["Escalonadas", all.filter(c => c.status === "ESCALONADO").length, "erro"], ["Cientes", all.filter(c => c.status === "CIENTE").length, ""]]
+    .map(([t, v, c]) => `<div class="kpi ${v && c ? c : ""}"><b>${v}</b><span>${t}</span></div>`).join("");
+  $("tabConf").innerHTML = `<table><tr><th>Convenção</th><th>Empresa</th><th>Sindicato</th><th>Responsável</th><th>Prazo</th><th>Situação</th><th>Status</th><th class="r">Lembr.</th><th></th></tr>` +
+    l.map(c => `<tr><td><b>${esc(c.numero_registro)}</b><br><small>${esc(c.tipo_instrumento||"")}</small></td><td>${esc(c.empresa||"(sindicato)")}</td><td>${esc(c.sindicato||"")}</td><td><small>${esc(c.responsavel_email||"—")}</small></td>
+      <td>${fmtD(c.prazo)}</td><td>${c.situacao ? tagStatus(c.situacao === "ATRASADA" ? "CRITICO" : c.situacao === "VENCE_HOJE" ? "ATENCAO" : "INFORMATIVO").replace(/>[^<]+</, ">" + c.situacao.replace(/_/g," ") + "<") : ""}</td>
+      <td>${tagStatus(c.status)}${c.ciente_em ? `<br><small>${fmtDT(c.ciente_em)} · ${esc(c.ciente_por||"")}</small>` : ""}</td><td class="r">${c.lembretes}</td>
+      <td style="white-space:nowrap">${ab(c) ? `<button class="b sm" onclick="registrarCiencia('${c.id}')">Registrar ciência</button>` : ""} <button class="b sec sm" onclick="abrirInst('${c.instrumento_id}')">Ver CCT</button></td></tr>`).join("") + `</table>` +
+    (l.length ? "" : `<div class="aviso">Nada aqui.</div>`);
+  $("cfgPrazo").value = APP.dados.cfg.prazo_ciencia_dias_uteis; $("cfgLemb").value = String(APP.dados.cfg.lembrete_diario); $("cfgEsc").value = String(APP.dados.cfg.escalonar_apos_prazo);
+}
+async function registrarCiencia(id) {
+  const obs = prompt("Observação (opcional) para o registro de ciência:") ;
+  if (obs === null) return;
+  try {
+    await patch("cct_ciencias", "id=eq." + id, { status: "CIENTE", ciente_em: new Date().toISOString(), ciente_por: APP.email, observacoes: obs || null });
+    const c = (APP.dados.conf||[]).find(x => x.id === id);
+    if (c && !(APP.dados.conf||[]).some(x => x.instrumento_id === c.instrumento_id && x.id !== id && ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(x.status)))
+      await patch("cct_instrumentos", "id=eq." + c.instrumento_id, { status_ciencia: "CIENTE" });
+    msg("Ciência registrada."); await carregarTudo();
+  } catch (e) { msg(e.message, "erro"); }
+}
+async function salvarConfig() {
+  const d = { tenant_id: APP.tenantId, prazo_ciencia_dias_uteis: +$("cfgPrazo").value || 2, lembrete_diario: $("cfgLemb").value === "true", escalonar_apos_prazo: $("cfgEsc").value === "true", updated_at: new Date().toISOString() };
+  try { await api("cct_config?on_conflict=tenant_id", { method:"POST", body: JSON.stringify(d), headers:{ Prefer: "resolution=merge-duplicates,return=representation" } }); msg("Parâmetros salvos."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
 
 // ---------- boot ----------
