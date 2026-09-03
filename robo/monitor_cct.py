@@ -29,7 +29,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.5.0"
+VERSAO = "0.5.2"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -90,6 +90,7 @@ def sb_upload(path, corpo: bytes, content_type="application/msword"):
 # ---------------------------------------------------------------- e-mail (hub artecon-mail)
 def enviar_email(dest, assunto, html):
     """Envia via hub, um destinatário por chamada (como a bright-task). Retorna (status, erro, destinatarios_efetivos)."""
+    global MAIL_DESTINO_UNICO
     dest = [d for d in dict.fromkeys(x.strip().lower() for x in dest if x) if d]
     if not dest:
         return "NAO_ENVIADA", "nenhum destinatário", []
@@ -117,6 +118,17 @@ def html_padrao(titulo, corpo):
             f'<b>CCT Monitor</b> · Artecon Artes Contábeis</div><div style="border:1px solid #d9e1e8;border-top:0;padding:16px;border-radius:0 0 8px 8px">'
             f'<h3 style="margin:0 0 10px;color:#1a5276">{titulo}</h3>{corpo}'
             f'<p style="font-size:12px;color:#7a8894;margin-top:16px">Acesse: https://arteconartescontabeis-design.github.io/rescisoes/cct.html</p></div></div>')
+
+
+def processar_testes_email(tenant):
+    """Pedidos de e-mail de teste feitos no app (cct_notificacoes tipo TESTE, status PENDENTE)."""
+    pend = sb_get("cct_notificacoes", {"tenant_id": f"eq.{tenant}", "tipo": "eq.TESTE", "status": "eq.PENDENTE", "select": "id,destinatarios"})
+    for n in pend:
+        st, erro, ef = enviar_email(n.get("destinatarios") or [], "TESTE – CCT Monitor – circuito de e-mail",
+                                    html_padrao("Teste de envio", f"<p>Se você recebeu esta mensagem, o CCT Monitor está conectado ao hub artecon-mail.</p><p>{datetime.now():%d/%m/%Y %H:%M}</p>"))
+        sb_patch("cct_notificacoes", {"id": f"eq.{n['id']}"}, {"status": st, "erro": erro, "tentativas": 1, "destinatarios": ef or n.get("destinatarios"),
+                                                              "enviada_em": datetime.now(timezone.utc).isoformat() if st == "ENVIADA" else None})
+        log(f"  E-MAIL DE TESTE (pedido no app) → {ef}: {st} {erro or ''}")
 
 
 # ---------------------------------------------------------------- incidentes / notificações
@@ -493,6 +505,12 @@ def main():
         log(f"tenant {TENANT_CNPJ} não encontrado — abortando");
         sys.exit(2)
     tenant = tenants[0]["id"]
+    global MAIL_DESTINO_UNICO
+    cfg_dest = (config(tenant).get("email_destino_teste") or "").strip().lower()
+    if cfg_dest:
+        MAIL_DESTINO_UNICO = cfg_dest
+        log(f"MODO TESTE de e-mail ativo (configurado no app): tudo vai para {cfg_dest}")
+    processar_testes_email(tenant)
     sinds = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true",
                                       "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email", "order": "nome"})
     emps_act = sb_get("cct_empresas", {"tenant_id": f"eq.{tenant}", "monitorar_act": "eq.true", "ativo": "eq.true",
