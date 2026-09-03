@@ -111,6 +111,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.5.0</td><td>03/09/2026</td><td>E-mail ligado ao hub artecon-mail (mesmo contrato da bright-task: x-api-key, um destinatário por chamada, app "CCT Monitor"); modelo visual padrão nas mensagens; modo teste MAIL_DESTINO_UNICO (redireciona tudo para um endereço) e execução "só testar e-mail" no workflow.</td></tr>
           <tr><td>v0.4.1</td><td>03/09/2026</td><td>Robô: HTTP 500 do Mediador com "Nenhum registro encontrado." (defeito do site, confirmado com o texto do erro) passa a ser tratado como zero resultados — CONSULTA COM ALERTA, sem novas tentativas e sem incidente. Outros 500 continuam como erro com retry.</td></tr>
           <tr><td>v0.4.0</td><td>03/09/2026</td><td>Bloco 3 — Análise: extração determinística de valores por cláusula (piso, reajuste, contribuições, feriados, intervalo, banco de horas…) com referência à cláusula e confiança; comparação automática com a CCT anterior do mesmo par de sindicatos (cláusulas novas, excluídas, alteradas com diff e variação dos valores); parecer por IA (resumo, destaques, providências, alertas) com validação das cláusulas citadas — sem chave de API fica ANÁLISE POR IA NÃO CONCLUÍDA mantendo valores e comparação. Aba Análise na convenção, valores no Painel, reprocessamento sob demanda. Banco <code>setup_cct_v0.4.0.sql</code> validado localmente.</td></tr>
           <tr><td>v0.3.0</td><td>03/09/2026</td><td>Bloco 2 — Ciência: cadastro de Empresas com responsável, gerente, CNAE e vínculo com sindicatos; Central de Confirmações (prazo em dias úteis via <code>resc_feriados</code>, atrasadas, registro de ciência por empresa); parâmetros de prazo/lembrete/escalonamento; responsável e gerente padrão por sindicato; monitoramento opcional de ACT por empresa. Robô: cria ciências ao importar, envia aviso ao responsável, lembrete diário e escalonamento ao gerente após o prazo; heartbeat (pg_cron) abre incidente crítico se o robô não rodar. Banco <code>setup_cct_v0.3.0.sql</code> validado localmente.</td></tr>
@@ -171,7 +172,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.4.1" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.5.0" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const $ = id => document.getElementById(id);
