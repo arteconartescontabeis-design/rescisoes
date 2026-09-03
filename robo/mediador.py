@@ -100,8 +100,16 @@ def consultar(page, cnpj: str, tipo="Convenção Coletiva", vigencia="Vigentes",
         if resp.status != 200:
             texto_erro = re.sub(r"<[^>]+>", " ", re.sub(r"<(script|style).*?</\1>", "", corpo, flags=re.S | re.I))
             texto_erro = re.sub(r"\s+", " ", _h.unescape(texto_erro)).strip()[:300]
-            r["erro"] = f"Mediador respondeu HTTP {resp.status} na pesquisa"
             r["trecho_erro"] = texto_erro
+            # Defeito conhecido do Mediador (confirmado em 03/09/2026): HTTP 500 com "Nenhum registro encontrado."
+            # quando a pesquisa não tem resultados. Não é falha de acesso: é ZERO resultados (alerta, não erro).
+            if resp.status == 500 and re.search(r"nenhum registro encontrado", texto_erro, re.I):
+                r["status"] = "CONSULTA_COM_ALERTA"
+                r["erro"] = "Site respondeu 'Nenhum registro encontrado' (HTTP 500) para os filtros — não é prova de inexistência"
+                r["total_site"] = 0
+                et.append("site: nenhum registro encontrado (via HTTP 500)")
+                return r
+            r["erro"] = f"Mediador respondeu HTTP {resp.status} na pesquisa"
             et.append(f"corpo do erro: {texto_erro[:200]}")
             return r
         r["registros"] = parse_registros(corpo)
