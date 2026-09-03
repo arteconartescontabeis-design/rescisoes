@@ -26,8 +26,9 @@ from playwright.sync_api import sync_playwright
 
 import mediador
 from extrair_cct import extrair
+import analisar_cct
 
-VERSAO = "0.2.2"
+VERSAO = "0.4.1"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -37,6 +38,7 @@ MAIL_URL = os.environ.get("MAIL_WEBHOOK_URL")
 MAIL_KEY = os.environ.get("MAIL_WEBHOOK_KEY")
 BUCKET = "cct-arquivos"
 TIPOS_MONITORADOS = ["Convenção Coletiva", "Termo Aditivo de Convenção Coletiva"]
+TIPOS_ACT = ["Acordo Coletivo", "Termo Aditivo de Acordo Coletivo"]
 H = {"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Content-Type": "application/json"}
 
 
@@ -161,10 +163,10 @@ def data_br(s):
     return None
 
 
-def importar(tenant, sind, reg, page, consulta_id):
+def importar(tenant, sind, reg, page, consulta_id, empresa=None):
     """Baixa, extrai e grava um instrumento novo. Sempre grava a linha — com status explícito."""
     registro = reg["registro"]
-    base = {"tenant_id": tenant, "sindicato_id": sind["id"], "numero_registro": registro,
+    base = {"tenant_id": tenant, "sindicato_id": sind.get("id"), "empresa_id": (empresa or {}).get("id"), "numero_registro": registro,
             "numero_solicitacao": reg.get("solicitacao"), "tipo": reg.get("tipo"),
             "partes": [{"nome": p} for p in reg.get("partes", [])], "origem_consulta_id": consulta_id}
     vig = (reg.get("vigencia") or "").split(" - ")
@@ -173,15 +175,15 @@ def importar(tenant, sind, reg, page, consulta_id):
 
     # 1) download
     try:
-        status, corpo = mediador.baixar_extrato(page, reg["solicitacao"])
+        status, corpo, trecho = mediador.baixar_extrato(page, reg["solicitacao"])
         if status != 200 or not mediador.extrato_valido(corpo):
-            raise RuntimeError(f"extrato inválido (HTTP {status}, {len(corpo) if corpo else 0} bytes)")
+            raise RuntimeError(f"extrato inválido (HTTP {status}, {len(corpo) if corpo else 0} bytes) — {trecho}")
         resolver(tenant, f"DOWNLOAD:{registro}")
     except Exception as e:
         row = sb_insert("cct_instrumentos", dict(base, status_importacao="IMPORTACAO_NAO_CONCLUIDA",
-                                                 observacoes=f"download falhou: {e}"), upsert_on="tenant_id,numero_registro")[0]
+                                                 observacoes=f"download falhou: {e}"[:1000]), upsert_on="tenant_id,numero_registro")[0]
         incidente(tenant, f"DOWNLOAD:{registro}", "DOWNLOAD", "ALTO", f"Download do extrato {registro} falhou: {e}",
-                  sind["id"], row["id"])
+                  sind.get("id"), row["id"], detalhes={"solicitacao": reg.get("solicitacao"), "resposta": str(e)[:1200]})
         return row, False
 
     sha = hashlib.sha256(corpo).hexdigest()
@@ -195,7 +197,7 @@ def importar(tenant, sind, reg, page, consulta_id):
         arquivo_path = sb_upload(f"{tenant}/{registro.replace('/', '-')}.doc", corpo)
         resolver(tenant, f"ARMAZENAMENTO:{registro}")
     except Exception as e:
-        incidente(tenant, f"ARMAZENAMENTO:{registro}", "ARMAZENAMENTO", "ALTO", f"Falha ao guardar {registro} no bucket: {e}", sind["id"])
+        incidente(tenant, f"ARMAZENAMENTO:{registro}", "ARMAZENAMENTO", "ALTO", f"Falha ao guardar {registro} no bucket: {e}", sind.get("id"))
 
     # 3) extração
     try:
@@ -219,26 +221,194 @@ def importar(tenant, sind, reg, page, consulta_id):
                       upsert_on="instrumento_id,ordem")
         resolver(tenant, f"IMPORTACAO:{registro}")
         log(f"  IMPORTADO {registro}: {d['total_clausulas']} cláusulas, {len(dados['partes'])} partes")
+        if dados["status_importacao"] == "IMPORTADO":
+            analisar_instrumento(tenant, row["id"], d, sind.get("id"))
         return row, dados["status_importacao"] == "IMPORTADO"
     except Exception as e:
         row = sb_insert("cct_instrumentos", dict(base, arquivo_path=arquivo_path, sha256=sha,
                                                  status_importacao="IMPORTACAO_NAO_CONCLUIDA",
                                                  observacoes=f"extração falhou: {e}"), upsert_on="tenant_id,numero_registro")[0]
         incidente(tenant, f"IMPORTACAO:{registro}", "IMPORTACAO", "ALTO", f"Importação de {registro} não concluída: {e}",
-                  sind["id"], row["id"])
+                  sind.get("id"), row["id"])
         return row, False
 
 
-# ---------------------------------------------------------------- ciclo por sindicato
+# ---------------------------------------------------------------- análise (seções 44-61)
+def carregar_dados_instrumento(inst_id):
+    """Reconstrói o dict no formato do extrair_cct a partir do banco (instrumento + cláusulas)."""
+    i = sb_get("cct_instrumentos", {"id": f"eq.{inst_id}", "select": "*"})[0]
+    cls = sb_get("cct_clausulas", {"instrumento_id": f"eq.{inst_id}", "select": "ordem,numero_extenso,titulo,grupo,subgrupo,texto", "order": "ordem"})
+    return {"metadados": {"numero_registro": i["numero_registro"], "data_registro": i.get("data_registro")}, "partes": i.get("partes") or [],
+            "vigencia": {"inicio": i.get("vigencia_inicio"), "fim": i.get("vigencia_fim")}, "categoria": i.get("categoria"),
+            "abrangencia_territorial": i.get("abrangencia"), "data_base": i.get("data_base"), "clausulas": cls, "total_clausulas": len(cls)}
+
+
+def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
+    """Gera valores, comparação com a anterior e parecer (IA opcional). Regra 99: IA falhou → ANALISE_IA_NAO_CONCLUIDA."""
+    try:
+        dados = dados or carregar_dados_instrumento(inst_id)
+        ant_id = sb_rpc("cct_anterior", {"p_instrumento": inst_id})
+        anterior = carregar_dados_instrumento(ant_id) if ant_id else None
+        r = analisar_cct.analisar(dados, anterior, usar_ia=bool(os.environ.get("ANTHROPIC_API_KEY")))
+        versao = 1 + len(sb_get("cct_analises", {"instrumento_id": f"eq.{inst_id}", "select": "id"}))
+        an = sb_insert("cct_analises", {"tenant_id": tenant, "instrumento_id": inst_id, "anterior_id": ant_id, "versao": versao, "status": r["status"],
+                                        "modelo": r["modelo"], "erro_ia": r["erro_ia"], "resumo": r["resumo"], "destaques": r["destaques"],
+                                        "providencias": r["providencias"], "alertas": r["alertas"], "pontos_incertos": r["pontos_incertos"],
+                                        "validacao": r["validacao"], "comparacao": r["comparacao"], "duracao_ms": r["duracao_ms"], "gerado_por": ORIGEM})[0]
+        requests.delete(f"{SB_URL}/rest/v1/cct_valores", headers=H, params={"instrumento_id": f"eq.{inst_id}"}, timeout=30)
+        if r["valores"]:
+            sb_insert("cct_valores", [{"tenant_id": tenant, "instrumento_id": inst_id, "analise_id": an["id"], **{k: v[k] for k in
+                      ("chave", "tema", "descricao", "valor_texto", "valor_num", "unidade", "clausula_ordem", "clausula_titulo", "trecho", "confianca")}} for v in r["valores"]])
+        sb_patch("cct_instrumentos", {"id": f"eq.{inst_id}"}, {"analise_status": r["status"], "analise_em": datetime.now(timezone.utc).isoformat()})
+        if r["status"] == "CONCLUIDA":
+            resolver(tenant, f"IA:{inst_id}")
+        elif os.environ.get("ANTHROPIC_API_KEY"):  # sem chave configurada não é incidente, é estado
+            incidente(tenant, f"IA:{inst_id}", "IA", "ATENCAO", f"ANÁLISE POR IA NÃO CONCLUÍDA – {dados['metadados']['numero_registro']}: {r['erro_ia']} (valores e comparação gravados)", sindicato_id, inst_id)
+        log(f"  ANÁLISE {dados['metadados']['numero_registro']}: {r['status']} — {len(r['valores'])} valores, "
+            f"{'comparada com ' + anterior['metadados']['numero_registro'] if anterior else 'sem anterior'}, {r['duracao_ms']} ms")
+        return an
+    except Exception as e:
+        log(f"  !! análise falhou: {e}")
+        incidente(tenant, f"IA:{inst_id}", "IA", "ALTO", f"Análise não concluída (erro interno): {e}", sindicato_id, inst_id)
+        sb_patch("cct_instrumentos", {"id": f"eq.{inst_id}"}, {"analise_status": "ANALISE_IA_NAO_CONCLUIDA"})
+        return None
+
+
+def analisar_pendentes(tenant):
+    """Instrumentos importados sem análise (ou reprocessamento pedido pelo app: analise_status nulo)."""
+    pend = sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "analise_status": "is.null", "select": "id,numero_registro,sindicato_id", "limit": "20"})
+    if pend:
+        log(f"análises pendentes: {len(pend)}")
+    for i in pend:
+        analisar_instrumento(tenant, i["id"], sindicato_id=i.get("sindicato_id"))
+
+
+# ---------------------------------------------------------------- ciência (seções 31-39)
+def config(tenant):
+    c = sb_get("cct_config", {"tenant_id": f"eq.{tenant}"})
+    return c[0] if c else {"prazo_ciencia_dias_uteis": 2, "lembrete_diario": True, "escalonar_apos_prazo": True}
+
+
+def prazo_ciencia(tenant):
+    dias = config(tenant)["prazo_ciencia_dias_uteis"]
+    try:
+        return sb_rpc("cct_adicionar_dias_uteis", {"p_inicio": datetime.now().date().isoformat(), "p_dias": dias})
+    except Exception:
+        from datetime import timedelta
+        return (datetime.now().date() + timedelta(days=dias + 2)).isoformat()
+
+
+def criar_ciencias(tenant, sind, row, empresa=None):
+    """Uma ciência por empresa vinculada ao sindicato (ou pela empresa do ACT); sem empresa → uma ciência do sindicato."""
+    prazo = prazo_ciencia(tenant)
+    alvos = []
+    if empresa:
+        alvos = [empresa]
+    elif sind:
+        vinc = sb_get("cct_empresa_sindicato", {"sindicato_id": f"eq.{sind['id']}", "select": "empresa:cct_empresas(id,razao_social,responsavel_email,gerente_email,ativo)"})
+        alvos = [v["empresa"] for v in vinc if v.get("empresa") and v["empresa"].get("ativo", True)]
+    linhas = []
+    if alvos:
+        for e in alvos:
+            linhas.append({"tenant_id": tenant, "instrumento_id": row["id"], "empresa_id": e["id"], "sindicato_id": sind["id"] if sind else None,
+                           "responsavel_email": e.get("responsavel_email") or (sind or {}).get("responsavel_email"),
+                           "gerente_email": e.get("gerente_email") or (sind or {}).get("gerente_email"), "prazo": prazo})
+    else:
+        linhas.append({"tenant_id": tenant, "instrumento_id": row["id"], "empresa_id": None, "sindicato_id": sind["id"] if sind else None,
+                       "responsavel_email": (sind or {}).get("responsavel_email"), "gerente_email": (sind or {}).get("gerente_email"), "prazo": prazo})
+    try:
+        criadas = sb_insert("cct_ciencias", linhas, upsert_on="instrumento_id,empresa_id")
+    except Exception:
+        criadas = []
+        for l in linhas:  # empresa_id nulo não entra no on_conflict do PostgREST; insere um a um ignorando duplicidade
+            try:
+                criadas += sb_insert("cct_ciencias", l)
+            except Exception as e:
+                if "duplicate" not in str(e) and "23505" not in str(e):
+                    log(f"  !! ciência: {e}")
+    log(f"  {len(criadas)} ciência(s) criada(s), prazo {prazo}")
+    return criadas
+
+
+def processar_ciencias(tenant):
+    """Rotina diária: lembretes dentro do prazo e escalonamento ao gerente após o prazo (seções 36-39)."""
+    cfg = config(tenant)
+    hoje = datetime.now().date().isoformat()
+    pend = sb_get("cct_v_confirmacoes", {"tenant_id": f"eq.{tenant}", "status": "in.(PENDENTE,NOTIFICADO,ESCALONADO)", "select": "*"})
+    log(f"ciências pendentes: {len(pend)}")
+    for c in pend:
+        alvo = c.get("empresa") or c.get("sindicato") or ""
+        ja_hoje = (c.get("ultimo_lembrete") or "")[:10] == hoje
+        dest_resp = [c["responsavel_email"]] if c.get("responsavel_email") else []
+        dest_ger = [c["gerente_email"]] if c.get("gerente_email") else []
+        cab = (f"<p><b>{c['tipo_instrumento']}</b> {c['numero_registro']} — {alvo}<br>Vigência {c.get('vigencia_inicio')} a {c.get('vigencia_fim')}"
+               f"<br><b>Prazo para ciência:</b> {c['prazo']}</p>")
+        if c["status"] == "PENDENTE" and dest_resp:
+            st = notificar_para(tenant, "NOVA_CCT", f"CONVENÇÃO COLETIVA REGISTRADA – {alvo} – {c['numero_registro']}", cab + "<p>Registre a ciência no CCT Monitor.</p>", dest_resp, ciencia_id=c["id"], instrumento_id=c["instrumento_id"])
+            if st == "ENVIADA":
+                sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"status": "NOTIFICADO", "notificado_em": datetime.now(timezone.utc).isoformat()})
+            continue
+        if c["situacao"] == "ATRASADA" and cfg.get("escalonar_apos_prazo", True) and c["status"] != "ESCALONADO":
+            st = notificar_para(tenant, "ESCALONAMENTO", f"CIÊNCIA PENDENTE – PRAZO VENCIDO – {alvo} – {c['numero_registro']}",
+                                cab + f"<p>Responsável ainda não registrou ciência ({c['dias_atraso']} dia(s) de atraso).</p>", dest_ger + dest_resp, ciencia_id=c["id"])
+            sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"status": "ESCALONADO", "escalonado_em": datetime.now(timezone.utc).isoformat(),
+                                                              "lembretes": c["lembretes"] + 1, "ultimo_lembrete": datetime.now(timezone.utc).isoformat()})
+            continue
+        if cfg.get("lembrete_diario", True) and not ja_hoje and (dest_resp or dest_ger):
+            dest = dest_resp + (dest_ger if c["status"] == "ESCALONADO" else [])
+            notificar_para(tenant, "LEMBRETE", f"LEMBRETE – ciência pendente – {alvo} – {c['numero_registro']}", cab, dest, ciencia_id=c["id"])
+            sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"lembretes": c["lembretes"] + 1, "ultimo_lembrete": datetime.now(timezone.utc).isoformat()})
+
+
+def notificar_para(tenant, tipo, assunto, html, dest, instrumento_id=None, incidente_id=None, ciencia_id=None):
+    """Igual a notificar(), mas para destinatários explícitos (responsável/gerente)."""
+    dest = [d for d in dict.fromkeys(dest) if d]
+    reg = {"tenant_id": tenant, "tipo": tipo, "instrumento_id": instrumento_id, "incidente_id": incidente_id, "ciencia_id": ciencia_id,
+           "destinatarios": dest, "assunto": assunto, "status": "PENDENTE", "tentativas": 0}
+    if not dest:
+        reg.update(status="NAO_ENVIADA", erro="sem responsável/gerente configurado")
+    elif not MAIL_URL:
+        reg.update(status="NAO_ENVIADA", erro="MAIL_WEBHOOK_URL não configurado (envio de e-mail ainda não ligado)")
+    else:
+        try:
+            h = {"Content-Type": "application/json"}
+            if MAIL_KEY:
+                h["Authorization"] = f"Bearer {MAIL_KEY}"
+            r = requests.post(MAIL_URL, headers=h, data=json.dumps({"to": dest, "subject": assunto, "html": html}), timeout=40)
+            reg["tentativas"] = 1
+            reg.update(status="ENVIADA", enviada_em=datetime.now(timezone.utc).isoformat()) if r.status_code < 300 else reg.update(status="NAO_ENVIADA", erro=f"webhook HTTP {r.status_code}: {r.text[:200]}")
+        except Exception as e:
+            reg.update(status="NAO_ENVIADA", tentativas=1, erro=f"{type(e).__name__}: {e}"[:300])
+    try:
+        sb_insert("cct_notificacoes", reg)
+    except Exception as e:
+        log(f"  !! falha ao gravar notificação: {e}")
+    log(f"  NOTIFICAÇÃO {tipo} → {', '.join(dest) or '-'}: {reg['status']}")
+    return reg["status"]
+
+
+# ---------------------------------------------------------------- ciclo por alvo (sindicato ou empresa/ACT)
 def processar_sindicato(tenant, sind, page, existentes):
+    return processar_alvo(tenant, sind, None, TIPOS_MONITORADOS, page, existentes)
+
+
+def processar_empresa_act(tenant, emp, page, existentes):
+    alvo = {"id": None, "cnpj": emp["cnpj"], "nome": emp["razao_social"], "responsavel_email": emp.get("responsavel_email"), "gerente_email": emp.get("gerente_email")}
+    st, n = processar_alvo(tenant, alvo, emp, TIPOS_ACT, page, existentes)
+    sb_patch("cct_empresas", {"id": f"eq.{emp['id']}"}, {"ultima_consulta_act": datetime.now(timezone.utc).isoformat()})
+    return st, n
+
+
+def processar_alvo(tenant, sind, empresa, tipos, page, existentes):
     cnpj = sind["cnpj"]
-    log(f"== {sind['nome']} ({cnpj})")
+    log(f"== {sind['nome']} ({cnpj}) — {'ACT' if empresa else 'CCT'}")
     t0 = time.time()
     # registro da consulta criado ANTES (status provisório) para vincular os instrumentos; atualizado ao final
     consulta = sb_insert("cct_consultas", {"tenant_id": tenant, "sindicato_id": sind["id"], "origem": ORIGEM,
-                                           "status": "CONSULTA_NAO_CONCLUIDA", "erro": "em execução", "etapas": []})[0]
+                                           "status": "CONSULTA_NAO_CONCLUIDA", "erro": "em execução",
+                                           "etapas": [f"ACT da empresa {sind['nome']}"] if empresa else []})[0]
     novos, etapas, http, por_tipo, total_encontrados = [], [], None, {}, 0
-    for tipo in TIPOS_MONITORADOS:
+    for tipo in tipos:
         r = mediador.consultar_com_retry(page, cnpj, tipo=tipo, vigencia="Vigentes")
         etapas += [f"[{tipo}] {e}" for e in r["etapas"]]
         http = r["http"] or http
@@ -260,15 +430,16 @@ def processar_sindicato(tenant, sind, page, existentes):
             if reg["registro"] in existentes:
                 continue
             log(f"  NOVO registro {reg['registro']} ({reg['tipo']}) — {reg.get('vigencia')}")
-            row, ok = importar(tenant, sind, reg, page, consulta["id"])
+            row, ok = importar(tenant, sind, reg, page, consulta["id"], empresa)
             existentes.add(reg["registro"])
             novos.append((reg, row, ok))
+            criar_ciencias(tenant, sind if sind.get("id") else None, row, empresa)
             etapas.append(f"[{tipo}] {reg['registro']}: {'importado' if ok else 'IMPORTAÇÃO NÃO CONCLUÍDA'}")
             time.sleep(1)
         time.sleep(2)
 
     falhas = [t for t, (st, _) in por_tipo.items() if st == "CONSULTA_NAO_CONCLUIDA"]
-    if len(falhas) == len(TIPOS_MONITORADOS):
+    if len(falhas) == len(tipos):
         status_geral = "CONSULTA_NAO_CONCLUIDA"
         erro_geral = "; ".join(f"{t}: {e}" for t, (_, e) in por_tipo.items())
     elif falhas or any(st == "CONSULTA_COM_ALERTA" for st, _ in por_tipo.values()):
@@ -290,7 +461,8 @@ def processar_sindicato(tenant, sind, page, existentes):
         st = notificar(tenant, "NOVA_CCT", f"NOVA {reg['tipo'].upper()} – {sind['nome']} – {reg['registro']}", html,
                        instrumento_id=row["id"])
         sb_patch("cct_instrumentos", {"id": f"eq.{row['id']}"}, {"status_ciencia": "NOTIFICADO" if st == "ENVIADA" else "PENDENTE"})
-    sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"ultima_consulta": consulta["executada_em"], "ultimo_status": status_geral})
+    if sind.get("id"):
+        sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"ultima_consulta": consulta["executada_em"], "ultimo_status": status_geral})
     return status_geral, len(novos)
 
 
@@ -302,11 +474,14 @@ def main():
         sys.exit(2)
     tenant = tenants[0]["id"]
     sinds = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true",
-                                      "select": "id,cnpj,nome,tipo,uf", "order": "nome"})
+                                      "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email", "order": "nome"})
+    emps_act = sb_get("cct_empresas", {"tenant_id": f"eq.{tenant}", "monitorar_act": "eq.true", "ativo": "eq.true",
+                                       "select": "id,cnpj,razao_social,responsavel_email,gerente_email", "order": "razao_social"})
     filtro = os.environ.get("APENAS_CNPJ", "").strip()
     if filtro:
         sinds = [s for s in sinds if s["cnpj"] == filtro]
-    log(f"{len(sinds)} sindicato(s) a monitorar")
+        emps_act = [e for e in emps_act if e["cnpj"] == filtro]
+    log(f"{len(sinds)} sindicato(s) e {len(emps_act)} empresa(s) com ACT a monitorar")
     # já importados de fato; os com IMPORTACAO_NAO_CONCLUIDA voltam a ser tentados (seção 92)
     existentes = {r["numero_registro"] for r in sb_get("cct_instrumentos",
                   {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "select": "numero_registro"})}
@@ -327,13 +502,35 @@ def main():
                     log(f"  !! exceção não tratada: {e}\n{traceback.format_exc()}")
                     incidente(tenant, f"APLICATIVO:excecao:{s['cnpj']}", "APLICATIVO", "CRITICO",
                               f"Exceção não tratada ao processar {s['nome']}: {e}", s["id"])
-                if i < len(sinds) - 1:
+                if i < len(sinds) - 1 or emps_act:
+                    time.sleep(INTERVALO)
+            for i, e in enumerate(emps_act):
+                try:
+                    st, n = processar_empresa_act(tenant, e, page, existentes)
+                    resumo[st] += 1
+                    resumo["novos"] += n
+                except Exception as ex:
+                    resumo["CONSULTA_NAO_CONCLUIDA"] += 1
+                    log(f"  !! exceção não tratada (ACT): {ex}\n{traceback.format_exc()}")
+                    incidente(tenant, f"APLICATIVO:excecao:{e['cnpj']}", "APLICATIVO", "CRITICO", f"Exceção não tratada ao processar ACT de {e['razao_social']}: {ex}")
+                if i < len(emps_act) - 1:
                     time.sleep(INTERVALO)
         finally:
             browser.close()
 
-    if not sinds:
+    if not sinds and not emps_act:
         incidente(tenant, "APLICATIVO:sem-sindicatos", "APLICATIVO", "ATENCAO", "Execução sem nenhum sindicato monitorado")
+    else:
+        resolver(tenant, "APLICATIVO:sem-sindicatos")
+    try:
+        analisar_pendentes(tenant)
+    except Exception as e:
+        log(f"  !! análises pendentes falharam: {e}")
+    try:
+        processar_ciencias(tenant)
+    except Exception as e:
+        log(f"  !! rotina de ciências falhou: {e}\n{traceback.format_exc()}")
+        incidente(tenant, "APLICATIVO:ciencias", "APLICATIVO", "ALTO", f"Rotina de lembretes/escalonamento falhou: {e}")
     resolver(tenant, "APLICATIVO:execucao-diaria")  # heartbeat: execução chegou ao fim
     log(f"RESUMO: {json.dumps(resumo, ensure_ascii=False)}")
     with open("resumo_execucao.json", "w", encoding="utf-8") as f:
