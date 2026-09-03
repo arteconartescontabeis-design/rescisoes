@@ -8,8 +8,9 @@ Variáveis de ambiente (secrets do GitHub Actions):
   SUPABASE_URL          https://fbxelwhdiisfmnwrerbl.supabase.co
   SUPABASE_SERVICE_KEY  chave service_role (NUNCA a publicável) — ignora RLS
   TENANT_CNPJ           79876769000128 (Artecon)
-  MAIL_WEBHOOK_URL      (opcional) endpoint que envia e-mail: POST JSON {to:[...], subject, html}
-  MAIL_WEBHOOK_KEY      (opcional) Authorization: Bearer <key> para o webhook
+  MAIL_API_KEY          chave do hub artecon-mail (a mesma da bright-task) — sem ela, notificações ficam NAO_ENVIADA
+  MAIL_DESTINO_UNICO    (opcional, teste) redireciona TODOS os e-mails para este endereço
+  MAIL_HUB_URL          (opcional) URL do hub; padrão: .../functions/v1/mail-send
   ORIGEM                rótulo da execução (default github-actions)
   INTERVALO_S           pausa entre sindicatos (default 8)
 """
@@ -28,14 +29,17 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.4.1"
+VERSAO = "0.5.0"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
 ORIGEM = os.environ.get("ORIGEM", "github-actions")
 INTERVALO = float(os.environ.get("INTERVALO_S", "8"))
-MAIL_URL = os.environ.get("MAIL_WEBHOOK_URL")
-MAIL_KEY = os.environ.get("MAIL_WEBHOOK_KEY")
+# Hub artecon-mail — mesmo contrato da Edge Function bright-task do Rescisões Pro
+MAIL_URL = os.environ.get("MAIL_HUB_URL", "https://tjnqloycikukvvnconqn.supabase.co/functions/v1/mail-send")
+MAIL_KEY = os.environ.get("MAIL_API_KEY")
+MAIL_DESTINO_UNICO = (os.environ.get("MAIL_DESTINO_UNICO") or "").strip().lower()  # modo teste: tudo vai para um endereço
+MAIL_APP = "CCT Monitor"
 BUCKET = "cct-arquivos"
 TIPOS_MONITORADOS = ["Convenção Coletiva", "Termo Aditivo de Convenção Coletiva"]
 TIPOS_ACT = ["Acordo Coletivo", "Termo Aditivo de Acordo Coletivo"]
@@ -83,6 +87,38 @@ def sb_upload(path, corpo: bytes, content_type="application/msword"):
     return path
 
 
+# ---------------------------------------------------------------- e-mail (hub artecon-mail)
+def enviar_email(dest, assunto, html):
+    """Envia via hub, um destinatário por chamada (como a bright-task). Retorna (status, erro, destinatarios_efetivos)."""
+    dest = [d for d in dict.fromkeys(x.strip().lower() for x in dest if x) if d]
+    if not dest:
+        return "NAO_ENVIADA", "nenhum destinatário", []
+    if not MAIL_KEY:
+        return "NAO_ENVIADA", "MAIL_API_KEY não configurada (envio de e-mail ainda não ligado)", dest
+    efetivos = [MAIL_DESTINO_UNICO] if MAIL_DESTINO_UNICO else dest
+    if MAIL_DESTINO_UNICO:
+        html = f'<p style="font-size:12px;color:#a93226">[MODO TESTE] destinatários reais: {", ".join(dest)}</p>' + html
+    falhas = []
+    for d in efetivos:
+        try:
+            r = requests.post(MAIL_URL, headers={"Content-Type": "application/json", "x-api-key": MAIL_KEY},
+                              data=json.dumps({"to": d, "assunto": assunto, "html": html, "app": MAIL_APP}), timeout=30)
+            if r.status_code >= 300:
+                falhas.append(f"{d}: HTTP {r.status_code} {r.text[:120]}")
+        except Exception as e:
+            falhas.append(f"{d}: {type(e).__name__}: {e}"[:200])
+    if falhas and len(falhas) == len(efetivos):
+        return "NAO_ENVIADA", "; ".join(falhas)[:400], efetivos
+    return ("ENVIADA", ("parcial: " + "; ".join(falhas))[:400] if falhas else None, efetivos)
+
+
+def html_padrao(titulo, corpo):
+    return (f'<div style="font-family:Arial,sans-serif;max-width:640px"><div style="background:#1a5276;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0">'
+            f'<b>CCT Monitor</b> · Artecon Artes Contábeis</div><div style="border:1px solid #d9e1e8;border-top:0;padding:16px;border-radius:0 0 8px 8px">'
+            f'<h3 style="margin:0 0 10px;color:#1a5276">{titulo}</h3>{corpo}'
+            f'<p style="font-size:12px;color:#7a8894;margin-top:16px">Acesse: https://arteconartescontabeis-design.github.io/rescisoes/cct.html</p></div></div>')
+
+
 # ---------------------------------------------------------------- incidentes / notificações
 def incidente(tenant, fingerprint, modulo, gravidade, mensagem, sindicato_id=None, instrumento_id=None, detalhes=None):
     try:
@@ -121,23 +157,9 @@ def notificar(tenant, tipo, assunto, html, instrumento_id=None, incidente_id=Non
     dest = destinatarios(tenant, tipo_dest or tipo)
     reg = {"tenant_id": tenant, "tipo": tipo, "instrumento_id": instrumento_id, "incidente_id": incidente_id,
            "destinatarios": dest, "assunto": assunto, "status": "PENDENTE", "tentativas": 0}
-    if not dest:
-        reg.update(status="NAO_ENVIADA", erro="nenhum destinatário configurado para este tipo")
-    elif not MAIL_URL:
-        reg.update(status="NAO_ENVIADA", erro="MAIL_WEBHOOK_URL não configurado (envio de e-mail ainda não ligado)")
-    else:
-        try:
-            h = {"Content-Type": "application/json"}
-            if MAIL_KEY:
-                h["Authorization"] = f"Bearer {MAIL_KEY}"
-            r = requests.post(MAIL_URL, headers=h, data=json.dumps({"to": dest, "subject": assunto, "html": html}), timeout=40)
-            reg["tentativas"] = 1
-            if r.status_code < 300:
-                reg.update(status="ENVIADA", enviada_em=datetime.now(timezone.utc).isoformat())
-            else:
-                reg.update(status="NAO_ENVIADA", erro=f"webhook HTTP {r.status_code}: {r.text[:200]}")
-        except Exception as e:
-            reg.update(status="NAO_ENVIADA", tentativas=1, erro=f"{type(e).__name__}: {e}"[:300])
+    st, erro, efetivos = enviar_email(dest, assunto, html_padrao(assunto, html))
+    reg.update(status=st, erro=erro, tentativas=1 if MAIL_KEY else 0, destinatarios=efetivos or dest,
+               enviada_em=datetime.now(timezone.utc).isoformat() if st == "ENVIADA" else None)
     try:
         sb_insert("cct_notificacoes", reg)
     except Exception as e:
@@ -367,18 +389,10 @@ def notificar_para(tenant, tipo, assunto, html, dest, instrumento_id=None, incid
            "destinatarios": dest, "assunto": assunto, "status": "PENDENTE", "tentativas": 0}
     if not dest:
         reg.update(status="NAO_ENVIADA", erro="sem responsável/gerente configurado")
-    elif not MAIL_URL:
-        reg.update(status="NAO_ENVIADA", erro="MAIL_WEBHOOK_URL não configurado (envio de e-mail ainda não ligado)")
     else:
-        try:
-            h = {"Content-Type": "application/json"}
-            if MAIL_KEY:
-                h["Authorization"] = f"Bearer {MAIL_KEY}"
-            r = requests.post(MAIL_URL, headers=h, data=json.dumps({"to": dest, "subject": assunto, "html": html}), timeout=40)
-            reg["tentativas"] = 1
-            reg.update(status="ENVIADA", enviada_em=datetime.now(timezone.utc).isoformat()) if r.status_code < 300 else reg.update(status="NAO_ENVIADA", erro=f"webhook HTTP {r.status_code}: {r.text[:200]}")
-        except Exception as e:
-            reg.update(status="NAO_ENVIADA", tentativas=1, erro=f"{type(e).__name__}: {e}"[:300])
+        st, erro, efetivos = enviar_email(dest, assunto, html_padrao(assunto, html))
+        reg.update(status=st, erro=erro, tentativas=1 if MAIL_KEY else 0, destinatarios=efetivos or dest,
+                   enviada_em=datetime.now(timezone.utc).isoformat() if st == "ENVIADA" else None)
     try:
         sb_insert("cct_notificacoes", reg)
     except Exception as e:
@@ -468,6 +482,12 @@ def processar_alvo(tenant, sind, empresa, tipos, page, existentes):
 
 def main():
     log(f"CCT Monitor robô v{VERSAO} — origem {ORIGEM}")
+    teste = (os.environ.get("TESTE_EMAIL") or "").strip()
+    if teste:
+        st, erro, ef = enviar_email([teste], "TESTE – CCT Monitor – circuito de e-mail", html_padrao("Teste de envio",
+                                    f"<p>Se você recebeu esta mensagem, o CCT Monitor está conectado ao hub artecon-mail.</p><p>{datetime.now():%d/%m/%Y %H:%M}</p>"))
+        log(f"TESTE DE E-MAIL para {ef}: {st} {erro or ''}")
+        sys.exit(0 if st == "ENVIADA" else 1)
     tenants = sb_get("resc_tenants", {"cnpj": f"eq.{TENANT_CNPJ}", "select": "id,nome"})
     if not tenants:
         log(f"tenant {TENANT_CNPJ} não encontrado — abortando");
