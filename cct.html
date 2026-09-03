@@ -148,6 +148,10 @@
 
     <section data-sec="destinatarios" style="display:none">
       <div class="card"><div class="topo"><h2>Responsáveis por alertas</h2><button class="b" onclick="abrirDest()">+ Novo destinatário</button></div><div id="tabDest"></div>
+        <div class="card" style="margin-top:12px"><h2>E-mail — modo teste</h2>
+          <div class="grid g2"><div><label>Redirecionar todos os e-mails para (vazio = produção)</label><input id="cfgDestTeste" type="email" placeholder="seu@email.com.br"></div>
+            <div style="display:flex;gap:8px;align-items:flex-end"><button class="b" onclick="salvarDestTeste()">Salvar</button><button class="b sec" onclick="pedirTeste()">Solicitar e-mail de teste</button></div></div>
+          <div class="aviso">Com um endereço preenchido, o robô manda <b>todos</b> os e-mails só para ele (o corpo indica os destinatários reais). O pedido de teste é atendido na próxima execução do robô (manual em Actions ou a das 06h) e aparece na lista abaixo como ENVIADA ou NÃO ENVIADA com o motivo.</div></div>
         <div class="aviso">Tipos: <b>NOVA_CCT</b> (convenção nova), <b>MEDIADOR</b>, <b>DOWNLOAD</b>, <b>IMPORTACAO</b>, <b>ARMAZENAMENTO</b>, <b>APLICATIVO</b>, <b>EMAIL</b> ou <b>TODOS</b>.</div>
         <div class="card" style="margin-top:12px"><h2>Notificações registradas</h2><div id="tabNotif"></div></div>
       </div>
@@ -156,6 +160,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.5.2</td><td>03/09/2026</td><td>Modo teste de e-mail configurado no app (Destinatários → "redirecionar todos os e-mails para"), substituindo o secret MAIL_DESTINO_UNICO; botão "Solicitar e-mail de teste" atendido pelo robô na próxima execução. Banco <code>setup_cct_v0.5.2.sql</code>.</td></tr>
           <tr><td>v0.5.1</td><td>03/09/2026</td><td>Layout alinhado ao Rescisões Pro (mesmas cores, tipografia, cartões, tabelas, indicadores, modais e tela de login com o logo da Artecon), mantendo a barra de navegação horizontal.</td></tr>
           <tr><td>v0.5.0</td><td>03/09/2026</td><td>E-mail ligado ao hub artecon-mail (mesmo contrato da bright-task: x-api-key, um destinatário por chamada, app "CCT Monitor"); modelo visual padrão nas mensagens; modo teste MAIL_DESTINO_UNICO (redireciona tudo para um endereço) e execução "só testar e-mail" no workflow.</td></tr>
           <tr><td>v0.4.1</td><td>03/09/2026</td><td>Robô: HTTP 500 do Mediador com "Nenhum registro encontrado." (defeito do site, confirmado com o texto do erro) passa a ser tratado como zero resultados — CONSULTA COM ALERTA, sem novas tentativas e sem incidente. Outros 500 continuam como erro com retry.</td></tr>
@@ -218,7 +223,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.5.1" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.5.2" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const $ = id => document.getElementById(id);
@@ -527,6 +532,7 @@ function renderConf() {
       <td>${tagStatus(c.status)}${c.ciente_em ? `<br><small>${fmtDT(c.ciente_em)} · ${esc(c.ciente_por||"")}</small>` : ""}</td><td class="r">${c.lembretes}</td>
       <td style="white-space:nowrap">${ab(c) ? `<button class="b sm" onclick="registrarCiencia('${c.id}')">Registrar ciência</button>` : ""} <button class="b sec sm" onclick="abrirInst('${c.instrumento_id}')">Ver CCT</button></td></tr>`).join("") + `</table>` +
     (l.length ? "" : `<div class="aviso">Nada aqui.</div>`);
+  $("cfgDestTeste").value = APP.dados.cfg.email_destino_teste || "";
   $("cfgPrazo").value = APP.dados.cfg.prazo_ciencia_dias_uteis; $("cfgLemb").value = String(APP.dados.cfg.lembrete_diario); $("cfgEsc").value = String(APP.dados.cfg.escalonar_apos_prazo);
 }
 async function registrarCiencia(id) {
@@ -540,8 +546,17 @@ async function registrarCiencia(id) {
     msg("Ciência registrada."); await carregarTudo();
   } catch (e) { msg(e.message, "erro"); }
 }
+async function salvarDestTeste() {
+  const d = { tenant_id: APP.tenantId, email_destino_teste: $("cfgDestTeste").value.trim().toLowerCase() || null, updated_at: new Date().toISOString() };
+  try { await api("cct_config?on_conflict=tenant_id", { method:"POST", body: JSON.stringify(d), headers:{ Prefer: "resolution=merge-duplicates,return=representation" } }); msg(d.email_destino_teste ? "Modo teste ativo: tudo vai para " + d.email_destino_teste : "Modo produção: e-mails vão aos destinatários reais."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
+}
+async function pedirTeste() {
+  const para = ($("cfgDestTeste").value.trim() || APP.email).toLowerCase();
+  try { await post("cct_notificacoes", { tenant_id: APP.tenantId, tipo: "TESTE", destinatarios: [para], assunto: "TESTE – CCT Monitor – circuito de e-mail", status: "PENDENTE" });
+    msg("Pedido registrado para " + para + ". Rode o robô (Actions → Run workflow) para enviar."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
+}
 async function salvarConfig() {
-  const d = { tenant_id: APP.tenantId, prazo_ciencia_dias_uteis: +$("cfgPrazo").value || 2, lembrete_diario: $("cfgLemb").value === "true", escalonar_apos_prazo: $("cfgEsc").value === "true", updated_at: new Date().toISOString() };
+  const d = { tenant_id: APP.tenantId, prazo_ciencia_dias_uteis: +$("cfgPrazo").value || 2, lembrete_diario: $("cfgLemb").value === "true", escalonar_apos_prazo: $("cfgEsc").value === "true", email_destino_teste: APP.dados.cfg.email_destino_teste || null, updated_at: new Date().toISOString() };
   try { await api("cct_config?on_conflict=tenant_id", { method:"POST", body: JSON.stringify(d), headers:{ Prefer: "resolution=merge-duplicates,return=representation" } }); msg("Parâmetros salvos."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
 
