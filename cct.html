@@ -1,570 +1,580 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CCT Monitor — Artecon</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-<style>
-  :root{--bg:#f4f6f9;--surface:#fff;--surface-2:#f0f2f5;--border:rgba(0,0,0,.08);--border-lt:rgba(0,0,0,.14);
-    --text:#1a2332;--text-2:#4a5568;--text-3:#8896a8;--gold:#1a5276;--gold-lt:#d6e4f0;--gold-dim:#154360;--gold-glow:0 0 20px rgba(26,82,118,.15);
-    --green:#1e8449;--green-lt:#eafaf1;--red:#c0392b;--red-lt:#fdedec;--amber:#b7770d;--amber-lt:#fef9e7;--radius:12px;
-    --shadow:0 2px 12px rgba(0,0,0,.08);--shadow-lg:0 8px 32px rgba(0,0,0,.14);--font:'DM Sans',Arial,sans-serif;--mono:'DM Mono',monospace;--display:'Playfair Display',Georgia,serif;--tr:160ms cubic-bezier(.4,0,.2,1);
-    /* aliases usados pelo script */ --azul:var(--gold);--azul-esc:var(--gold-dim);--cinza:var(--text-3);--borda:var(--border-lt);--fundo:var(--bg);--ok:var(--green);--alerta:var(--amber);--erro:var(--red);--info:var(--gold)}
-  *{box-sizing:border-box} html,body{margin:0;min-height:100%}
-  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
-  h1,h2,h3{margin:0;font-weight:700} a{color:var(--gold)}
-  /* ===== TOPO (barra horizontal) ===== */
-  header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 34px;display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:100}
-  header .brand{display:flex;align-items:center;gap:12px}
-  header .brand img{height:38px;width:auto}
-  header h1{font-family:var(--display);font-size:19px;line-height:1;color:var(--text)}
-  header small{display:block;font-family:var(--font);font-size:9px;color:var(--text-3);letter-spacing:.12em;text-transform:uppercase;font-weight:600;margin-top:3px}
-  .badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:20px;font-size:10.5px;font-weight:600;background:var(--gold-lt);color:var(--gold);white-space:nowrap}
-  #usuario{font-size:12.5px;color:var(--text-2)}
-  nav{background:var(--surface);border-bottom:1px solid var(--border);padding:6px 34px;display:flex;gap:2px;overflow-x:auto;position:sticky;top:63px;z-index:99}
-  nav button{display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:9px;color:var(--text-3);font-size:13px;font-weight:500;cursor:pointer;transition:var(--tr);border:none;background:none;white-space:nowrap;font-family:inherit}
-  nav button:hover{background:var(--bg);color:var(--text-2)} nav button.on{background:var(--gold-lt);color:var(--gold);font-weight:600}
-  main{max-width:1240px;margin:0 auto;padding:26px 34px}
-  /* ===== CARDS ===== */
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
-  .card h2{font-family:var(--display);font-size:19px;color:var(--text);margin:0 0 14px}
-  .topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-  .grid{display:grid;gap:14px}.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
-  label{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin:0 0 6px}
-  input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border-lt);border-radius:9px;background:var(--surface);font-family:inherit;font-size:13.5px;color:var(--text);transition:var(--tr)}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-lt)}
-  input[type=checkbox]{width:auto}
-  /* ===== BOTÕES ===== */
-  button.b{padding:9px 18px;background:linear-gradient(135deg,var(--gold-dim),var(--gold));color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;transition:var(--tr);display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-family:inherit}
-  button.b:hover{filter:brightness(1.08);box-shadow:0 4px 16px rgba(26,82,118,.25)}
-  button.b.sec{background:transparent;color:var(--text-2);border:1.5px solid var(--border-lt);font-weight:500;box-shadow:none}
-  button.b.sec:hover{border-color:var(--text-3);color:var(--text);filter:none;box-shadow:none}
-  button.b.sm{padding:6px 12px;font-size:12.5px} button.b:disabled{opacity:.5;cursor:not-allowed}
-  /* ===== TABELAS ===== */
-  table{width:100%;border-collapse:collapse}
-  th{text-align:left;padding:8px 7px;font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border);white-space:nowrap;background:none}
-  td{padding:8px 7px;font-size:12.5px;line-height:1.35;border-bottom:1px solid var(--surface-2);vertical-align:top;word-break:break-word}
-  tr:last-child td{border-bottom:none} tr:hover td{background:var(--bg)} td.r,th.r{text-align:right}
-  /* ===== TAGS / KPI ===== */
-  .tag{display:inline-flex;align-items:center;padding:2px 10px;border-radius:20px;font-size:10.5px;font-weight:600;white-space:nowrap}
-  .tag.ok{background:var(--green-lt);color:var(--green)}.tag.alerta{background:var(--amber-lt);color:var(--amber)}.tag.erro{background:var(--red-lt);color:var(--red)}.tag.info{background:var(--gold-lt);color:var(--gold)}.tag.cinza{background:var(--surface-2);color:var(--text-3)}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
-  .kpi{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--border-lt);border-radius:12px;padding:14px 16px;transition:.15s}
-  .kpi:hover{box-shadow:var(--gold-glow);transform:translateY(-1px)}
-  .kpi b{font-family:var(--mono);font-size:26px;font-weight:500;line-height:1;display:block;color:var(--text)} .kpi span{font-weight:600;margin-top:6px;font-size:12.5px;color:var(--text-2);display:block}
-  .kpi.erro{border-left-color:var(--red)} .kpi.erro b{color:var(--red)} .kpi.alerta{border-left-color:var(--amber)} .kpi.alerta b{color:var(--amber)} .kpi.info{border-left-color:var(--gold)} .kpi.info b{color:var(--gold)}
-  .aviso{font-size:12.5px;color:var(--text-2);border-left:3px solid var(--gold);padding:10px 13px;background:var(--gold-lt);border-radius:0 9px 9px 0;margin:10px 0;line-height:1.6}
-  .aviso code,.cfg code{background:var(--surface);padding:1px 6px;border-radius:5px;font-family:var(--mono);font-size:11.5px}
-  /* ===== MODAL ===== */
-  .modal{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;place-items:start center;padding:30px 18px;z-index:200;overflow-y:auto}
-  .modal.on{display:grid}
-  .modal>.card{width:100%;max-width:900px;border-radius:16px;box-shadow:var(--shadow-lg);animation:sl .2s ease;padding:22px 26px}
-  .modal>.card>h2{font-family:var(--display);font-size:19px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:16px}
-  @keyframes sl{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .cl{border:1px solid var(--border);border-radius:10px;padding:10px 13px;margin-bottom:8px;background:var(--surface)} .cl h4{margin:0 0 4px;font-size:13.5px;color:var(--gold)} .cl small{color:var(--text-3)} .cl p{margin:6px 0 0;white-space:pre-wrap;font-size:13px;color:var(--text-2)}
-  pre{background:#0f172a;color:#e9f0ec;padding:14px;border-radius:10px;font-size:12px;font-family:var(--mono);max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-word;line-height:1.55}
-  .etapas{font-size:12.5px;color:var(--text-3);margin:0 0 12px 18px}
-  /* ===== LOGIN ===== */
-  #login{position:fixed;inset:0;display:grid;place-items:center;padding:16px;background:linear-gradient(135deg,#1a3a5c 0%,#1a5276 50%,#2e86c1 100%);z-index:300}
-  #login .auth-wrap{width:calc(100vw - 32px);max-width:400px}
-  #login .auth-logo{max-width:180px;height:auto;display:block;margin:0 auto 14px}
-  #login .auth-title{text-align:center;color:#fff;font-weight:700;font-size:22px;letter-spacing:.04em;text-transform:uppercase}
-  #login .auth-tagline{text-align:center;color:rgba(255,255,255,.78);font-size:12px;letter-spacing:.04em;margin:4px 0 26px}
-  #login .card{border-radius:18px;padding:32px;box-shadow:0 20px 60px rgba(0,0,0,.18);margin:0}
-  #login .card h2{font-size:23px;margin-bottom:4px} #login .sub{color:var(--text-3);font-size:13px;margin-bottom:22px}
-  #login label{margin-top:14px} #btnEntrar{width:100%;padding:11px;margin-top:18px;justify-content:center;font-size:13.5px}
-  #lMsg{color:var(--red);font-size:12.5px;margin-top:12px;text-align:center;min-height:18px;display:block}
-  /* ===== MENSAGENS ===== */
-  .msg{position:fixed;right:18px;bottom:18px;background:var(--text);color:#fff;padding:12px 16px;border-radius:10px;font-size:13px;box-shadow:var(--shadow-lg);max-width:340px;z-index:400;display:none;animation:sl .25s ease}
-  .msg.on{display:block}.msg.ok{background:var(--green)}.msg.erro{background:var(--red)}
-  .cfg{font-size:12px;color:var(--text-3);margin-top:8px}
-  details summary{cursor:pointer;color:var(--gold);font-weight:600;font-size:12px}
-  @media(max-width:800px){.g4,.g3,.g2{grid-template-columns:1fr}header,nav,main{padding-left:14px;padding-right:14px}nav{top:auto;position:static}}
-</style>
-</head>
-<body>
-<header>
-  <div class="brand"><img src="logo.webp" alt="Artecon" onerror="this.style.display='none'"><div><h1>CCT Monitor</h1><small>Convenções Coletivas · Sistema Mediador</small></div></div>
-  <div style="display:flex;gap:12px;align-items:center"><span id="usuario"></span><button class="b sec sm" id="btnSair" style="display:none">Sair</button><span class="badge" id="versao"></span></div>
-</header>
-<nav id="nav" style="display:none">
-  <button data-aba="painel" class="on">Painel</button><button data-aba="sindicatos">Sindicatos</button><button data-aba="empresas">Empresas</button><button data-aba="instrumentos">Convenções</button><button data-aba="confirmacoes">Confirmações</button>
-  <button data-aba="consultas">Consultas</button><button data-aba="erros">Central de Erros</button><button data-aba="destinatarios">Destinatários</button><button data-aba="versoes">Versões</button>
-</nav>
-<main>
-  <div id="login"><div class="auth-wrap">
-    <img class="auth-logo" src="logo.webp" alt="Artecon" onerror="this.style.display='none'">
-    <div class="auth-title">CCT Monitor</div><div class="auth-tagline">Monitoramento de Convenções Coletivas · Artecon Artes Contábeis</div>
-    <div class="card"><h2>Entrar</h2><div class="sub">Use o mesmo acesso do Rescisões Pro</div>
-      <label>E-mail</label><input id="lEmail" type="email" autocomplete="username">
-      <label>Senha</label><input id="lSenha" type="password" autocomplete="current-password">
-      <button class="b" id="btnEntrar">Entrar</button><span id="lMsg"></span>
-    </div>
-  </div></div>
-  <div id="app" style="display:none">
-    <div class="msg" id="msg"></div>
+"""
+monitor_cct.py — robô do CCT Monitor (fase 1), v0.2.0
+Para cada sindicato monitorado: consulta o Mediador (CCT + Termo Aditivo de CCT vigentes), identifica
+registros novos, baixa o extrato, importa cláusulas, grava tudo no Supabase, abre/resolve incidentes e
+registra notificações (seções 22-28, 40-43, 81-100 da spec).
 
-    <section data-sec="painel">
-      <div class="topo" style="align-items:flex-end;margin-bottom:18px"><div><h2 style="font-family:var(--display);font-size:28px;margin:0">Painel</h2><div style="color:var(--text-3);font-size:13px;margin-top:4px">Monitoramento de Convenções Coletivas — Artecon Artes Contábeis</div></div></div>
-      <div class="kpis" id="kpis"></div>
-      <div class="card" style="margin-top:16px"><h2>Últimas convenções detectadas</h2><div id="painelNovos"></div></div>
-      <div class="card"><h2>Como funciona</h2>
-        <div class="aviso">O robô roda nos dias úteis às 06h (GitHub Actions), consulta o Mediador para cada sindicato marcado como "monitorar", baixa e importa as Convenções e Termos Aditivos vigentes que ainda não constam aqui, e registra incidentes quando qualquer etapa falha. Falha de acesso <b>nunca</b> é registrada como "não existe CCT".</div>
-      </div>
-    </section>
+Variáveis de ambiente (secrets do GitHub Actions):
+  SUPABASE_URL          https://fbxelwhdiisfmnwrerbl.supabase.co
+  SUPABASE_SERVICE_KEY  chave service_role (NUNCA a publicável) — ignora RLS
+  TENANT_CNPJ           79876769000128 (Artecon)
+  MAIL_API_KEY          chave do hub artecon-mail (a mesma da bright-task) — sem ela, notificações ficam NAO_ENVIADA
+  MAIL_DESTINO_UNICO    (opcional, teste) redireciona TODOS os e-mails para este endereço
+  MAIL_HUB_URL          (opcional) URL do hub; padrão: .../functions/v1/mail-send
+  ORIGEM                rótulo da execução (default github-actions)
+  INTERVALO_S           pausa entre sindicatos (default 8)
+"""
+import hashlib
+import json
+import os
+import sys
+import time
+import traceback
+from datetime import datetime, timezone
 
-    <section data-sec="sindicatos" style="display:none">
-      <div class="card"><div class="topo"><h2>Sindicatos monitorados</h2><button class="b" onclick="abrirSind()">+ Novo sindicato</button></div><div id="tabSind"></div></div>
-    </section>
+import requests
+from playwright.sync_api import sync_playwright
 
-    <section data-sec="empresas" style="display:none">
-      <div class="card"><div class="topo"><h2>Empresas e enquadramento sindical</h2><button class="b" onclick="abrirEmp()">+ Nova empresa</button></div><div id="tabEmp"></div>
-        <div class="aviso">O responsável da empresa recebe o aviso de convenção nova e os lembretes; o gerente recebe o escalonamento quando o prazo vence. "Monitorar ACT" faz o robô consultar também os Acordos Coletivos da própria empresa no Mediador.</div></div>
-    </section>
+import mediador
+from extrair_cct import extrair
+import analisar_cct
 
-    <section data-sec="confirmacoes" style="display:none">
-      <div class="card"><div class="topo"><h2>Central de Confirmações de Ciência</h2><select id="fConf" style="width:220px" onchange="renderConf()"><option value="pendentes">Pendentes</option><option value="atrasadas">Atrasadas</option><option value="todas">Todas</option></select></div>
-        <div class="kpis" id="kpisConf" style="margin-bottom:12px"></div><div id="tabConf"></div></div>
-      <div class="card"><h2>Parâmetros de ciência</h2>
-        <div class="grid g3"><div><label>Prazo para ciência (dias úteis)</label><input id="cfgPrazo" type="number" min="1" max="30"></div>
-          <div><label>Lembrete diário</label><select id="cfgLemb"><option value="true">Sim</option><option value="false">Não</option></select></div>
-          <div><label>Escalonar ao gerente após o prazo</label><select id="cfgEsc"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
-        <div style="margin-top:10px"><button class="b" onclick="salvarConfig()">Salvar parâmetros</button></div></div>
-    </section>
+VERSAO = "0.5.3"
+SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
+SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
+ORIGEM = os.environ.get("ORIGEM", "github-actions")
+INTERVALO = float(os.environ.get("INTERVALO_S", "8"))
+# Hub artecon-mail — mesmo contrato da Edge Function bright-task do Rescisões Pro
+MAIL_URL = os.environ.get("MAIL_HUB_URL", "https://tjnqloycikukvvnconqn.supabase.co/functions/v1/mail-send")
+MAIL_KEY = (os.environ.get("MAIL_API_KEY") or "").strip() or None
+MAIL_DESTINO_UNICO = (os.environ.get("MAIL_DESTINO_UNICO") or "").strip().lower()  # modo teste: tudo vai para um endereço
+MAIL_APP = "CCT Monitor"
+BUCKET = "cct-arquivos"
+TIPOS_MONITORADOS = ["Convenção Coletiva", "Termo Aditivo de Convenção Coletiva"]
+TIPOS_ACT = ["Acordo Coletivo", "Termo Aditivo de Acordo Coletivo"]
+H = {"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Content-Type": "application/json"}
 
-    <section data-sec="instrumentos" style="display:none">
-      <div class="card"><div class="topo"><h2>Convenções e Termos Aditivos</h2><div style="display:flex;gap:8px"><input id="fInst" placeholder="filtrar por registro, sindicato, categoria…" style="width:280px" oninput="renderInst()"></div></div><div id="tabInst"></div></div>
-    </section>
 
-    <section data-sec="consultas" style="display:none">
-      <div class="card"><h2>Histórico de consultas ao Mediador</h2><div id="tabCons"></div></div>
-    </section>
+def log(msg):
+    print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
 
-    <section data-sec="erros" style="display:none">
-      <div class="card"><div class="topo"><h2>Central de Erros e Incidentes</h2><select id="fInc" style="width:220px" onchange="renderInc()"><option value="abertos">Abertos</option><option value="todos">Todos</option></select></div><div id="tabInc"></div></div>
-    </section>
 
-    <section data-sec="destinatarios" style="display:none">
-      <div class="card"><div class="topo"><h2>Responsáveis por alertas</h2><button class="b" onclick="abrirDest()">+ Novo destinatário</button></div><div id="tabDest"></div>
-        <div class="card" style="margin-top:12px"><h2>E-mail — modo teste</h2>
-          <div class="grid g2"><div><label>Redirecionar todos os e-mails para (vazio = produção)</label><input id="cfgDestTeste" type="email" placeholder="seu@email.com.br"></div>
-            <div style="display:flex;gap:8px;align-items:flex-end"><button class="b" onclick="salvarDestTeste()">Salvar</button><button class="b sec" onclick="pedirTeste()">Solicitar e-mail de teste</button></div></div>
-          <div class="aviso">Com um endereço preenchido, o robô manda <b>todos</b> os e-mails só para ele (o corpo indica os destinatários reais). O pedido de teste é atendido na próxima execução do robô (manual em Actions ou a das 06h) e aparece na lista abaixo como ENVIADA ou NÃO ENVIADA com o motivo.</div></div>
-        <div class="aviso">Tipos: <b>NOVA_CCT</b> (convenção nova), <b>MEDIADOR</b>, <b>DOWNLOAD</b>, <b>IMPORTACAO</b>, <b>ARMAZENAMENTO</b>, <b>APLICATIVO</b>, <b>EMAIL</b> ou <b>TODOS</b>.</div>
-        <div class="card" style="margin-top:12px"><h2>Notificações registradas</h2><div id="tabNotif"></div></div>
-      </div>
-    </section>
+# ---------------------------------------------------------------- Supabase (PostgREST)
+def sb_get(tabela, params):
+    r = requests.get(f"{SB_URL}/rest/v1/{tabela}", headers=H, params=params, timeout=30)
+    r.raise_for_status()
+    return r.json()
 
-    <section data-sec="versoes" style="display:none">
-      <div class="card"><h2>Versões</h2>
-        <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
-          <tr><td>v0.5.2</td><td>03/09/2026</td><td>Modo teste de e-mail configurado no app (Destinatários → "redirecionar todos os e-mails para"), substituindo o secret MAIL_DESTINO_UNICO; botão "Solicitar e-mail de teste" atendido pelo robô na próxima execução. Banco <code>setup_cct_v0.5.2.sql</code>.</td></tr>
-          <tr><td>v0.5.1</td><td>03/09/2026</td><td>Layout alinhado ao Rescisões Pro (mesmas cores, tipografia, cartões, tabelas, indicadores, modais e tela de login com o logo da Artecon), mantendo a barra de navegação horizontal.</td></tr>
-          <tr><td>v0.5.0</td><td>03/09/2026</td><td>E-mail ligado ao hub artecon-mail (mesmo contrato da bright-task: x-api-key, um destinatário por chamada, app "CCT Monitor"); modelo visual padrão nas mensagens; modo teste MAIL_DESTINO_UNICO (redireciona tudo para um endereço) e execução "só testar e-mail" no workflow.</td></tr>
-          <tr><td>v0.4.1</td><td>03/09/2026</td><td>Robô: HTTP 500 do Mediador com "Nenhum registro encontrado." (defeito do site, confirmado com o texto do erro) passa a ser tratado como zero resultados — CONSULTA COM ALERTA, sem novas tentativas e sem incidente. Outros 500 continuam como erro com retry.</td></tr>
-          <tr><td>v0.4.0</td><td>03/09/2026</td><td>Bloco 3 — Análise: extração determinística de valores por cláusula (piso, reajuste, contribuições, feriados, intervalo, banco de horas…) com referência à cláusula e confiança; comparação automática com a CCT anterior do mesmo par de sindicatos (cláusulas novas, excluídas, alteradas com diff e variação dos valores); parecer por IA (resumo, destaques, providências, alertas) com validação das cláusulas citadas — sem chave de API fica ANÁLISE POR IA NÃO CONCLUÍDA mantendo valores e comparação. Aba Análise na convenção, valores no Painel, reprocessamento sob demanda. Banco <code>setup_cct_v0.4.0.sql</code> validado localmente.</td></tr>
-          <tr><td>v0.3.0</td><td>03/09/2026</td><td>Bloco 2 — Ciência: cadastro de Empresas com responsável, gerente, CNAE e vínculo com sindicatos; Central de Confirmações (prazo em dias úteis via <code>resc_feriados</code>, atrasadas, registro de ciência por empresa); parâmetros de prazo/lembrete/escalonamento; responsável e gerente padrão por sindicato; monitoramento opcional de ACT por empresa. Robô: cria ciências ao importar, envia aviso ao responsável, lembrete diário e escalonamento ao gerente após o prazo; heartbeat (pg_cron) abre incidente crítico se o robô não rodar. Banco <code>setup_cct_v0.3.0.sql</code> validado localmente.</td></tr>
-          <tr><td>v0.2.3</td><td>02/09/2026</td><td>Robô: download do extrato feito de dentro da página do Mediador (fetch same-origin, com os cabeçalhos do navegador), com fallback; texto da resposta do site (403/erro) guardado no incidente e na observação da convenção.</td></tr>
-          <tr><td>v0.2.2</td><td>02/09/2026</td><td>Robô: extratos baixados imediatamente após a pesquisa que os encontrou (o Mediador nega o download — HTTP 403 — quando a última pesquisa da sessão não contém o registro); registro da consulta criado no início e concluído ao final; incidente antigo do Mediador resolvido quando a pesquisa de Convenção volta a funcionar.</td></tr>
-          <tr><td>v0.2.1</td><td>02/09/2026</td><td>Robô: cada tipo (Convenção / Termo Aditivo) consultado de forma independente — falha em um não descarta os resultados do outro; nova tentativa automática (3x, 20 s) em HTTP 5xx/timeout (seção 92); texto do erro do Mediador guardado no incidente; incidente por tipo. Consulta com um tipo falho fica como CONSULTA COM ALERTA.</td></tr>
-          <tr><td>v0.2.0</td><td>02/09/2026</td><td>Fase 1: login, cadastro de sindicatos, lista de convenções com cláusulas e download do extrato, histórico de consultas, Central de Erros (status manual), destinatários e notificações. Banco <code>setup_cct_v0.2.0.sql</code> validado em PostgreSQL local; robô <code>monitor_cct.py</code> agendado no GitHub Actions.</td></tr>
-          <tr><td>v0.1.3</td><td>02/09/2026</td><td>Protótipo: domínio mediador.trabalho.gov.br confirmado; inspeção de campos via Edge Function; identificação do reCAPTCHA e do endpoint getConsultaAvancada.</td></tr>
-          <tr><td>v0.1.0</td><td>02/09/2026</td><td>Protótipo inicial de teste de consulta.</td></tr>
-        </table>
-      </div>
-    </section>
-  </div>
-</main>
 
-<div class="modal" id="mSind"><div class="card"><h2 id="mSindTit">Sindicato</h2>
-  <input type="hidden" id="sId">
-  <div class="grid g2"><div><label>CNPJ</label><input id="sCnpj" maxlength="18"></div><div><label>Nome</label><input id="sNome"></div>
-    <div><label>Tipo</label><select id="sTipo"><option value="laboral">Laboral (empregados)</option><option value="patronal">Patronal</option></select></div>
-    <div><label>UF (referência)</label><input id="sUf" maxlength="2" placeholder="SC"></div>
-    <div><label>Categoria</label><input id="sCat" placeholder="ex.: Comerciários"></div>
-    <div><label>Monitorar</label><select id="sMon"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
-  <div class="grid g2" style="margin-top:8px"><div><label>E-mail do responsável padrão (ciência)</label><input id="sResp" type="email" placeholder="usado quando a empresa não tem o seu"></div><div><label>E-mail do gerente (escalonamento)</label><input id="sGer" type="email"></div></div>
-  <div style="margin-top:8px"><label>Observações</label><textarea id="sObs" rows="2"></textarea></div>
-  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mSind')">Cancelar</button><button class="b" onclick="salvarSind()">Salvar</button></div>
-</div></div>
+def sb_insert(tabela, dados, upsert_on=None):
+    h = dict(H, Prefer="return=representation" + (",resolution=merge-duplicates" if upsert_on else ""))
+    params = {"on_conflict": upsert_on} if upsert_on else None
+    r = requests.post(f"{SB_URL}/rest/v1/{tabela}", headers=h, params=params, data=json.dumps(dados), timeout=60)
+    if r.status_code >= 300:
+        raise RuntimeError(f"{tabela}: HTTP {r.status_code} {r.text[:300]}")
+    return r.json()
 
-<div class="modal" id="mEmp"><div class="card"><h2 id="mEmpTit">Empresa</h2>
-  <input type="hidden" id="eId">
-  <div class="grid g3"><div><label>CNPJ</label><input id="eCnpj" maxlength="18"></div><div style="grid-column:span 2"><label>Razão social</label><input id="eNome"></div>
-    <div><label>UF</label><input id="eUf" maxlength="2"></div><div><label>Município</label><input id="eMun"></div><div><label>CNAE principal</label><input id="eCnae" placeholder="0000-0/00"></div>
-    <div><label>Responsável (nome)</label><input id="eRespN"></div><div><label>Responsável (e-mail)</label><input id="eRespE" type="email"></div><div><label>Monitorar ACT da empresa</label><select id="eAct"><option value="false">Não</option><option value="true">Sim</option></select></div>
-    <div><label>Gerente (nome)</label><input id="eGerN"></div><div><label>Gerente (e-mail)</label><input id="eGerE" type="email"></div><div><label>Ativa</label><select id="eAtivo"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
-  <div style="margin-top:10px"><label>Sindicatos vinculados (enquadramento)</label><div id="eSinds" style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;font-size:13px"></div></div>
-  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mEmp')">Cancelar</button><button class="b" onclick="salvarEmp()">Salvar</button></div>
-</div></div>
 
-<div class="modal" id="mDest"><div class="card" style="max-width:560px"><h2>Destinatário de alertas</h2>
-  <input type="hidden" id="dId">
-  <div class="grid g2"><div><label>Nome</label><input id="dNome"></div><div><label>E-mail</label><input id="dEmail" type="email"></div>
-    <div><label>Grupo</label><select id="dGrupo"><option>ADMINISTRADOR</option><option>RESPONSAVEL_TECNICO</option><option>GERENTE</option><option>TI</option><option>DP</option></select></div>
-    <div><label>Tipos (separados por vírgula)</label><input id="dTipos" value="TODOS"></div></div>
-  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mDest')">Cancelar</button><button class="b" onclick="salvarDest()">Salvar</button></div>
-</div></div>
+def sb_patch(tabela, params, dados):
+    r = requests.patch(f"{SB_URL}/rest/v1/{tabela}", headers=H, params=params, data=json.dumps(dados), timeout=30)
+    if r.status_code >= 300:
+        raise RuntimeError(f"{tabela} patch: HTTP {r.status_code} {r.text[:300]}")
 
-<div class="modal" id="mInst"><div class="card"><div class="topo"><h2 id="mInstTit">Convenção</h2><div style="display:flex;gap:8px"><button class="b sec sm" id="btnBaixar">Baixar extrato (.doc)</button><button class="b sec sm" onclick="fechar('mInst')">Fechar</button></div></div>
-  <div id="mInstCab" style="font-size:13px;margin-bottom:10px"></div>
-  <div style="display:flex;gap:6px;margin-bottom:10px"><button class="b sm" id="tabAn" onclick="abaInst('an')">Análise</button><button class="b sec sm" id="tabCl" onclick="abaInst('cl')">Cláusulas</button><button class="b sec sm" onclick="reprocessar()">Reprocessar análise</button></div>
-  <div id="mInstAn"></div>
-  <div id="mInstClWrap" style="display:none"><input id="fCl" placeholder="buscar nas cláusulas…" oninput="renderCl()" style="margin-bottom:10px"><div id="mInstCl"></div></div>
-</div></div>
 
-<div class="modal" id="mInc"><div class="card" style="max-width:640px"><h2>Incidente</h2>
-  <input type="hidden" id="iId"><div id="iDet" style="font-size:13px;margin-bottom:10px"></div>
-  <div class="grid g2"><div><label>Novo status</label><select id="iStatus"><option>EM_ANALISE</option><option>RESOLVIDO_MANUALMENTE</option><option>IGNORADO_COM_JUSTIFICATIVA</option></select></div><div><label>Analisado por</label><input id="iPor"></div></div>
-  <div style="margin-top:8px"><label>Observações / justificativa</label><textarea id="iObs" rows="3"></textarea></div>
-  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mInc')">Cancelar</button><button class="b" onclick="salvarInc()">Salvar</button></div>
-</div></div>
+def sb_rpc(fn, args):
+    r = requests.post(f"{SB_URL}/rest/v1/rpc/{fn}", headers=H, data=json.dumps(args), timeout=30)
+    if r.status_code >= 300:
+        raise RuntimeError(f"rpc {fn}: HTTP {r.status_code} {r.text[:300]}")
+    return r.json()
 
-<script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.5.2" };
-document.getElementById("versao").textContent = CONFIG.versao;
-const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const fmtCnpj = c => (c||"").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
-const fmtD = d => d ? d.split("-").reverse().join("/") : "—";
-const fmtDT = d => d ? new Date(d).toLocaleString("pt-BR", {dateStyle:"short", timeStyle:"short"}) : "—";
-const tagStatus = s => { const m = {CONSULTA_CONFIRMADA:"ok", IMPORTADO:"ok", ENVIADA:"ok", CONSULTA_COM_ALERTA:"alerta", PENDENTE:"alerta", NOTIFICADO:"info", CIENTE:"ok",
-  CONSULTA_NAO_CONCLUIDA:"erro", IMPORTACAO_NAO_CONCLUIDA:"erro", NAO_ENVIADA:"erro", NOVO:"erro", PERSISTENTE:"erro", EM_NOVA_TENTATIVA:"alerta", EM_ANALISE:"info",
-  RESOLVIDO_AUTOMATICAMENTE:"ok", RESOLVIDO_MANUALMENTE:"ok", IGNORADO_COM_JUSTIFICATIVA:"cinza", CRITICO:"erro", ALTO:"erro", ATENCAO:"alerta", INFORMATIVO:"info"};
-  return `<span class="tag ${m[s]||"cinza"}">${esc((s||"").replace(/_/g," "))}</span>`; };
-function msg(t, tipo="ok"){ const m=$("msg"); m.className="msg on "+tipo; m.textContent=t; setTimeout(()=>m.className="msg",4000); }
-function fechar(id){ $(id).classList.remove("on"); }
 
-// ---------- API ----------
-async function api(path, opt={}) {
-  const h = { apikey: CONFIG.key, "Content-Type": "application/json", Authorization: "Bearer " + APP.token, ...(opt.headers||{}) };
-  const r = await fetch(CONFIG.url + "/rest/v1/" + path, { ...opt, headers: h });
-  if (r.status === 401) { sair(); throw new Error("Sessão expirada"); }
-  const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; }
-  if (!r.ok) throw new Error((j && j.message) || t || ("HTTP " + r.status));
-  return j;
-}
-const get = p => api(p);
-const post = (t, d, prefer="return=representation") => api(t, { method:"POST", body: JSON.stringify(d), headers:{Prefer:prefer} });
-const patch = (t, q, d) => api(t + "?" + q, { method:"PATCH", body: JSON.stringify(d), headers:{Prefer:"return=representation"} });
-const del = (t, q) => api(t + "?" + q, { method:"DELETE" });
+def sb_upload(path, corpo: bytes, content_type="application/msword"):
+    h = {"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Content-Type": content_type, "x-upsert": "true"}
+    r = requests.post(f"{SB_URL}/storage/v1/object/{BUCKET}/{path}", headers=h, data=corpo, timeout=60)
+    if r.status_code >= 300:
+        raise RuntimeError(f"storage: HTTP {r.status_code} {r.text[:300]}")
+    return path
 
-// ---------- login ----------
-async function entrar() {
-  $("lMsg").textContent = "";
-  try {
-    const r = await fetch(CONFIG.url + "/auth/v1/token?grant_type=password", { method:"POST", headers:{ apikey: CONFIG.key, "Content-Type":"application/json" },
-      body: JSON.stringify({ email: $("lEmail").value.trim(), password: $("lSenha").value }) });
-    const d = await r.json();
-    if (!r.ok || !d.access_token) throw new Error(d.error_description || d.msg || "Login inválido");
-    APP.token = d.access_token; APP.uid = d.user.id; APP.email = d.user.email;
-    sessionStorage.setItem("cct_sess", JSON.stringify({ token: APP.token, uid: APP.uid, email: APP.email }));
-    await iniciar();
-  } catch (e) { $("lMsg").textContent = e.message; }
-}
-async function iniciar() {
-  const u = await get(`resc_usuarios?select=tenant_id&auth_id=eq.${APP.uid}&limit=1`);
-  if (!u.length) { $("lMsg").textContent = "Usuário sem vínculo de tenant (resc_usuarios)."; return; }
-  APP.tenantId = u[0].tenant_id;
-  $("login").style.display = "none"; $("app").style.display = "block"; $("nav").style.display = "flex";
-  $("usuario").textContent = APP.email; $("btnSair").style.display = "inline-block";
-  await carregarTudo(); mostrar("painel");
-}
-function sair() { sessionStorage.removeItem("cct_sess"); location.reload(); }
-$("btnEntrar").onclick = entrar; $("lSenha").addEventListener("keydown", e => e.key === "Enter" && entrar()); $("btnSair").onclick = sair;
 
-// ---------- navegação ----------
-document.querySelectorAll("nav button").forEach(b => b.onclick = () => mostrar(b.dataset.aba));
-function mostrar(aba) {
-  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.aba === aba));
-  document.querySelectorAll("section[data-sec]").forEach(s => s.style.display = s.dataset.sec === aba ? "block" : "none");
-}
+# ---------------------------------------------------------------- e-mail (hub artecon-mail)
+def enviar_email(dest, assunto, html):
+    """Envia via hub, um destinatário por chamada (como a bright-task). Retorna (status, erro, destinatarios_efetivos)."""
+    global MAIL_DESTINO_UNICO
+    dest = [d for d in dict.fromkeys(x.strip().lower() for x in dest if x) if d]
+    if not dest:
+        return "NAO_ENVIADA", "nenhum destinatário", []
+    if not MAIL_KEY:
+        return "NAO_ENVIADA", "MAIL_API_KEY não configurada (envio de e-mail ainda não ligado)", dest
+    digital = f"chave enviada: {len(MAIL_KEY)} caracteres, começa '{MAIL_KEY[:3]}' termina '{MAIL_KEY[-3:]}'"
+    efetivos = [MAIL_DESTINO_UNICO] if MAIL_DESTINO_UNICO else dest
+    if MAIL_DESTINO_UNICO:
+        html = f'<p style="font-size:12px;color:#a93226">[MODO TESTE] destinatários reais: {", ".join(dest)}</p>' + html
+    falhas = []
+    for d in efetivos:
+        try:
+            r = requests.post(MAIL_URL, headers={"Content-Type": "application/json", "x-api-key": MAIL_KEY},
+                              data=json.dumps({"to": d, "assunto": assunto, "html": html, "app": MAIL_APP}), timeout=30)
+            if r.status_code >= 300:
+                falhas.append(f"{d}: HTTP {r.status_code} {r.text[:120]}" + (f" [{digital}]" if r.status_code in (401, 403) else ""))
+        except Exception as e:
+            falhas.append(f"{d}: {type(e).__name__}: {e}"[:200])
+    if falhas and len(falhas) == len(efetivos):
+        return "NAO_ENVIADA", "; ".join(falhas)[:400], efetivos
+    return ("ENVIADA", ("parcial: " + "; ".join(falhas))[:400] if falhas else None, efetivos)
 
-// ---------- dados ----------
-async function carregarTudo() {
-  const t = APP.tenantId;
-  const [sind, inst, cons, inc, dest, notif, emp, conf, cfg] = await Promise.all([
-    get(`cct_sindicatos?tenant_id=eq.${t}&order=nome`),
-    get(`cct_instrumentos?tenant_id=eq.${t}&select=*,sindicato:cct_sindicatos(nome)&order=detectado_em.desc`),
-    get(`cct_consultas?tenant_id=eq.${t}&select=*,sindicato:cct_sindicatos(nome,cnpj)&order=executada_em.desc&limit=300`),
-    get(`cct_incidentes?tenant_id=eq.${t}&select=*,sindicato:cct_sindicatos(nome)&order=ultima_ocorrencia.desc&limit=300`),
-    get(`cct_alertas_destinatarios?tenant_id=eq.${t}&order=nome`),
-    get(`cct_notificacoes?tenant_id=eq.${t}&order=created_at.desc&limit=100`),
-    get(`cct_empresas?tenant_id=eq.${t}&select=*,vinculos:cct_empresa_sindicato(id,sindicato_id,papel)&order=razao_social`),
-    get(`cct_v_confirmacoes?tenant_id=eq.${t}&order=prazo`),
-    get(`cct_config?tenant_id=eq.${t}`)]);
-  APP.dados = { sind, inst, cons, inc, dest, notif, emp, conf, cfg: cfg[0] || { prazo_ciencia_dias_uteis: 2, lembrete_diario: true, escalonar_apos_prazo: true } };
-  renderPainel(); renderSind(); renderInst(); renderCons(); renderInc(); renderDest(); renderNotif(); renderEmp(); renderConf();
-}
 
-function renderPainel() {
-  const d = APP.dados, h24 = Date.now() - 864e5, abertos = d.inc.filter(i => ["NOVO","EM_NOVA_TENTATIVA","PERSISTENTE","EM_ANALISE"].includes(i.status));
-  const ult = d.cons[0];
-  const k = [["Sindicatos monitorados", d.sind.filter(s => s.monitorar && s.ativo).length, ""],
-    ["Convenções na base", d.inst.length, ""],
-    ["Novas nos últimos 7 dias", d.inst.filter(i => new Date(i.detectado_em) > Date.now() - 7*864e5).length, "alerta"],
-    ["Importações não concluídas", d.inst.filter(i => i.status_importacao !== "IMPORTADO").length, "erro"],
-    ["Análises por IA não concluídas", d.inst.filter(i => i.analise_status === "ANALISE_IA_NAO_CONCLUIDA").length, "alerta"],
-    ["Erros nas últimas 24h", d.inc.filter(i => new Date(i.ultima_ocorrencia) > h24).length, "erro"],
-    ["Incidentes abertos", abertos.length, "erro"],
-    ["Críticos abertos", abertos.filter(i => i.gravidade === "CRITICO").length, "erro"],
-    ["Falhas no Mediador (abertas)", abertos.filter(i => i.modulo === "MEDIADOR").length, "erro"],
-    ["Ciências pendentes", (d.conf||[]).filter(c => ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(c.status)).length, "alerta"],
-    ["Ciências atrasadas", (d.conf||[]).filter(c => c.situacao === "ATRASADA").length, "erro"],
-    ["Notificações não enviadas", d.notif.filter(n => n.status === "NAO_ENVIADA").length, "alerta"],
-    ["Última consulta", ult ? fmtDT(ult.executada_em) : "—", ""]];
-  $("kpis").innerHTML = k.map(([l, v, c]) => `<div class="kpi ${v && c ? c : ""}"><b>${esc(v)}</b><span>${l}</span></div>`).join("");
-  $("painelNovos").innerHTML = tabInst(d.inst.slice(0, 8));
-}
+def html_padrao(titulo, corpo):
+    return (f'<div style="font-family:Arial,sans-serif;max-width:640px"><div style="background:#1a5276;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0">'
+            f'<b>CCT Monitor</b> · Artecon Artes Contábeis</div><div style="border:1px solid #d9e1e8;border-top:0;padding:16px;border-radius:0 0 8px 8px">'
+            f'<h3 style="margin:0 0 10px;color:#1a5276">{titulo}</h3>{corpo}'
+            f'<p style="font-size:12px;color:#7a8894;margin-top:16px">Acesse: https://arteconartescontabeis-design.github.io/rescisoes/cct.html</p></div></div>')
 
-function renderSind() {
-  $("tabSind").innerHTML = `<table><tr><th>CNPJ</th><th>Nome</th><th>Tipo</th><th>UF</th><th>Monitorar</th><th>Última consulta</th><th>Status</th><th></th></tr>` +
-    APP.dados.sind.map(s => `<tr><td>${fmtCnpj(s.cnpj)}</td><td>${esc(s.nome)}<br><small style="color:var(--cinza)">${esc(s.categoria||"")}</small></td><td>${s.tipo}</td><td>${s.uf||""}</td>
-      <td>${s.monitorar && s.ativo ? '<span class="tag ok">sim</span>' : '<span class="tag cinza">não</span>'}</td><td>${fmtDT(s.ultima_consulta)}</td><td>${s.ultimo_status ? tagStatus(s.ultimo_status) : "—"}</td>
-      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirSind('${s.id}')">Editar</button> <button class="b sec sm" onclick="excluirSind('${s.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
-    (APP.dados.sind.length ? "" : `<div class="aviso">Nenhum sindicato cadastrado. Cadastre o sindicato laboral (e, se quiser, o patronal) de cada cliente.</div>`);
-}
-function abrirSind(id) {
-  const s = APP.dados.sind.find(x => x.id === id) || {};
-  $("mSindTit").textContent = id ? "Editar sindicato" : "Novo sindicato";
-  $("sId").value = id || ""; $("sCnpj").value = s.cnpj ? fmtCnpj(s.cnpj) : ""; $("sNome").value = s.nome || ""; $("sTipo").value = s.tipo || "laboral";
-  $("sUf").value = s.uf || ""; $("sCat").value = s.categoria || ""; $("sMon").value = String(s.monitorar ?? true); $("sObs").value = s.observacoes || "";
-  $("sResp").value = s.responsavel_email || ""; $("sGer").value = s.gerente_email || "";
-  $("mSind").classList.add("on");
-}
-async function salvarSind() {
-  const cnpj = $("sCnpj").value.replace(/\D/g, "");
-  if (cnpj.length !== 14 || !$("sNome").value.trim()) return msg("Informe CNPJ (14 dígitos) e nome.", "erro");
-  const d = { tenant_id: APP.tenantId, cnpj, nome: $("sNome").value.trim(), tipo: $("sTipo").value, uf: $("sUf").value.trim().toUpperCase() || null,
-    categoria: $("sCat").value.trim() || null, monitorar: $("sMon").value === "true", observacoes: $("sObs").value.trim() || null,
-    responsavel_email: $("sResp").value.trim().toLowerCase() || null, gerente_email: $("sGer").value.trim().toLowerCase() || null };
-  try { if ($("sId").value) await patch("cct_sindicatos", "id=eq." + $("sId").value, d); else await post("cct_sindicatos", d);
-    fechar("mSind"); msg("Sindicato salvo."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
-}
-async function excluirSind(id) {
-  if (!confirm("Excluir o sindicato? As convenções já importadas permanecem na base (sem vínculo).")) return;
-  try { await del("cct_sindicatos", "id=eq." + id); msg("Excluído."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
-}
 
-function tabInst(lista) {
-  if (!lista.length) return `<div class="aviso">Nenhuma convenção na base ainda — o robô preenche na próxima execução.</div>`;
-  return `<table><tr><th>Registro</th><th>Tipo</th><th>Sindicato</th><th>Categoria</th><th>Vigência</th><th>Registro MTE</th><th>Detectada</th><th>Importação</th><th>Análise</th><th>Ciência</th><th class="r">Cláus.</th><th></th></tr>` +
-    lista.map(i => `<tr><td><b>${esc(i.numero_registro)}</b></td><td>${esc(i.tipo||"")}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.categoria||"")}</td>
-      <td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${fmtD(i.data_registro)}</td><td>${fmtDT(i.detectado_em)}</td><td>${tagStatus(i.status_importacao)}</td><td>${i.analise_status ? tagStatus(i.analise_status === "CONCLUIDA" ? "IMPORTADO" : "ATENCAO").replace(/>[^<]+</, ">" + (i.analise_status === "CONCLUIDA" ? "concluída" : "IA pendente") + "<") : "—"}</td>
-      <td>${tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td><button class="b sec sm" onclick="abrirInst('${i.id}')">Abrir</button></td></tr>`).join("") + `</table>`;
-}
-function renderInst() {
-  const f = ($("fInst").value || "").toLowerCase();
-  $("tabInst").innerHTML = tabInst(APP.dados.inst.filter(i => !f || [i.numero_registro, i.sindicato?.nome, i.categoria, i.tipo, i.abrangencia].join(" ").toLowerCase().includes(f)));
-}
-async function abrirInst(id) {
-  const i = APP.dados.inst.find(x => x.id === id); APP.instAtual = i;
-  $("mInstTit").textContent = `${i.tipo || "Instrumento"} ${i.numero_registro}`;
-  $("mInstCab").innerHTML = `<b>Partes:</b> ${(i.partes||[]).map(p => esc(p.nome || p)).join(" × ")}<br><b>Categoria:</b> ${esc(i.categoria||"—")} · <b>Abrangência:</b> ${esc(i.abrangencia||"—")}<br>
-    <b>Vigência:</b> ${fmtD(i.vigencia_inicio)} a ${fmtD(i.vigencia_fim)} · <b>Data-base:</b> ${esc(i.data_base||"—")} · <b>Registro MTE:</b> ${fmtD(i.data_registro)} · <b>Processo:</b> ${esc(i.numero_processo||"—")}<br>
-    ${tagStatus(i.status_importacao)} ${tagStatus(i.status_ciencia)} ${i.status_ciencia !== "CIENTE" ? `<button class="b sm" onclick="darCiencia('${i.id}')">Registrar ciência</button>` : ""} ${i.observacoes ? `<br><small style="color:var(--erro)">${esc(i.observacoes)}</small>` : ""}`;
-  const cis = (APP.dados.conf||[]).filter(c => c.instrumento_id === id);
-  if (cis.length) $("mInstCab").innerHTML += `<div style="margin-top:8px"><b>Ciências:</b> ` + cis.map(c => `${esc(c.empresa||"sindicato")}: ${tagStatus(c.status)} (prazo ${fmtD(c.prazo)})`).join(" · ") + `</div>`;
-  $("btnBaixar").style.display = i.arquivo_path ? "inline-block" : "none";
-  $("btnBaixar").onclick = () => baixar(i.arquivo_path);
-  $("fCl").value = ""; $("mInstCl").innerHTML = "carregando…"; $("mInstAn").innerHTML = "carregando…"; abaInst("an"); $("mInst").classList.add("on");
-  try {
-    const [cl, an, val] = await Promise.all([get(`cct_clausulas?instrumento_id=eq.${id}&select=ordem,numero_extenso,titulo,grupo,subgrupo,texto&order=ordem`),
-      get(`cct_analises?instrumento_id=eq.${id}&order=versao.desc&limit=1`), get(`cct_valores?instrumento_id=eq.${id}&order=clausula_ordem`)]);
-    APP.clAtual = cl; renderCl(); renderAn(an[0], val);
-  } catch (e) { $("mInstCl").innerHTML = $("mInstAn").innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
-}
-function renderCl() {
-  const f = ($("fCl").value || "").toLowerCase(); let g = "";
-  $("mInstCl").innerHTML = (APP.clAtual || []).filter(c => !f || (c.titulo + " " + c.texto).toLowerCase().includes(f)).map(c => {
-    const cab = c.grupo && c.grupo !== g ? (g = c.grupo, `<div style="margin:12px 0 6px;font-weight:700;color:var(--cinza);font-size:12px;text-transform:uppercase">${esc(c.grupo)}</div>`) : "";
-    return cab + `<div class="cl" id="cl-${c.ordem}"><h4>Cláusula ${esc(c.numero_extenso||c.ordem)} — ${esc(c.titulo)}</h4><small>${esc(c.subgrupo||"")}</small><p>${esc(c.texto)}</p></div>`; }).join("") || `<div class="aviso">Nenhuma cláusula.</div>`;
-}
-async function darCiencia(id) {
-  try { await patch("cct_instrumentos", "id=eq." + id, { status_ciencia: "CIENTE", observacoes: `Ciência registrada por ${APP.email} em ${new Date().toLocaleString("pt-BR")}` });
-    fechar("mInst"); msg("Ciência registrada."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
-}
-async function baixar(path) {
-  try {
-    const r = await fetch(`${CONFIG.url}/storage/v1/object/sign/cct-arquivos/${path}`, { method:"POST", headers:{ apikey: CONFIG.key, Authorization:"Bearer "+APP.token, "Content-Type":"application/json" }, body: JSON.stringify({ expiresIn: 600 }) });
-    const d = await r.json(); if (!r.ok) throw new Error(d.message || "não foi possível assinar a URL");
-    window.open(CONFIG.url + "/storage/v1" + d.signedURL, "_blank");
-  } catch (e) { msg(e.message, "erro"); }
-}
+def processar_testes_email(tenant):
+    """Pedidos de e-mail de teste feitos no app (cct_notificacoes tipo TESTE, status PENDENTE)."""
+    pend = sb_get("cct_notificacoes", {"tenant_id": f"eq.{tenant}", "tipo": "eq.TESTE", "status": "eq.PENDENTE", "select": "id,destinatarios"})
+    for n in pend:
+        st, erro, ef = enviar_email(n.get("destinatarios") or [], "TESTE – CCT Monitor – circuito de e-mail",
+                                    html_padrao("Teste de envio", f"<p>Se você recebeu esta mensagem, o CCT Monitor está conectado ao hub artecon-mail.</p><p>{datetime.now():%d/%m/%Y %H:%M}</p>"))
+        sb_patch("cct_notificacoes", {"id": f"eq.{n['id']}"}, {"status": st, "erro": erro, "tentativas": 1, "destinatarios": ef or n.get("destinatarios"),
+                                                              "enviada_em": datetime.now(timezone.utc).isoformat() if st == "ENVIADA" else None})
+        log(f"  E-MAIL DE TESTE (pedido no app) → {ef}: {st} {erro or ''}")
 
-function renderCons() {
-  $("tabCons").innerHTML = `<table><tr><th>Quando</th><th>Sindicato</th><th>Origem</th><th>Status</th><th class="r">Encontrados</th><th class="r">Novos</th><th class="r">ms</th><th>Erro / etapas</th></tr>` +
-    APP.dados.cons.map(c => `<tr><td>${fmtDT(c.executada_em)}</td><td>${esc(c.sindicato?.nome||"")}<br><small style="color:var(--cinza)">${fmtCnpj(c.sindicato?.cnpj)}</small></td><td>${esc(c.origem)}</td><td>${tagStatus(c.status)}</td>
-      <td class="r">${c.qtd_encontrados}</td><td class="r">${c.qtd_novos}</td><td class="r">${c.duracao_ms ?? ""}</td>
-      <td>${c.erro ? `<span style="color:var(--erro)">${esc(c.erro)}</span><br>` : ""}<details><summary style="cursor:pointer;color:var(--azul);font-size:12px">etapas</summary><small>${(c.etapas||[]).map(esc).join("<br>")}</small></details></td></tr>`).join("") + `</table>` +
-    (APP.dados.cons.length ? "" : `<div class="aviso">Nenhuma consulta registrada ainda.</div>`);
-}
-function renderInc() {
-  const so = $("fInc").value === "abertos", ab = ["NOVO","EM_NOVA_TENTATIVA","PERSISTENTE","EM_ANALISE"];
-  const l = APP.dados.inc.filter(i => !so || ab.includes(i.status));
-  $("tabInc").innerHTML = `<table><tr><th>Última ocorrência</th><th>Módulo</th><th>Sindicato</th><th>Erro</th><th>Gravidade</th><th class="r">Ocorr.</th><th>Status</th><th></th></tr>` +
-    l.map(i => `<tr><td>${fmtDT(i.ultima_ocorrencia)}<br><small style="color:var(--cinza)">1ª: ${fmtDT(i.primeira_ocorrencia)}</small></td><td>${esc(i.modulo)}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.mensagem)}</td>
-      <td>${tagStatus(i.gravidade)}</td><td class="r">${i.ocorrencias}</td><td>${tagStatus(i.status)}${i.resolvido_em ? `<br><small>${fmtDT(i.resolvido_em)}</small>` : ""}</td>
-      <td>${ab.includes(i.status) ? `<button class="b sec sm" onclick="abrirInc('${i.id}')">Tratar</button>` : ""}</td></tr>`).join("") + `</table>` +
-    (l.length ? "" : `<div class="aviso">Nenhum incidente ${so ? "aberto" : "registrado"}.</div>`);
-}
-function abrirInc(id) {
-  const i = APP.dados.inc.find(x => x.id === id);
-  $("iId").value = id; $("iDet").innerHTML = `<b>${esc(i.modulo)}</b> · ${tagStatus(i.gravidade)} · ${i.ocorrencias} ocorrência(s)<br>${esc(i.mensagem)}<br><small>${esc(JSON.stringify(i.detalhes||{})).slice(0,600)}</small>`;
-  $("iPor").value = APP.email; $("iObs").value = i.observacoes || ""; $("mInc").classList.add("on");
-}
-async function salvarInc() {
-  const st = $("iStatus").value, d = { status: st, observacoes: $("iObs").value.trim() || null, resolvido_por: $("iPor").value.trim() || APP.email };
-  if (st === "IGNORADO_COM_JUSTIFICATIVA" && !d.observacoes) return msg("Ignorar exige justificativa.", "erro");
-  if (st !== "EM_ANALISE") d.resolvido_em = new Date().toISOString();
-  try { await patch("cct_incidentes", "id=eq." + $("iId").value, d); fechar("mInc"); msg("Incidente atualizado."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
-}
-function renderDest() {
-  $("tabDest").innerHTML = `<table><tr><th>Nome</th><th>E-mail</th><th>Grupo</th><th>Tipos</th><th>Ativo</th><th></th></tr>` +
-    APP.dados.dest.map(d => `<tr><td>${esc(d.nome)}</td><td>${esc(d.email)}</td><td>${esc(d.grupo||"")}</td><td>${(d.tipos||[]).map(esc).join(", ")}</td><td>${d.ativo ? "sim" : "não"}</td>
-      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirDest('${d.id}')">Editar</button> <button class="b sec sm" onclick="excluirDest('${d.id}')">Excluir</button></td></tr>`).join("") + `</table>`;
-}
-function abrirDest(id) {
-  const d = APP.dados.dest.find(x => x.id === id) || {};
-  $("dId").value = id || ""; $("dNome").value = d.nome || ""; $("dEmail").value = d.email || ""; $("dGrupo").value = d.grupo || "ADMINISTRADOR"; $("dTipos").value = (d.tipos || ["TODOS"]).join(", ");
-  $("mDest").classList.add("on");
-}
-async function salvarDest() {
-  const d = { tenant_id: APP.tenantId, nome: $("dNome").value.trim(), email: $("dEmail").value.trim().toLowerCase(), grupo: $("dGrupo").value,
-    tipos: $("dTipos").value.split(",").map(s => s.trim().toUpperCase()).filter(Boolean), ativo: true };
-  if (!d.nome || !d.email.includes("@")) return msg("Informe nome e e-mail válido.", "erro");
-  try { if ($("dId").value) await patch("cct_alertas_destinatarios", "id=eq." + $("dId").value, d); else await post("cct_alertas_destinatarios", d);
-    fechar("mDest"); msg("Destinatário salvo."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
-}
-async function excluirDest(id) { if (!confirm("Excluir destinatário?")) return; try { await del("cct_alertas_destinatarios", "id=eq." + id); await carregarTudo(); } catch (e) { msg(e.message, "erro"); } }
-function renderNotif() {
-  $("tabNotif").innerHTML = `<table><tr><th>Quando</th><th>Tipo</th><th>Assunto</th><th>Destinatários</th><th>Status</th><th>Erro</th></tr>` +
-    APP.dados.notif.map(n => `<tr><td>${fmtDT(n.created_at)}</td><td>${esc(n.tipo)}</td><td>${esc(n.assunto)}</td><td>${(n.destinatarios||[]).map(esc).join(", ")}</td><td>${tagStatus(n.status)}</td><td><small>${esc(n.erro||"")}</small></td></tr>`).join("") + `</table>` +
-    (APP.dados.notif.length ? "" : `<div class="aviso">Nenhuma notificação registrada.</div>`);
-}
 
-// ---------- análise ----------
-function abaInst(a) { $("mInstAn").style.display = a === "an" ? "block" : "none"; $("mInstClWrap").style.display = a === "cl" ? "block" : "none"; $("tabAn").className = "b sm" + (a === "an" ? "" : " sec"); $("tabCl").className = "b sm" + (a === "cl" ? "" : " sec"); }
-function renderAn(an, val) {
-  const cl = o => `<a href="#" onclick="abaInst('cl');$('fCl').value='';renderCl();document.getElementById('cl-'+${o})?.scrollIntoView();return false" style="font-size:12px">cl. ${o}</a>`;
-  let h = "";
-  if (!an) h += `<div class="aviso">Ainda sem análise — o robô gera na próxima execução (ou use "Reprocessar análise").</div>`;
-  else {
-    h += `<div style="font-size:12.5px;color:var(--cinza);margin-bottom:8px">Análise v${an.versao} · ${fmtDT(an.gerado_em)} · ${tagStatus(an.status === "CONCLUIDA" ? "IMPORTADO" : "IMPORTACAO_NAO_CONCLUIDA").replace(/>[^<]+</, ">" + (an.status === "CONCLUIDA" ? "parecer por IA concluído" : "ANÁLISE POR IA NÃO CONCLUÍDA") + "<")}${an.modelo ? " · " + esc(an.modelo) : ""}${an.erro_ia ? ` · <small style="color:var(--erro)">${esc(an.erro_ia)}</small>` : ""}</div>`;
-    if (an.resumo) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Resumo</h2><p style="margin:0;white-space:pre-wrap">${esc(an.resumo)}</p></div>`;
-    if ((an.destaques||[]).length) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Destaques</h2>` + an.destaques.map(d => `<div class="cl"><h4>${esc(d.tema)} ${d.confianca === "NECESSITA_VALIDACAO" ? '<span class="tag alerta">necessita validação</span>' : '<span class="tag ok">conferido</span>'}</h4><p>${esc(d.texto)}</p><small>${(d.clausulas||[]).map(cl).join(" · ")}</small></div>`).join("") + `</div>`;
-    if ((an.providencias||[]).length) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Providências para o DP</h2><table><tr><th>Ação</th><th>Prazo</th><th>Cláusulas</th><th></th></tr>` + an.providencias.map(p => `<tr><td>${esc(p.acao)}</td><td>${esc(p.prazo||"")}</td><td>${(p.clausulas||[]).map(cl).join(" ")}</td><td>${p.confianca === "NECESSITA_VALIDACAO" ? '<span class="tag alerta">validar</span>' : ""}</td></tr>`).join("") + `</table></div>`;
-    if ((an.alertas||[]).length || (an.pontos_incertos||[]).length) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Alertas e pontos incertos</h2><ul style="margin:0;padding-left:18px">${(an.alertas||[]).map(a => `<li>${esc(a)}</li>`).join("")}${(an.pontos_incertos||[]).map(a => `<li style="color:var(--cinza)">(incerto) ${esc(a)}</li>`).join("")}</ul></div>`;
-  }
-  if ((val||[]).length) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Valores extraídos (localizados no texto)</h2><table><tr><th>Tema</th><th>Descrição</th><th class="r">Valor</th><th>Cláusula</th></tr>` +
-    val.map(v => `<tr><td>${esc(v.tema)}</td><td>${esc(v.descricao)}<br><small style="color:var(--cinza)">${esc(v.trecho||"")}</small></td><td class="r"><b>${esc(v.valor_texto)}</b></td><td>${cl(v.clausula_ordem)}<br><small>${esc(v.clausula_titulo||"")}</small></td></tr>`).join("") + `</table></div>`;
-  const c = an && an.comparacao;
-  if (c) {
-    h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Comparação com a anterior (${esc(c.anterior)})</h2>
-      <div class="kpis" style="margin-bottom:10px"><div class="kpi"><b>${c.novas.length}</b><span>cláusulas novas</span></div><div class="kpi"><b>${c.alteradas.length}</b><span>alteradas</span></div><div class="kpi"><b>${c.excluidas.length}</b><span>excluídas</span></div><div class="kpi"><b>${c.inalteradas}</b><span>inalteradas</span></div></div>`;
-    if (c.valores.length) h += `<table style="margin-bottom:10px"><tr><th>Tema</th><th>Descrição</th><th class="r">Anterior</th><th class="r">Atual</th><th class="r">Variação</th></tr>` + c.valores.map(v => `<tr><td>${esc(v.tema)}</td><td>${esc(v.descricao)}</td><td class="r">${esc(v.anterior)}</td><td class="r"><b>${esc(v.atual)}</b></td><td class="r">${v.variacao_pct != null ? v.variacao_pct + "%" : ""}</td></tr>`).join("") + `</table>`;
-    h += c.alteradas.map(a => `<details class="cl"><summary style="cursor:pointer"><b>${esc(a.titulo)}</b> <small>(${Math.round(a.similaridade*100)}% igual · ${cl(a.ordem_atual)})</small></summary><pre style="max-height:220px">${a.diff.map(l => esc(l)).join("\n")}</pre></details>`).join("");
-    h += c.novas.map(n => `<div class="cl"><h4><span class="tag ok">nova</span> ${esc(n.titulo)} ${cl(n.ordem)}</h4><p>${esc(n.texto)}</p></div>`).join("");
-    h += c.excluidas.map(n => `<div class="cl"><h4><span class="tag erro">excluída</span> ${esc(n.titulo)}</h4><p style="color:var(--cinza)">${esc(n.texto)}</p></div>`).join("") + `</div>`;
-  } else if (an) h += `<div class="aviso">Sem versão anterior desta CCT na base (mesmo par de sindicatos) — a comparação passa a existir a partir da próxima renovação.</div>`;
-  $("mInstAn").innerHTML = h;
-}
-async function reprocessar() {
-  if (!APP.instAtual || !confirm("Marcar para nova análise na próxima execução do robô?")) return;
-  try { await patch("cct_instrumentos", "id=eq." + APP.instAtual.id, { analise_status: null }); msg("Marcada para reprocessamento."); } catch (e) { msg(e.message, "erro"); }
-}
+# ---------------------------------------------------------------- incidentes / notificações
+def incidente(tenant, fingerprint, modulo, gravidade, mensagem, sindicato_id=None, instrumento_id=None, detalhes=None):
+    try:
+        inc_id = sb_rpc("cct_registrar_incidente", {
+            "p_tenant": tenant, "p_fingerprint": fingerprint, "p_modulo": modulo, "p_gravidade": gravidade,
+            "p_mensagem": mensagem[:1000], "p_sindicato": sindicato_id, "p_instrumento": instrumento_id,
+            "p_detalhes": detalhes or {}})
+        log(f"  INCIDENTE {gravidade} [{modulo}] {mensagem[:120]}")
+        inc = sb_get("cct_incidentes", {"id": f"eq.{inc_id}", "select": "id,ocorrencias,gravidade"})[0]
+        if inc["ocorrencias"] in (1, 3, 10) and gravidade in ("ALTO", "CRITICO"):
+            notificar(tenant, "ERRO", f"ALERTA DE ERRO – {modulo} – {mensagem[:60]}",
+                      f"<p><b>Módulo:</b> {modulo}<br><b>Gravidade:</b> {gravidade}<br><b>Ocorrências:</b> {inc['ocorrencias']}"
+                      f"<br><b>Mensagem:</b> {mensagem}<br><b>Origem:</b> {ORIGEM} · {datetime.now():%d/%m/%Y %H:%M}</p>",
+                      incidente_id=inc_id, tipo_dest=modulo)
+        return inc_id
+    except Exception as e:
+        log(f"  !! falha ao registrar incidente: {e}")
+        return None
 
-// ---------- empresas ----------
-function renderEmp() {
-  const nomeS = id => (APP.dados.sind.find(s => s.id === id) || {}).nome || "?";
-  $("tabEmp").innerHTML = `<table><tr><th>CNPJ</th><th>Razão social</th><th>Sindicatos</th><th>Responsável</th><th>Gerente</th><th>ACT</th><th>Ativa</th><th></th></tr>` +
-    (APP.dados.emp||[]).map(e => `<tr><td>${fmtCnpj(e.cnpj)}</td><td>${esc(e.razao_social)}<br><small style="color:var(--cinza)">${esc([e.municipio,e.uf].filter(Boolean).join("/"))} ${esc(e.cnae||"")}</small></td>
-      <td>${(e.vinculos||[]).map(v => esc(nomeS(v.sindicato_id))).join("<br>") || '<span class="tag alerta">sem vínculo</span>'}</td>
-      <td>${esc(e.responsavel_nome||"")}<br><small>${esc(e.responsavel_email||"")}</small></td><td>${esc(e.gerente_nome||"")}<br><small>${esc(e.gerente_email||"")}</small></td>
-      <td>${e.monitorar_act ? '<span class="tag ok">sim</span>' : ""}</td><td>${e.ativo ? "sim" : "não"}</td>
-      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirEmp('${e.id}')">Editar</button> <button class="b sec sm" onclick="excluirEmp('${e.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
-    ((APP.dados.emp||[]).length ? "" : `<div class="aviso">Nenhuma empresa cadastrada. Cadastre as empresas dos clientes e vincule ao sindicato laboral (e patronal) de cada uma.</div>`);
-}
-function abrirEmp(id) {
-  const e = (APP.dados.emp||[]).find(x => x.id === id) || {};
-  $("mEmpTit").textContent = id ? "Editar empresa" : "Nova empresa";
-  $("eId").value = id || ""; $("eCnpj").value = e.cnpj ? fmtCnpj(e.cnpj) : ""; $("eNome").value = e.razao_social || ""; $("eUf").value = e.uf || ""; $("eMun").value = e.municipio || ""; $("eCnae").value = e.cnae || "";
-  $("eRespN").value = e.responsavel_nome || ""; $("eRespE").value = e.responsavel_email || ""; $("eGerN").value = e.gerente_nome || ""; $("eGerE").value = e.gerente_email || "";
-  $("eAct").value = String(e.monitorar_act ?? false); $("eAtivo").value = String(e.ativo ?? true);
-  const vinc = new Set((e.vinculos||[]).map(v => v.sindicato_id));
-  $("eSinds").innerHTML = APP.dados.sind.map(s => `<label style="display:flex;gap:6px;align-items:center;font-size:13px;color:inherit"><input type="checkbox" style="width:auto" data-sid="${s.id}" ${vinc.has(s.id) ? "checked" : ""}> ${esc(s.nome)} <small style="color:var(--cinza)">(${s.tipo})</small></label>`).join("") || `<small>Cadastre sindicatos primeiro.</small>`;
-  $("mEmp").classList.add("on");
-}
-async function salvarEmp() {
-  const cnpj = $("eCnpj").value.replace(/\D/g, "");
-  if (cnpj.length !== 14 || !$("eNome").value.trim()) return msg("Informe CNPJ (14 dígitos) e razão social.", "erro");
-  const d = { tenant_id: APP.tenantId, cnpj, razao_social: $("eNome").value.trim(), uf: $("eUf").value.trim().toUpperCase() || null, municipio: $("eMun").value.trim() || null, cnae: $("eCnae").value.trim() || null,
-    responsavel_nome: $("eRespN").value.trim() || null, responsavel_email: $("eRespE").value.trim().toLowerCase() || null, gerente_nome: $("eGerN").value.trim() || null, gerente_email: $("eGerE").value.trim().toLowerCase() || null,
-    monitorar_act: $("eAct").value === "true", ativo: $("eAtivo").value === "true" };
-  try {
-    let id = $("eId").value;
-    if (id) await patch("cct_empresas", "id=eq." + id, d); else id = (await post("cct_empresas", d))[0].id;
-    const marcados = [...document.querySelectorAll("#eSinds input:checked")].map(i => i.dataset.sid);
-    const atuais = ((APP.dados.emp||[]).find(x => x.id === id) || {}).vinculos || [];
-    for (const v of atuais) if (!marcados.includes(v.sindicato_id)) await del("cct_empresa_sindicato", "id=eq." + v.id);
-    for (const sid of marcados) if (!atuais.find(v => v.sindicato_id === sid)) {
-      const s = APP.dados.sind.find(x => x.id === sid);
-      await post("cct_empresa_sindicato", { tenant_id: APP.tenantId, empresa_id: id, sindicato_id: sid, papel: s ? s.tipo : "laboral" });
-    }
-    fechar("mEmp"); msg("Empresa salva."); await carregarTudo();
-  } catch (e) { msg(e.message, "erro"); }
-}
-async function excluirEmp(id) { if (!confirm("Excluir a empresa e seus vínculos?")) return; try { await del("cct_empresas", "id=eq." + id); await carregarTudo(); } catch (e) { msg(e.message, "erro"); } }
 
-// ---------- confirmações de ciência ----------
-function renderConf() {
-  const all = APP.dados.conf || [], f = $("fConf").value;
-  const ab = c => ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(c.status);
-  const l = all.filter(c => f === "todas" || (f === "pendentes" ? ab(c) : c.situacao === "ATRASADA"));
-  $("kpisConf").innerHTML = [["Pendentes", all.filter(ab).length, "alerta"], ["Vencem hoje", all.filter(c => c.situacao === "VENCE_HOJE").length, "alerta"], ["Atrasadas", all.filter(c => c.situacao === "ATRASADA").length, "erro"], ["Escalonadas", all.filter(c => c.status === "ESCALONADO").length, "erro"], ["Cientes", all.filter(c => c.status === "CIENTE").length, ""]]
-    .map(([t, v, c]) => `<div class="kpi ${v && c ? c : ""}"><b>${v}</b><span>${t}</span></div>`).join("");
-  $("tabConf").innerHTML = `<table><tr><th>Convenção</th><th>Empresa</th><th>Sindicato</th><th>Responsável</th><th>Prazo</th><th>Situação</th><th>Status</th><th class="r">Lembr.</th><th></th></tr>` +
-    l.map(c => `<tr><td><b>${esc(c.numero_registro)}</b><br><small>${esc(c.tipo_instrumento||"")}</small></td><td>${esc(c.empresa||"(sindicato)")}</td><td>${esc(c.sindicato||"")}</td><td><small>${esc(c.responsavel_email||"—")}</small></td>
-      <td>${fmtD(c.prazo)}</td><td>${c.situacao ? tagStatus(c.situacao === "ATRASADA" ? "CRITICO" : c.situacao === "VENCE_HOJE" ? "ATENCAO" : "INFORMATIVO").replace(/>[^<]+</, ">" + c.situacao.replace(/_/g," ") + "<") : ""}</td>
-      <td>${tagStatus(c.status)}${c.ciente_em ? `<br><small>${fmtDT(c.ciente_em)} · ${esc(c.ciente_por||"")}</small>` : ""}</td><td class="r">${c.lembretes}</td>
-      <td style="white-space:nowrap">${ab(c) ? `<button class="b sm" onclick="registrarCiencia('${c.id}')">Registrar ciência</button>` : ""} <button class="b sec sm" onclick="abrirInst('${c.instrumento_id}')">Ver CCT</button></td></tr>`).join("") + `</table>` +
-    (l.length ? "" : `<div class="aviso">Nada aqui.</div>`);
-  $("cfgDestTeste").value = APP.dados.cfg.email_destino_teste || "";
-  $("cfgPrazo").value = APP.dados.cfg.prazo_ciencia_dias_uteis; $("cfgLemb").value = String(APP.dados.cfg.lembrete_diario); $("cfgEsc").value = String(APP.dados.cfg.escalonar_apos_prazo);
-}
-async function registrarCiencia(id) {
-  const obs = prompt("Observação (opcional) para o registro de ciência:") ;
-  if (obs === null) return;
-  try {
-    await patch("cct_ciencias", "id=eq." + id, { status: "CIENTE", ciente_em: new Date().toISOString(), ciente_por: APP.email, observacoes: obs || null });
-    const c = (APP.dados.conf||[]).find(x => x.id === id);
-    if (c && !(APP.dados.conf||[]).some(x => x.instrumento_id === c.instrumento_id && x.id !== id && ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(x.status)))
-      await patch("cct_instrumentos", "id=eq." + c.instrumento_id, { status_ciencia: "CIENTE" });
-    msg("Ciência registrada."); await carregarTudo();
-  } catch (e) { msg(e.message, "erro"); }
-}
-async function salvarDestTeste() {
-  const d = { tenant_id: APP.tenantId, email_destino_teste: $("cfgDestTeste").value.trim().toLowerCase() || null, updated_at: new Date().toISOString() };
-  try { await api("cct_config?on_conflict=tenant_id", { method:"POST", body: JSON.stringify(d), headers:{ Prefer: "resolution=merge-duplicates,return=representation" } }); msg(d.email_destino_teste ? "Modo teste ativo: tudo vai para " + d.email_destino_teste : "Modo produção: e-mails vão aos destinatários reais."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
-}
-async function pedirTeste() {
-  const para = ($("cfgDestTeste").value.trim() || APP.email).toLowerCase();
-  try { await post("cct_notificacoes", { tenant_id: APP.tenantId, tipo: "TESTE", destinatarios: [para], assunto: "TESTE – CCT Monitor – circuito de e-mail", status: "PENDENTE" });
-    msg("Pedido registrado para " + para + ". Rode o robô (Actions → Run workflow) para enviar."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
-}
-async function salvarConfig() {
-  const d = { tenant_id: APP.tenantId, prazo_ciencia_dias_uteis: +$("cfgPrazo").value || 2, lembrete_diario: $("cfgLemb").value === "true", escalonar_apos_prazo: $("cfgEsc").value === "true", email_destino_teste: APP.dados.cfg.email_destino_teste || null, updated_at: new Date().toISOString() };
-  try { await api("cct_config?on_conflict=tenant_id", { method:"POST", body: JSON.stringify(d), headers:{ Prefer: "resolution=merge-duplicates,return=representation" } }); msg("Parâmetros salvos."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
-}
+def resolver(tenant, fingerprint):
+    try:
+        n = sb_rpc("cct_resolver_incidente", {"p_tenant": tenant, "p_fingerprint": fingerprint, "p_forma": "automatico"})
+        if n:
+            log(f"  ERRO RESOLVIDO AUTOMATICAMENTE ({fingerprint})")
+    except Exception as e:
+        log(f"  !! falha ao resolver incidente: {e}")
 
-// ---------- boot ----------
-(async () => {
-  const s = sessionStorage.getItem("cct_sess");
-  if (s) { try { Object.assign(APP, JSON.parse(s)); await iniciar(); } catch { sessionStorage.removeItem("cct_sess"); } }
-})();
-</script>
-</body>
-</html>
+
+def destinatarios(tenant, tipo):
+    rows = sb_get("cct_alertas_destinatarios", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "select": "email,tipos"})
+    return [r["email"] for r in rows if "TODOS" in (r["tipos"] or []) or tipo in (r["tipos"] or [])]
+
+
+def notificar(tenant, tipo, assunto, html, instrumento_id=None, incidente_id=None, tipo_dest=None):
+    dest = destinatarios(tenant, tipo_dest or tipo)
+    reg = {"tenant_id": tenant, "tipo": tipo, "instrumento_id": instrumento_id, "incidente_id": incidente_id,
+           "destinatarios": dest, "assunto": assunto, "status": "PENDENTE", "tentativas": 0}
+    st, erro, efetivos = enviar_email(dest, assunto, html_padrao(assunto, html))
+    reg.update(status=st, erro=erro, tentativas=1 if MAIL_KEY else 0, destinatarios=efetivos or dest,
+               enviada_em=datetime.now(timezone.utc).isoformat() if st == "ENVIADA" else None)
+    try:
+        sb_insert("cct_notificacoes", reg)
+    except Exception as e:
+        log(f"  !! falha ao gravar notificação: {e}")
+    log(f"  NOTIFICAÇÃO {tipo}: {reg['status']}" + (f" ({reg.get('erro')})" if reg.get("erro") else ""))
+    return reg["status"]
+
+
+# ---------------------------------------------------------------- importação
+def data_br(s):
+    """'24/08/2026' -> '2026-08-24'; '01º de agosto de 2026' -> '2026-08-01'."""
+    if not s:
+        return None
+    import re
+    m = re.match(r"(\d{2})/(\d{2})/(\d{4})", s)
+    if m:
+        return f"{m.group(3)}-{m.group(2)}-{m.group(1)}"
+    meses = {"janeiro": 1, "fevereiro": 2, "março": 3, "marco": 3, "abril": 4, "maio": 5, "junho": 6, "julho": 7,
+             "agosto": 8, "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12}
+    m = re.match(r"(\d{1,2})º?\s+de\s+(\w+)\s+de\s+(\d{4})", s, re.I)
+    if m and m.group(2).lower() in meses:
+        return f"{m.group(3)}-{meses[m.group(2).lower()]:02d}-{int(m.group(1)):02d}"
+    return None
+
+
+def importar(tenant, sind, reg, page, consulta_id, empresa=None):
+    """Baixa, extrai e grava um instrumento novo. Sempre grava a linha — com status explícito."""
+    registro = reg["registro"]
+    base = {"tenant_id": tenant, "sindicato_id": sind.get("id"), "empresa_id": (empresa or {}).get("id"), "numero_registro": registro,
+            "numero_solicitacao": reg.get("solicitacao"), "tipo": reg.get("tipo"),
+            "partes": [{"nome": p} for p in reg.get("partes", [])], "origem_consulta_id": consulta_id}
+    vig = (reg.get("vigencia") or "").split(" - ")
+    if len(vig) == 2:
+        base["vigencia_inicio"], base["vigencia_fim"] = data_br(vig[0]), data_br(vig[1])
+
+    # 1) download
+    try:
+        status, corpo, trecho = mediador.baixar_extrato(page, reg["solicitacao"])
+        if status != 200 or not mediador.extrato_valido(corpo):
+            raise RuntimeError(f"extrato inválido (HTTP {status}, {len(corpo) if corpo else 0} bytes) — {trecho}")
+        resolver(tenant, f"DOWNLOAD:{registro}")
+    except Exception as e:
+        row = sb_insert("cct_instrumentos", dict(base, status_importacao="IMPORTACAO_NAO_CONCLUIDA",
+                                                 observacoes=f"download falhou: {e}"[:1000]), upsert_on="tenant_id,numero_registro")[0]
+        incidente(tenant, f"DOWNLOAD:{registro}", "DOWNLOAD", "ALTO", f"Download do extrato {registro} falhou: {e}",
+                  sind.get("id"), row["id"], detalhes={"solicitacao": reg.get("solicitacao"), "resposta": str(e)[:1200]})
+        return row, False
+
+    sha = hashlib.sha256(corpo).hexdigest()
+    caminho_local = f"extrato_{registro.replace('/', '-')}.doc"
+    with open(caminho_local, "wb") as f:
+        f.write(corpo)
+
+    # 2) armazenamento
+    arquivo_path = None
+    try:
+        arquivo_path = sb_upload(f"{tenant}/{registro.replace('/', '-')}.doc", corpo)
+        resolver(tenant, f"ARMAZENAMENTO:{registro}")
+    except Exception as e:
+        incidente(tenant, f"ARMAZENAMENTO:{registro}", "ARMAZENAMENTO", "ALTO", f"Falha ao guardar {registro} no bucket: {e}", sind.get("id"))
+
+    # 3) extração
+    try:
+        d = extrair(caminho_local)
+        m = d["metadados"]
+        if m.get("numero_registro") and m["numero_registro"] != registro:
+            raise RuntimeError(f"divergência: consulta={registro}, documento={m['numero_registro']}")
+        dados = dict(base, numero_processo=m.get("numero_processo"), denominacao=m.get("denominacao"),
+                     data_registro=data_br(m.get("data_registro")), data_protocolo=data_br(m.get("data_protocolo")),
+                     vigencia_inicio=data_br((d.get("vigencia") or {}).get("inicio")) or base.get("vigencia_inicio"),
+                     vigencia_fim=data_br((d.get("vigencia") or {}).get("fim")) or base.get("vigencia_fim"),
+                     data_base=d.get("data_base"), categoria=d.get("categoria"), abrangencia=d.get("abrangencia_territorial"),
+                     partes=d.get("partes") or base["partes"], anexos=d.get("anexos") or [],
+                     arquivo_path=arquivo_path, sha256=sha, total_clausulas=d["total_clausulas"],
+                     status_importacao="IMPORTADO" if d["total_clausulas"] > 0 else "IMPORTACAO_NAO_CONCLUIDA")
+        row = sb_insert("cct_instrumentos", dados, upsert_on="tenant_id,numero_registro")[0]
+        if d["clausulas"]:
+            sb_insert("cct_clausulas", [{"tenant_id": tenant, "instrumento_id": row["id"], "ordem": c["ordem"],
+                                         "numero_extenso": c["numero_extenso"], "titulo": c["titulo"], "grupo": c["grupo"],
+                                         "subgrupo": c["subgrupo"], "texto": c["texto"]} for c in d["clausulas"]],
+                      upsert_on="instrumento_id,ordem")
+        resolver(tenant, f"IMPORTACAO:{registro}")
+        log(f"  IMPORTADO {registro}: {d['total_clausulas']} cláusulas, {len(dados['partes'])} partes")
+        if dados["status_importacao"] == "IMPORTADO":
+            analisar_instrumento(tenant, row["id"], d, sind.get("id"))
+        return row, dados["status_importacao"] == "IMPORTADO"
+    except Exception as e:
+        row = sb_insert("cct_instrumentos", dict(base, arquivo_path=arquivo_path, sha256=sha,
+                                                 status_importacao="IMPORTACAO_NAO_CONCLUIDA",
+                                                 observacoes=f"extração falhou: {e}"), upsert_on="tenant_id,numero_registro")[0]
+        incidente(tenant, f"IMPORTACAO:{registro}", "IMPORTACAO", "ALTO", f"Importação de {registro} não concluída: {e}",
+                  sind.get("id"), row["id"])
+        return row, False
+
+
+# ---------------------------------------------------------------- análise (seções 44-61)
+def carregar_dados_instrumento(inst_id):
+    """Reconstrói o dict no formato do extrair_cct a partir do banco (instrumento + cláusulas)."""
+    i = sb_get("cct_instrumentos", {"id": f"eq.{inst_id}", "select": "*"})[0]
+    cls = sb_get("cct_clausulas", {"instrumento_id": f"eq.{inst_id}", "select": "ordem,numero_extenso,titulo,grupo,subgrupo,texto", "order": "ordem"})
+    return {"metadados": {"numero_registro": i["numero_registro"], "data_registro": i.get("data_registro")}, "partes": i.get("partes") or [],
+            "vigencia": {"inicio": i.get("vigencia_inicio"), "fim": i.get("vigencia_fim")}, "categoria": i.get("categoria"),
+            "abrangencia_territorial": i.get("abrangencia"), "data_base": i.get("data_base"), "clausulas": cls, "total_clausulas": len(cls)}
+
+
+def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
+    """Gera valores, comparação com a anterior e parecer (IA opcional). Regra 99: IA falhou → ANALISE_IA_NAO_CONCLUIDA."""
+    try:
+        dados = dados or carregar_dados_instrumento(inst_id)
+        ant_id = sb_rpc("cct_anterior", {"p_instrumento": inst_id})
+        anterior = carregar_dados_instrumento(ant_id) if ant_id else None
+        r = analisar_cct.analisar(dados, anterior, usar_ia=bool(os.environ.get("ANTHROPIC_API_KEY")))
+        versao = 1 + len(sb_get("cct_analises", {"instrumento_id": f"eq.{inst_id}", "select": "id"}))
+        an = sb_insert("cct_analises", {"tenant_id": tenant, "instrumento_id": inst_id, "anterior_id": ant_id, "versao": versao, "status": r["status"],
+                                        "modelo": r["modelo"], "erro_ia": r["erro_ia"], "resumo": r["resumo"], "destaques": r["destaques"],
+                                        "providencias": r["providencias"], "alertas": r["alertas"], "pontos_incertos": r["pontos_incertos"],
+                                        "validacao": r["validacao"], "comparacao": r["comparacao"], "duracao_ms": r["duracao_ms"], "gerado_por": ORIGEM})[0]
+        requests.delete(f"{SB_URL}/rest/v1/cct_valores", headers=H, params={"instrumento_id": f"eq.{inst_id}"}, timeout=30)
+        if r["valores"]:
+            sb_insert("cct_valores", [{"tenant_id": tenant, "instrumento_id": inst_id, "analise_id": an["id"], **{k: v[k] for k in
+                      ("chave", "tema", "descricao", "valor_texto", "valor_num", "unidade", "clausula_ordem", "clausula_titulo", "trecho", "confianca")}} for v in r["valores"]])
+        sb_patch("cct_instrumentos", {"id": f"eq.{inst_id}"}, {"analise_status": r["status"], "analise_em": datetime.now(timezone.utc).isoformat()})
+        if r["status"] == "CONCLUIDA":
+            resolver(tenant, f"IA:{inst_id}")
+        elif os.environ.get("ANTHROPIC_API_KEY"):  # sem chave configurada não é incidente, é estado
+            incidente(tenant, f"IA:{inst_id}", "IA", "ATENCAO", f"ANÁLISE POR IA NÃO CONCLUÍDA – {dados['metadados']['numero_registro']}: {r['erro_ia']} (valores e comparação gravados)", sindicato_id, inst_id)
+        log(f"  ANÁLISE {dados['metadados']['numero_registro']}: {r['status']} — {len(r['valores'])} valores, "
+            f"{'comparada com ' + anterior['metadados']['numero_registro'] if anterior else 'sem anterior'}, {r['duracao_ms']} ms")
+        return an
+    except Exception as e:
+        log(f"  !! análise falhou: {e}")
+        incidente(tenant, f"IA:{inst_id}", "IA", "ALTO", f"Análise não concluída (erro interno): {e}", sindicato_id, inst_id)
+        sb_patch("cct_instrumentos", {"id": f"eq.{inst_id}"}, {"analise_status": "ANALISE_IA_NAO_CONCLUIDA"})
+        return None
+
+
+def analisar_pendentes(tenant):
+    """Instrumentos importados sem análise (ou reprocessamento pedido pelo app: analise_status nulo)."""
+    pend = sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "analise_status": "is.null", "select": "id,numero_registro,sindicato_id", "limit": "20"})
+    if pend:
+        log(f"análises pendentes: {len(pend)}")
+    for i in pend:
+        analisar_instrumento(tenant, i["id"], sindicato_id=i.get("sindicato_id"))
+
+
+# ---------------------------------------------------------------- ciência (seções 31-39)
+def config(tenant):
+    c = sb_get("cct_config", {"tenant_id": f"eq.{tenant}"})
+    return c[0] if c else {"prazo_ciencia_dias_uteis": 2, "lembrete_diario": True, "escalonar_apos_prazo": True}
+
+
+def prazo_ciencia(tenant):
+    dias = config(tenant)["prazo_ciencia_dias_uteis"]
+    try:
+        return sb_rpc("cct_adicionar_dias_uteis", {"p_inicio": datetime.now().date().isoformat(), "p_dias": dias})
+    except Exception:
+        from datetime import timedelta
+        return (datetime.now().date() + timedelta(days=dias + 2)).isoformat()
+
+
+def criar_ciencias(tenant, sind, row, empresa=None):
+    """Uma ciência por empresa vinculada ao sindicato (ou pela empresa do ACT); sem empresa → uma ciência do sindicato."""
+    prazo = prazo_ciencia(tenant)
+    alvos = []
+    if empresa:
+        alvos = [empresa]
+    elif sind:
+        vinc = sb_get("cct_empresa_sindicato", {"sindicato_id": f"eq.{sind['id']}", "select": "empresa:cct_empresas(id,razao_social,responsavel_email,gerente_email,ativo)"})
+        alvos = [v["empresa"] for v in vinc if v.get("empresa") and v["empresa"].get("ativo", True)]
+    linhas = []
+    if alvos:
+        for e in alvos:
+            linhas.append({"tenant_id": tenant, "instrumento_id": row["id"], "empresa_id": e["id"], "sindicato_id": sind["id"] if sind else None,
+                           "responsavel_email": e.get("responsavel_email") or (sind or {}).get("responsavel_email"),
+                           "gerente_email": e.get("gerente_email") or (sind or {}).get("gerente_email"), "prazo": prazo})
+    else:
+        linhas.append({"tenant_id": tenant, "instrumento_id": row["id"], "empresa_id": None, "sindicato_id": sind["id"] if sind else None,
+                       "responsavel_email": (sind or {}).get("responsavel_email"), "gerente_email": (sind or {}).get("gerente_email"), "prazo": prazo})
+    try:
+        criadas = sb_insert("cct_ciencias", linhas, upsert_on="instrumento_id,empresa_id")
+    except Exception:
+        criadas = []
+        for l in linhas:  # empresa_id nulo não entra no on_conflict do PostgREST; insere um a um ignorando duplicidade
+            try:
+                criadas += sb_insert("cct_ciencias", l)
+            except Exception as e:
+                if "duplicate" not in str(e) and "23505" not in str(e):
+                    log(f"  !! ciência: {e}")
+    log(f"  {len(criadas)} ciência(s) criada(s), prazo {prazo}")
+    return criadas
+
+
+def processar_ciencias(tenant):
+    """Rotina diária: lembretes dentro do prazo e escalonamento ao gerente após o prazo (seções 36-39)."""
+    cfg = config(tenant)
+    hoje = datetime.now().date().isoformat()
+    pend = sb_get("cct_v_confirmacoes", {"tenant_id": f"eq.{tenant}", "status": "in.(PENDENTE,NOTIFICADO,ESCALONADO)", "select": "*"})
+    log(f"ciências pendentes: {len(pend)}")
+    for c in pend:
+        alvo = c.get("empresa") or c.get("sindicato") or ""
+        ja_hoje = (c.get("ultimo_lembrete") or "")[:10] == hoje
+        dest_resp = [c["responsavel_email"]] if c.get("responsavel_email") else []
+        dest_ger = [c["gerente_email"]] if c.get("gerente_email") else []
+        cab = (f"<p><b>{c['tipo_instrumento']}</b> {c['numero_registro']} — {alvo}<br>Vigência {c.get('vigencia_inicio')} a {c.get('vigencia_fim')}"
+               f"<br><b>Prazo para ciência:</b> {c['prazo']}</p>")
+        if c["status"] == "PENDENTE" and dest_resp:
+            st = notificar_para(tenant, "NOVA_CCT", f"CONVENÇÃO COLETIVA REGISTRADA – {alvo} – {c['numero_registro']}", cab + "<p>Registre a ciência no CCT Monitor.</p>", dest_resp, ciencia_id=c["id"], instrumento_id=c["instrumento_id"])
+            if st == "ENVIADA":
+                sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"status": "NOTIFICADO", "notificado_em": datetime.now(timezone.utc).isoformat()})
+            continue
+        if c["situacao"] == "ATRASADA" and cfg.get("escalonar_apos_prazo", True) and c["status"] != "ESCALONADO":
+            st = notificar_para(tenant, "ESCALONAMENTO", f"CIÊNCIA PENDENTE – PRAZO VENCIDO – {alvo} – {c['numero_registro']}",
+                                cab + f"<p>Responsável ainda não registrou ciência ({c['dias_atraso']} dia(s) de atraso).</p>", dest_ger + dest_resp, ciencia_id=c["id"])
+            sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"status": "ESCALONADO", "escalonado_em": datetime.now(timezone.utc).isoformat(),
+                                                              "lembretes": c["lembretes"] + 1, "ultimo_lembrete": datetime.now(timezone.utc).isoformat()})
+            continue
+        if cfg.get("lembrete_diario", True) and not ja_hoje and (dest_resp or dest_ger):
+            dest = dest_resp + (dest_ger if c["status"] == "ESCALONADO" else [])
+            notificar_para(tenant, "LEMBRETE", f"LEMBRETE – ciência pendente – {alvo} – {c['numero_registro']}", cab, dest, ciencia_id=c["id"])
+            sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"lembretes": c["lembretes"] + 1, "ultimo_lembrete": datetime.now(timezone.utc).isoformat()})
+
+
+def notificar_para(tenant, tipo, assunto, html, dest, instrumento_id=None, incidente_id=None, ciencia_id=None):
+    """Igual a notificar(), mas para destinatários explícitos (responsável/gerente)."""
+    dest = [d for d in dict.fromkeys(dest) if d]
+    reg = {"tenant_id": tenant, "tipo": tipo, "instrumento_id": instrumento_id, "incidente_id": incidente_id, "ciencia_id": ciencia_id,
+           "destinatarios": dest, "assunto": assunto, "status": "PENDENTE", "tentativas": 0}
+    if not dest:
+        reg.update(status="NAO_ENVIADA", erro="sem responsável/gerente configurado")
+    else:
+        st, erro, efetivos = enviar_email(dest, assunto, html_padrao(assunto, html))
+        reg.update(status=st, erro=erro, tentativas=1 if MAIL_KEY else 0, destinatarios=efetivos or dest,
+                   enviada_em=datetime.now(timezone.utc).isoformat() if st == "ENVIADA" else None)
+    try:
+        sb_insert("cct_notificacoes", reg)
+    except Exception as e:
+        log(f"  !! falha ao gravar notificação: {e}")
+    log(f"  NOTIFICAÇÃO {tipo} → {', '.join(dest) or '-'}: {reg['status']}")
+    return reg["status"]
+
+
+# ---------------------------------------------------------------- ciclo por alvo (sindicato ou empresa/ACT)
+def processar_sindicato(tenant, sind, page, existentes):
+    return processar_alvo(tenant, sind, None, TIPOS_MONITORADOS, page, existentes)
+
+
+def processar_empresa_act(tenant, emp, page, existentes):
+    alvo = {"id": None, "cnpj": emp["cnpj"], "nome": emp["razao_social"], "responsavel_email": emp.get("responsavel_email"), "gerente_email": emp.get("gerente_email")}
+    st, n = processar_alvo(tenant, alvo, emp, TIPOS_ACT, page, existentes)
+    sb_patch("cct_empresas", {"id": f"eq.{emp['id']}"}, {"ultima_consulta_act": datetime.now(timezone.utc).isoformat()})
+    return st, n
+
+
+def processar_alvo(tenant, sind, empresa, tipos, page, existentes):
+    cnpj = sind["cnpj"]
+    log(f"== {sind['nome']} ({cnpj}) — {'ACT' if empresa else 'CCT'}")
+    t0 = time.time()
+    # registro da consulta criado ANTES (status provisório) para vincular os instrumentos; atualizado ao final
+    consulta = sb_insert("cct_consultas", {"tenant_id": tenant, "sindicato_id": sind["id"], "origem": ORIGEM,
+                                           "status": "CONSULTA_NAO_CONCLUIDA", "erro": "em execução",
+                                           "etapas": [f"ACT da empresa {sind['nome']}"] if empresa else []})[0]
+    novos, etapas, http, por_tipo, total_encontrados = [], [], None, {}, 0
+    for tipo in tipos:
+        r = mediador.consultar_com_retry(page, cnpj, tipo=tipo, vigencia="Vigentes")
+        etapas += [f"[{tipo}] {e}" for e in r["etapas"]]
+        http = r["http"] or http
+        por_tipo[tipo] = (r["status"], r["erro"])
+        if r["status"] == "CONSULTA_NAO_CONCLUIDA":
+            etapas.append(f"[{tipo}] ERRO: {r['erro']}")
+            incidente(tenant, f"MEDIADOR:consulta:{cnpj}:{tipo}", "MEDIADOR", "ALTO",
+                      f"CONSULTA NÃO CONCLUÍDA – {tipo} – {sind['nome']}: {r['erro']}", sind["id"],
+                      detalhes={"tipo": tipo, "http": r["http"], "trecho_erro": r.get("trecho_erro"), "etapas": r["etapas"]})
+            time.sleep(2)
+            continue
+        resolver(tenant, f"MEDIADOR:consulta:{cnpj}:{tipo}")
+        resolver(tenant, f"MEDIADOR:consulta:{cnpj}")  # fingerprint da v0.2.0 (compatibilidade)
+        if r["status"] == "CONSULTA_COM_ALERTA":
+            etapas.append(f"[{tipo}] {r['erro']}")
+        total_encontrados += len(r["registros"])
+        # importar AGORA, enquanto a sessão do Mediador ainda tem este resultado (o extrato é negado — 403 — fora dele)
+        for reg in r["registros"]:
+            if reg["registro"] in existentes:
+                continue
+            log(f"  NOVO registro {reg['registro']} ({reg['tipo']}) — {reg.get('vigencia')}")
+            row, ok = importar(tenant, sind, reg, page, consulta["id"], empresa)
+            existentes.add(reg["registro"])
+            novos.append((reg, row, ok))
+            criar_ciencias(tenant, sind if sind.get("id") else None, row, empresa)
+            etapas.append(f"[{tipo}] {reg['registro']}: {'importado' if ok else 'IMPORTAÇÃO NÃO CONCLUÍDA'}")
+            time.sleep(1)
+        time.sleep(2)
+
+    falhas = [t for t, (st, _) in por_tipo.items() if st == "CONSULTA_NAO_CONCLUIDA"]
+    if len(falhas) == len(tipos):
+        status_geral = "CONSULTA_NAO_CONCLUIDA"
+        erro_geral = "; ".join(f"{t}: {e}" for t, (_, e) in por_tipo.items())
+    elif falhas or any(st == "CONSULTA_COM_ALERTA" for st, _ in por_tipo.values()):
+        status_geral = "CONSULTA_COM_ALERTA"
+        erro_geral = "; ".join(f"{t}: {e}" for t, (st, e) in por_tipo.items() if e) or None
+    else:
+        status_geral, erro_geral = "CONSULTA_CONFIRMADA", None
+
+    sb_patch("cct_consultas", {"id": f"eq.{consulta['id']}"}, {
+        "status": status_geral, "http": http, "qtd_encontrados": total_encontrados, "qtd_novos": len(novos),
+        "duracao_ms": int((time.time() - t0) * 1000), "erro": erro_geral, "etapas": etapas})
+
+    for reg, row, ok in novos:
+        partes = "<br>".join(p["nome"] if isinstance(p, dict) else p for p in (row.get("partes") or []))
+        html = (f"<p><b>{reg['tipo']}</b> registrada no Mediador para <b>{sind['nome']}</b>.</p>"
+                f"<p><b>Registro:</b> {reg['registro']}<br><b>Solicitação:</b> {reg.get('solicitacao')}<br>"
+                f"<b>Vigência:</b> {reg.get('vigencia')}<br><b>Partes:</b><br>{partes}</p>"
+                f"<p><b>Importação:</b> {'concluída' if ok else 'NÃO CONCLUÍDA — verificar na Central de Erros'}</p>")
+        st = notificar(tenant, "NOVA_CCT", f"NOVA {reg['tipo'].upper()} – {sind['nome']} – {reg['registro']}", html,
+                       instrumento_id=row["id"])
+        sb_patch("cct_instrumentos", {"id": f"eq.{row['id']}"}, {"status_ciencia": "NOTIFICADO" if st == "ENVIADA" else "PENDENTE"})
+    if sind.get("id"):
+        sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"ultima_consulta": consulta["executada_em"], "ultimo_status": status_geral})
+    return status_geral, len(novos)
+
+
+def main():
+    log(f"CCT Monitor robô v{VERSAO} — origem {ORIGEM}")
+    teste = (os.environ.get("TESTE_EMAIL") or "").strip()
+    if teste:
+        st, erro, ef = enviar_email([teste], "TESTE – CCT Monitor – circuito de e-mail", html_padrao("Teste de envio",
+                                    f"<p>Se você recebeu esta mensagem, o CCT Monitor está conectado ao hub artecon-mail.</p><p>{datetime.now():%d/%m/%Y %H:%M}</p>"))
+        log(f"TESTE DE E-MAIL para {ef}: {st} {erro or ''}")
+        sys.exit(0 if st == "ENVIADA" else 1)
+    tenants = sb_get("resc_tenants", {"cnpj": f"eq.{TENANT_CNPJ}", "select": "id,nome"})
+    if not tenants:
+        log(f"tenant {TENANT_CNPJ} não encontrado — abortando");
+        sys.exit(2)
+    tenant = tenants[0]["id"]
+    global MAIL_DESTINO_UNICO
+    cfg_dest = (config(tenant).get("email_destino_teste") or "").strip().lower()
+    if cfg_dest:
+        MAIL_DESTINO_UNICO = cfg_dest
+        log(f"MODO TESTE de e-mail ativo (configurado no app): tudo vai para {cfg_dest}")
+    processar_testes_email(tenant)
+    sinds = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true",
+                                      "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email", "order": "nome"})
+    emps_act = sb_get("cct_empresas", {"tenant_id": f"eq.{tenant}", "monitorar_act": "eq.true", "ativo": "eq.true",
+                                       "select": "id,cnpj,razao_social,responsavel_email,gerente_email", "order": "razao_social"})
+    filtro = os.environ.get("APENAS_CNPJ", "").strip()
+    if filtro:
+        sinds = [s for s in sinds if s["cnpj"] == filtro]
+        emps_act = [e for e in emps_act if e["cnpj"] == filtro]
+    log(f"{len(sinds)} sindicato(s) e {len(emps_act)} empresa(s) com ACT a monitorar")
+    # já importados de fato; os com IMPORTACAO_NAO_CONCLUIDA voltam a ser tentados (seção 92)
+    existentes = {r["numero_registro"] for r in sb_get("cct_instrumentos",
+                  {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "select": "numero_registro"})}
+    resumo = {"CONSULTA_CONFIRMADA": 0, "CONSULTA_COM_ALERTA": 0, "CONSULTA_NAO_CONCLUIDA": 0, "novos": 0}
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)  # headed sob xvfb: melhor pontuação no reCAPTCHA
+        ctx = browser.new_context(locale="pt-BR", accept_downloads=True)
+        page = ctx.new_page()
+        try:
+            for i, s in enumerate(sinds):
+                try:
+                    st, n = processar_sindicato(tenant, s, page, existentes)
+                    resumo[st] += 1
+                    resumo["novos"] += n
+                except Exception as e:
+                    resumo["CONSULTA_NAO_CONCLUIDA"] += 1
+                    log(f"  !! exceção não tratada: {e}\n{traceback.format_exc()}")
+                    incidente(tenant, f"APLICATIVO:excecao:{s['cnpj']}", "APLICATIVO", "CRITICO",
+                              f"Exceção não tratada ao processar {s['nome']}: {e}", s["id"])
+                if i < len(sinds) - 1 or emps_act:
+                    time.sleep(INTERVALO)
+            for i, e in enumerate(emps_act):
+                try:
+                    st, n = processar_empresa_act(tenant, e, page, existentes)
+                    resumo[st] += 1
+                    resumo["novos"] += n
+                except Exception as ex:
+                    resumo["CONSULTA_NAO_CONCLUIDA"] += 1
+                    log(f"  !! exceção não tratada (ACT): {ex}\n{traceback.format_exc()}")
+                    incidente(tenant, f"APLICATIVO:excecao:{e['cnpj']}", "APLICATIVO", "CRITICO", f"Exceção não tratada ao processar ACT de {e['razao_social']}: {ex}")
+                if i < len(emps_act) - 1:
+                    time.sleep(INTERVALO)
+        finally:
+            browser.close()
+
+    if not sinds and not emps_act:
+        incidente(tenant, "APLICATIVO:sem-sindicatos", "APLICATIVO", "ATENCAO", "Execução sem nenhum sindicato monitorado")
+    else:
+        resolver(tenant, "APLICATIVO:sem-sindicatos")
+    try:
+        analisar_pendentes(tenant)
+    except Exception as e:
+        log(f"  !! análises pendentes falharam: {e}")
+    try:
+        processar_ciencias(tenant)
+    except Exception as e:
+        log(f"  !! rotina de ciências falhou: {e}\n{traceback.format_exc()}")
+        incidente(tenant, "APLICATIVO:ciencias", "APLICATIVO", "ALTO", f"Rotina de lembretes/escalonamento falhou: {e}")
+    resolver(tenant, "APLICATIVO:execucao-diaria")  # heartbeat: execução chegou ao fim
+    log(f"RESUMO: {json.dumps(resumo, ensure_ascii=False)}")
+    with open("resumo_execucao.json", "w", encoding="utf-8") as f:
+        json.dump({"versao": VERSAO, "origem": ORIGEM, "quando": datetime.now(timezone.utc).isoformat(), **resumo}, f, ensure_ascii=False, indent=2)
+
+
+if __name__ == "__main__":
+    main()
