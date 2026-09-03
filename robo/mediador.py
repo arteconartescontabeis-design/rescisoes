@@ -146,9 +146,31 @@ def consultar_com_retry(page, cnpj, tipo="Convenção Coletiva", vigencia="Vigen
 
 
 def baixar_extrato(page, solicitacao: str):
-    """GET direto do extrato (.doc = HTML) na mesma sessão do navegador. Retorna (status, bytes)."""
-    resp = page.request.get(URL_EXTRATO.format(solicitacao=solicitacao), timeout=TIMEOUT_MS)
-    return resp.status, resp.body()
+    """Baixa o extrato (.doc = HTML) de DENTRO da página (fetch same-origin, com todos os cabeçalhos do navegador).
+    Fallback: page.request.get. Retorna (status, bytes, trecho_da_resposta_em_caso_de_erro)."""
+    import base64
+    url = URL_EXTRATO.format(solicitacao=solicitacao)
+    try:
+        res = page.evaluate("""async (url) => {
+            const r = await fetch(url, { credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const buf = new Uint8Array(await r.arrayBuffer());
+            let bin = ''; const CH = 8192;
+            for (let i = 0; i < buf.length; i += CH) bin += String.fromCharCode.apply(null, buf.subarray(i, i + CH));
+            return { status: r.status, b64: btoa(bin), ct: r.headers.get('content-type') || '' };
+        }""", url)
+        corpo = base64.b64decode(res["b64"])
+        status = int(res["status"])
+        via = "fetch in-page"
+    except Exception as e:
+        resp = page.request.get(url, timeout=TIMEOUT_MS)
+        status, corpo, via = resp.status, resp.body(), f"page.request (fetch in-page falhou: {type(e).__name__})"
+    trecho = None
+    if status != 200 or not extrato_valido(corpo):
+        txt = corpo[:6000].decode("latin-1", errors="replace")
+        txt = re.sub(r"<(script|style).*?</\1>", "", txt, flags=re.S | re.I)
+        txt = re.sub(r"\s+", " ", _h.unescape(re.sub(r"<[^>]+>", " ", txt))).strip()[:400]
+        trecho = f"[{via}] {txt}"
+    return status, corpo, trecho
 
 
 def extrato_valido(corpo: bytes) -> bool:
