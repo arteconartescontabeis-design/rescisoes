@@ -215,6 +215,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.12.2</td><td>03/09/2026</td><td>Alterar nível passa a usar função do banco com privilégio (a política do Rescisões não permitia alterar a linha de outro usuário); validações de único gerente e auto-rebaixamento no banco. Banco <code>setup_cct_v0.12.2.sql</code>.</td></tr>
           <tr><td>v0.12.1</td><td>03/09/2026</td><td>Usuários: botão "Alterar nível" — muda entre Usuário e Gerente (equipe) e, nos acessos de cliente, troca a empresa; impede rebaixar o último gerente ou a si mesmo.</td></tr>
           <tr><td>v0.12.0</td><td>03/09/2026</td><td>Aba <b>Configurações</b> (Sistema): todos os parâmetros num só lugar — ciência, histórico (com "importar automaticamente os últimos N anos" para todo sindicato novo), consultas (horários/fila), IA e e-mail modo teste; só o gerente altera. <b>Histórico de alterações</b> (Sistema): auditoria automática do banco — quem alterou o quê e quando em sindicatos, empresas, vínculos, configurações, ciências, incidentes, destinatários, acessos e convenções, com antes/depois. Convenções: ordenação por qualquer coluna e filtros por tipo, sindicato, categoria, importação e origem.</td></tr>
           <tr><td>v0.11.0</td><td>03/09/2026</td><td>Parâmetros exclusivos do gerente: IA ligada/desligada, limite mensal de pareceres (com uso do mês), parecer para histórico sim/não; horários de consulta (vários por dia), intervalo entre consultas e máximo de sindicatos por execução — as consultas passam a ser uma fila (os consultados há mais tempo primeiro) com espaçamento configurável; o robô roda de hora em hora e só consulta nos horários definidos. Botão "Limpar registros de teste" (gerente) e script SQL para início oficial.</td></tr>
@@ -316,7 +317,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.12.1" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.12.2" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const $ = id => document.getElementById(id);
@@ -675,10 +676,7 @@ async function salvarNivel() {
   try {
     if (tipo === "resc") {
       const novo = $("nNivel").value;
-      if (id === APP.uid && novo !== "diretoria") throw new Error("Você não pode rebaixar o seu próprio acesso.");
-      const gerentes = (APP.dados.usu || []).filter(u => ["diretoria","superadmin","admin"].includes(u.papel));
-      if (novo !== "diretoria" && gerentes.length === 1 && gerentes[0].auth_id === id) throw new Error("Este é o único gerente — promova outro antes de rebaixá-lo.");
-      await patch("resc_usuarios", "auth_id=eq." + id, { papel: novo });
+      await api("rpc/cct_alterar_nivel", { method: "POST", body: JSON.stringify({ p_auth: id, p_novo: novo }) });
     } else if ($("nEmp").style.display !== "none") {
       await patch("cct_acessos", "id=eq." + id, { empresa_id: $("nEmpresa").value });
     } else {
