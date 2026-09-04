@@ -31,7 +31,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.13.1"
+VERSAO = "0.13.2"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -717,12 +717,16 @@ def main():
                 continue
             if devido is None or alvo > devido:
                 devido = alvo
-        ultima = sb_get("cct_consultas", {"tenant_id": f"eq.{tenant}", "origem": "eq.github-actions", "select": "executada_em", "order": "executada_em.desc", "limit": "1"})
-        ultima_dt = datetime.fromisoformat(ultima[0]["executada_em"].replace("Z", "+00:00")).astimezone(BRT) if ultima else None
-        if devido is None or (ultima_dt and ultima_dt >= devido):
-            log(f"nada devido: horários {cfg0.get('horarios_consulta')} · última execução automática {ultima_dt:%d/%m %H:%M} BRT" if ultima_dt else f"nada devido: horários {cfg0.get('horarios_consulta')}")
+        if devido is None:
+            log("nenhum horário válido configurado"); processar_testes_email(tenant); return
+        # devido = último horário configurado já passado. Executa enquanto houver sindicato monitorado NÃO consultado desde então
+        # (assim, o que não coube em um disparo de 45 min continua no próximo, e um máximo por execução vira fila natural).
+        todos = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true", "select": "id,ultima_consulta"})
+        pendentes = [x for x in todos if not x.get("ultima_consulta") or datetime.fromisoformat(x["ultima_consulta"].replace("Z", "+00:00")).astimezone(BRT) < devido]
+        if todos and not pendentes:
+            log(f"nada devido: todos os {len(todos)} sindicatos já consultados desde {devido:%d/%m %H:%M} BRT (horários {cfg0.get('horarios_consulta')})")
             processar_testes_email(tenant); return
-        log(f"executando: horário devido {devido:%d/%m %H:%M} BRT, agora {agora:%H:%M}" + (f", última automática {ultima_dt:%d/%m %H:%M}" if ultima_dt else ", primeira execução automática"))
+        log(f"executando: horário devido {devido:%d/%m %H:%M} BRT, agora {agora:%H:%M} — {len(pendentes)} de {len(todos)} sindicato(s) ainda não consultados desde então")
     global MAIL_DESTINO_UNICO
     cfg_dest = (config(tenant).get("email_destino_teste") or "").strip().lower()
     if cfg_dest:
