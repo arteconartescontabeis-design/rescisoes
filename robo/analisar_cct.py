@@ -184,11 +184,16 @@ jornada, férias/licenças, saúde/segurança, relações sindicais, disposiçõ
 obrigação, valor, prazo ou condição relevante para o DP. As providências são apenas as ações que decorrem de obrigação
 EXPRESSA no texto (ex.: "recolher a contribuição até dia X" quando a cláusula fixa a data).
 
+Além disso, em "comentarios" você PODE registrar observações do analista (interpretação, orientação prática, atenção do DP),
+sempre ligadas a uma cláusula. Esses comentários são apresentados separadamente, rotulados como COMENTÁRIO e com aviso
+de que podem conter erro — por isso, mesmo neles, não invente números: qualquer valor citado deve estar no texto.
+
 Responda SOMENTE com JSON válido, sem markdown:
 {"resumo": "parágrafo só com fatos presentes no texto, com os números exatamente como no texto",
  "destaques": [{"tema": "...", "texto": "...", "clausulas": [n], "trecho": "..."}],
  "providencias": [{"acao": "...", "prazo": "...", "clausulas": [n], "trecho": "..."}],
  "alertas": [{"texto": "...", "clausulas": [n], "trecho": "..."}],
+ "comentarios": [{"texto": "observação do analista", "clausulas": [n]}],
  "pontos_incertos": ["o que o texto deixa em aberto — sem completar com suposições"]}"""
 
 
@@ -246,6 +251,19 @@ def _validar_refs(parecer, dados, valores):
         else:
             descartados.append({"grupo": "resumo", "item": f[:160], "motivo": "número não localizado no texto da CCT"})
     parecer["resumo"] = " ".join(resumo_ok).strip()
+    # comentários: interpretação permitida, mas cláusula tem de existir e números têm de estar no texto da CCT
+    coment = []
+    for c in parecer.get("comentarios", []) or []:
+        if isinstance(c, str):
+            c = {"texto": c, "clausulas": []}
+        refs = [o for o in (c.get("clausulas") or []) if isinstance(o, int) and o in ordens]
+        nums = _numeros(c.get("texto") or "")
+        if not refs:
+            descartados.append({"grupo": "comentarios", "item": (c.get("texto") or "")[:160], "motivo": "comentário sem cláusula de referência"}); continue
+        if any(_norm_txt(n).replace(" ", "") not in texto_total.replace(" ", "") for n in nums):
+            descartados.append({"grupo": "comentarios", "item": (c.get("texto") or "")[:160], "motivo": "comentário cita número inexistente na CCT"}); continue
+        coment.append({"texto": c["texto"], "clausulas": refs, "tipo": "COMENTARIO"})
+    parecer["comentarios"] = coment[:15]
     parecer["pontos_incertos"] = [p for p in (parecer.get("pontos_incertos") or []) if isinstance(p, str)][:10]
     parecer["descartados"] = descartados
     parecer["validacao"] = [f"{d['grupo']}: {d['motivo']}" for d in descartados]
@@ -336,6 +354,7 @@ def analisar(dados, anterior=None, usar_ia=True):
         "providencias": (parecer or {}).get("providencias", []), "alertas": (parecer or {}).get("alertas", []),
         "pontos_incertos": (parecer or {}).get("pontos_incertos", []), "validacao": (parecer or {}).get("validacao", []),
         "descartados": (parecer or {}).get("descartados", []),
+        "comentarios": (parecer or {}).get("comentarios", []),
         "duracao_ms": int((time.time() - t0) * 1000),
     }
 
