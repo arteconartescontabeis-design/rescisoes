@@ -31,7 +31,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.12.3"
+VERSAO = "0.13.1"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -697,16 +697,32 @@ def main():
     cfg0 = config(tenant)
     forcar = (os.environ.get("FORCAR") or "").lower() in ("1", "true", "sim")
     if not forcar and ORIGEM == "github-actions":
-        # roda de hora em hora; só executa nas horas configuradas (BRT). Manual (FORCAR) sempre executa.
+        # Disparos de hora em hora (aos :05). Regra: executa no PRIMEIRO disparo após cada horário configurado (HH:MM, BRT),
+        # se ainda não houve execução automática desde esse horário. Atraso máximo ≈ 1 h. Fins de semana não consultam.
+        from datetime import timedelta
         agora = datetime.now(BRT)
-        horas = {h.strip()[:2] for h in (cfg0.get("horarios_consulta") or "06:00").split(",") if h.strip()}
         if agora.weekday() >= 5:
             log(f"fim de semana ({agora:%d/%m %H:%M} BRT) — sem consulta"); processar_testes_email(tenant); return
-        if f"{agora:%H}" not in horas:
-            log(f"fora dos horários configurados ({cfg0.get('horarios_consulta')}) — agora {agora:%H:%M} BRT; nada a fazer")
-            processar_testes_email(tenant)  # pedidos de teste são atendidos mesmo fora do horário
-            return
-        log(f"horário de consulta {agora:%H:%M} BRT (configurados: {cfg0.get('horarios_consulta')})")
+        horarios = []
+        for h in (cfg0.get("horarios_consulta") or "06:00").split(","):
+            m = _re.match(r"\s*(\d{1,2}):(\d{2})", h)
+            if m:
+                horarios.append((int(m.group(1)) % 24, int(m.group(2)) % 60))
+        devido = None
+        for hh, mm in horarios:
+            alvo = agora.replace(hour=hh, minute=mm, second=0, microsecond=0)
+            if alvo > agora:
+                alvo -= timedelta(days=1)
+            if alvo.weekday() >= 5:
+                continue
+            if devido is None or alvo > devido:
+                devido = alvo
+        ultima = sb_get("cct_consultas", {"tenant_id": f"eq.{tenant}", "origem": "eq.github-actions", "select": "executada_em", "order": "executada_em.desc", "limit": "1"})
+        ultima_dt = datetime.fromisoformat(ultima[0]["executada_em"].replace("Z", "+00:00")).astimezone(BRT) if ultima else None
+        if devido is None or (ultima_dt and ultima_dt >= devido):
+            log(f"nada devido: horários {cfg0.get('horarios_consulta')} · última execução automática {ultima_dt:%d/%m %H:%M} BRT" if ultima_dt else f"nada devido: horários {cfg0.get('horarios_consulta')}")
+            processar_testes_email(tenant); return
+        log(f"executando: horário devido {devido:%d/%m %H:%M} BRT, agora {agora:%H:%M}" + (f", última automática {ultima_dt:%d/%m %H:%M}" if ultima_dt else ", primeira execução automática"))
     global MAIL_DESTINO_UNICO
     cfg_dest = (config(tenant).get("email_destino_teste") or "").strip().lower()
     if cfg_dest:
