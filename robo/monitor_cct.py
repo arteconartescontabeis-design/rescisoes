@@ -29,7 +29,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.5.2"
+VERSAO = "0.6.0"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -37,7 +37,7 @@ ORIGEM = os.environ.get("ORIGEM", "github-actions")
 INTERVALO = float(os.environ.get("INTERVALO_S", "8"))
 # Hub artecon-mail — mesmo contrato da Edge Function bright-task do Rescisões Pro
 MAIL_URL = os.environ.get("MAIL_HUB_URL", "https://tjnqloycikukvvnconqn.supabase.co/functions/v1/mail-send")
-MAIL_KEY = os.environ.get("MAIL_API_KEY")
+MAIL_KEY = (os.environ.get("MAIL_API_KEY") or "").strip() or None
 MAIL_DESTINO_UNICO = (os.environ.get("MAIL_DESTINO_UNICO") or "").strip().lower()  # modo teste: tudo vai para um endereço
 MAIL_APP = "CCT Monitor"
 BUCKET = "cct-arquivos"
@@ -96,6 +96,7 @@ def enviar_email(dest, assunto, html):
         return "NAO_ENVIADA", "nenhum destinatário", []
     if not MAIL_KEY:
         return "NAO_ENVIADA", "MAIL_API_KEY não configurada (envio de e-mail ainda não ligado)", dest
+    digital = f"chave enviada: {len(MAIL_KEY)} caracteres, começa '{MAIL_KEY[:3]}' termina '{MAIL_KEY[-3:]}'"
     efetivos = [MAIL_DESTINO_UNICO] if MAIL_DESTINO_UNICO else dest
     if MAIL_DESTINO_UNICO:
         html = f'<p style="font-size:12px;color:#a93226">[MODO TESTE] destinatários reais: {", ".join(dest)}</p>' + html
@@ -105,7 +106,7 @@ def enviar_email(dest, assunto, html):
             r = requests.post(MAIL_URL, headers={"Content-Type": "application/json", "x-api-key": MAIL_KEY},
                               data=json.dumps({"to": d, "assunto": assunto, "html": html, "app": MAIL_APP}), timeout=30)
             if r.status_code >= 300:
-                falhas.append(f"{d}: HTTP {r.status_code} {r.text[:120]}")
+                falhas.append(f"{d}: HTTP {r.status_code} {r.text[:120]}" + (f" [{digital}]" if r.status_code in (401, 403) else ""))
         except Exception as e:
             falhas.append(f"{d}: {type(e).__name__}: {e}"[:200])
     if falhas and len(falhas) == len(efetivos):
@@ -364,6 +365,48 @@ def criar_ciencias(tenant, sind, row, empresa=None):
     return criadas
 
 
+def html_impacto(tenant, instrumento_id, empresa_id=None):
+    """Matriz de impacto (seção 53) para o e-mail do responsável: itens-chave + variação + providências."""
+    try:
+        params = {"instrumento_id": f"eq.{instrumento_id}", "order": "clausula_ordem"}
+        if empresa_id:
+            params["empresa_id"] = f"eq.{empresa_id}"
+        else:
+            params["limit"] = "40"
+        rows = [r for r in sb_get("cct_v_impacto", params) if r.get("chave")]
+        an = sb_get("cct_analises", {"instrumento_id": f"eq.{instrumento_id}", "order": "versao.desc", "limit": "1"})
+        an = an[0] if an else {}
+        varm = {}
+        for v in ((an.get("comparacao") or {}).get("valores") or []):
+            varm[f"{v.get('descricao')}|{v.get('atual')}"] = v
+        if not rows and not an.get("providencias"):
+            return ""
+        vistos, linhas = set(), []
+        for r in rows:
+            k = (r["chave"], r["descricao"], r["valor_texto"])
+            if k in vistos:
+                continue
+            vistos.add(k)
+            v = varm.get(f"{r['descricao']}|{r['valor_texto']}")
+            ant = f"{v['anterior']} ({v['variacao_pct']}%)" if v and v.get("variacao_pct") is not None else (v["anterior"] if v else "—")
+            linhas.append(f"<tr><td style='padding:4px 8px;border-bottom:1px solid #eee'>{r['tema']}</td><td style='padding:4px 8px;border-bottom:1px solid #eee'>{r['descricao']}</td>"
+                          f"<td style='padding:4px 8px;border-bottom:1px solid #eee;text-align:right'><b>{r['valor_texto']}</b></td><td style='padding:4px 8px;border-bottom:1px solid #eee;text-align:right'>{ant}</td>"
+                          f"<td style='padding:4px 8px;border-bottom:1px solid #eee'>cl. {r['clausula_ordem']}</td></tr>")
+        h = "<h4 style='margin:14px 0 6px;color:#1a5276'>Matriz de impacto</h4>"
+        if linhas:
+            h += ("<table style='border-collapse:collapse;font-size:12.5px;width:100%'><tr style='background:#eef3f7'><th style='padding:4px 8px;text-align:left'>Tema</th><th style='padding:4px 8px;text-align:left'>Descrição</th>"
+                  "<th style='padding:4px 8px;text-align:right'>Valor</th><th style='padding:4px 8px;text-align:right'>Anterior</th><th style='padding:4px 8px;text-align:left'>Cláusula</th></tr>" + "".join(linhas) + "</table>")
+        if an.get("resumo"):
+            h += f"<p style='margin:10px 0 4px'><b>Resumo:</b> {an['resumo']}</p>"
+        if an.get("providencias"):
+            h += "<p style='margin:8px 0 4px'><b>Providências:</b></p><ul style='margin:0;padding-left:18px'>" + "".join(
+                f"<li>{p.get('acao')}" + (f" <i>({p.get('prazo')})</i>" if p.get("prazo") else "") + "</li>" for p in an["providencias"]) + "</ul>"
+        return h
+    except Exception as e:
+        log(f"  !! matriz de impacto: {e}")
+        return ""
+
+
 def processar_ciencias(tenant):
     """Rotina diária: lembretes dentro do prazo e escalonamento ao gerente após o prazo (seções 36-39)."""
     cfg = config(tenant)
@@ -378,7 +421,9 @@ def processar_ciencias(tenant):
         cab = (f"<p><b>{c['tipo_instrumento']}</b> {c['numero_registro']} — {alvo}<br>Vigência {c.get('vigencia_inicio')} a {c.get('vigencia_fim')}"
                f"<br><b>Prazo para ciência:</b> {c['prazo']}</p>")
         if c["status"] == "PENDENTE" and dest_resp:
-            st = notificar_para(tenant, "NOVA_CCT", f"CONVENÇÃO COLETIVA REGISTRADA – {alvo} – {c['numero_registro']}", cab + "<p>Registre a ciência no CCT Monitor.</p>", dest_resp, ciencia_id=c["id"], instrumento_id=c["instrumento_id"])
+            st = notificar_para(tenant, "NOVA_CCT", f"CONVENÇÃO COLETIVA REGISTRADA – {alvo} – {c['numero_registro']}",
+                                cab + html_impacto(tenant, c["instrumento_id"], c.get("empresa_id")) + "<p>Registre a ciência no CCT Monitor.</p>",
+                                dest_resp, ciencia_id=c["id"], instrumento_id=c["instrumento_id"])
             if st == "ENVIADA":
                 sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"status": "NOTIFICADO", "notificado_em": datetime.now(timezone.utc).isoformat()})
             continue
