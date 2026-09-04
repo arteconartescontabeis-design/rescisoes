@@ -215,6 +215,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.12.1</td><td>03/09/2026</td><td>Usuários: botão "Alterar nível" — muda entre Usuário e Gerente (equipe) e, nos acessos de cliente, troca a empresa; impede rebaixar o último gerente ou a si mesmo.</td></tr>
           <tr><td>v0.12.0</td><td>03/09/2026</td><td>Aba <b>Configurações</b> (Sistema): todos os parâmetros num só lugar — ciência, histórico (com "importar automaticamente os últimos N anos" para todo sindicato novo), consultas (horários/fila), IA e e-mail modo teste; só o gerente altera. <b>Histórico de alterações</b> (Sistema): auditoria automática do banco — quem alterou o quê e quando em sindicatos, empresas, vínculos, configurações, ciências, incidentes, destinatários, acessos e convenções, com antes/depois. Convenções: ordenação por qualquer coluna e filtros por tipo, sindicato, categoria, importação e origem.</td></tr>
           <tr><td>v0.11.0</td><td>03/09/2026</td><td>Parâmetros exclusivos do gerente: IA ligada/desligada, limite mensal de pareceres (com uso do mês), parecer para histórico sim/não; horários de consulta (vários por dia), intervalo entre consultas e máximo de sindicatos por execução — as consultas passam a ser uma fila (os consultados há mais tempo primeiro) com espaçamento configurável; o robô roda de hora em hora e só consulta nos horários definidos. Botão "Limpar registros de teste" (gerente) e script SQL para início oficial.</td></tr>
           <tr><td>v0.10.0</td><td>03/09/2026</td><td>Painel no modelo Executivo (números com tendência, agenda dos próximos 90 dias, cobertura das empresas, saúde do sistema). Sindicato pode ser cadastrado sem tipo: o robô define laboral/patronal pelas partes do extrato da primeira CCT e cadastra as demais partes (sem monitorar). Histórico: botão "Importar últimos N anos" por sindicato (ou em lote); o robô percorre todas as páginas do Mediador (a paginação não exige novo reCAPTCHA) e importa aos poucos — no máximo N downloads por execução, com pausas — para não provocar bloqueio; convenções históricas não geram ciência nem e-mail. Banco <code>setup_cct_v0.10.0.sql</code>.</td></tr>
@@ -284,6 +285,13 @@
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mLote')">Fechar</button><button class="b" id="btnLote" onclick="rodarLote()">Consultar Receita e cadastrar</button></div>
 </div></div>
 
+<div class="modal" id="mNivel"><div class="card" style="max-width:520px"><h2>Alterar nível de acesso</h2>
+  <input type="hidden" id="nTipo"><input type="hidden" id="nId"><div id="nQuem" style="font-size:13px;margin-bottom:10px"></div>
+  <div id="nEquipe"><label>Novo nível</label><select id="nNivel"><option value="usuario">Usuário (equipe do escritório)</option><option value="diretoria">Gerente do escritório</option></select></div>
+  <div id="nEmp" style="display:none"><label>Empresa deste acesso</label><select id="nEmpresa"></select></div>
+  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mNivel')">Cancelar</button><button class="b" onclick="salvarNivel()">Salvar</button></div>
+</div></div>
+
 <div class="modal" id="mDest"><div class="card" style="max-width:560px"><h2>Destinatário de alertas</h2>
   <input type="hidden" id="dId">
   <div class="grid g2"><div><label>Nome</label><input id="dNome"></div><div><label>E-mail</label><input id="dEmail" type="email"></div>
@@ -308,7 +316,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.12.0" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.12.1" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const $ = id => document.getElementById(id);
@@ -650,9 +658,34 @@ function renderUsu() {
   const nivelDe = p => ["diretoria","superadmin","admin"].includes(p) ? "gerente do escritório" : "usuário";
   $("tabUsu").innerHTML = `<table><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>Empresa</th><th>Status</th><th></th></tr>` +
     l.map(u => `<tr><td>${esc(u.colaborador?.nome||"")}</td><td>${esc(u.colaborador?.email||"")}</td><td>${tagStatus(nivelDe(u.papel) === "usuário" ? "IMPORTADO" : "INFORMATIVO").replace(/>[^<]+</, ">" + nivelDe(u.papel) + "<")}</td><td>—</td><td>${esc(u.colaborador?.status||"")}</td>
-      <td>${u.colaborador?.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(u.colaborador.email)}')">Redefinir senha</button>` : ""}</td></tr>`).join("") +
+      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirNivel('resc','${u.auth_id}','${esc(u.colaborador?.nome||u.colaborador?.email||"")}','${u.papel}')">Alterar nível</button> ${u.colaborador?.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(u.colaborador.email)}')">Redefinir senha</button>` : ""}</td></tr>`).join("") +
     ac.map(a => `<tr><td>${esc(a.nome||"")}</td><td>${esc(a.email||"")}</td><td>${tagStatus(a.nivel === "empresa" ? "ATENCAO" : "INFORMATIVO").replace(/>[^<]+</, ">" + (a.nivel === "empresa" ? "empresa (cliente)" : a.nivel) + "<")}</td><td>${esc(a.empresa?.razao_social||"")}</td><td>${a.ativo ? "ativo" : "inativo"}</td>
-      <td style="white-space:nowrap">${a.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(a.email)}')">Redefinir senha</button>` : ""} <button class="b sec sm" onclick="toggleAcesso('${a.id}',${!a.ativo})">${a.ativo ? "Desativar" : "Ativar"}</button></td></tr>`).join("") + `</table>`;
+      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirNivel('cct','${a.id}','${esc(a.nome||a.email||"")}','${a.nivel}','${a.empresa_id||""}')">Alterar nível</button> ${a.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(a.email)}')">Redefinir senha</button>` : ""} <button class="b sec sm" onclick="toggleAcesso('${a.id}',${!a.ativo})">${a.ativo ? "Desativar" : "Ativar"}</button></td></tr>`).join("") + `</table>`;
+}
+function abrirNivel(tipo, id, nome, nivel, empresaId) {
+  $("nTipo").value = tipo; $("nId").value = id; $("nQuem").innerHTML = `<b>${esc(nome)}</b> · nível atual: ${esc(nivel === "diretoria" ? "gerente do escritório" : nivel)}`;
+  const emp = tipo === "cct" && nivel === "empresa";
+  $("nEquipe").style.display = emp ? "none" : "block"; $("nEmp").style.display = emp ? "block" : "none";
+  if (emp) $("nEmpresa").innerHTML = (APP.dados.emp || []).filter(e => e.ativo).map(e => `<option value="${e.id}" ${e.id === empresaId ? "selected" : ""}>${esc(e.razao_social)}</option>`).join("");
+  else { $("nNivel").innerHTML = tipo === "resc" ? `<option value="usuario">Usuário (equipe do escritório)</option><option value="diretoria">Gerente do escritório</option>` : `<option value="usuario">Usuário (equipe do escritório)</option><option value="gerente">Gerente do escritório</option>`; $("nNivel").value = nivel === "diretoria" || nivel === "gerente" ? (tipo === "resc" ? "diretoria" : "gerente") : "usuario"; }
+  $("mNivel").classList.add("on");
+}
+async function salvarNivel() {
+  const tipo = $("nTipo").value, id = $("nId").value;
+  try {
+    if (tipo === "resc") {
+      const novo = $("nNivel").value;
+      if (id === APP.uid && novo !== "diretoria") throw new Error("Você não pode rebaixar o seu próprio acesso.");
+      const gerentes = (APP.dados.usu || []).filter(u => ["diretoria","superadmin","admin"].includes(u.papel));
+      if (novo !== "diretoria" && gerentes.length === 1 && gerentes[0].auth_id === id) throw new Error("Este é o único gerente — promova outro antes de rebaixá-lo.");
+      await patch("resc_usuarios", "auth_id=eq." + id, { papel: novo });
+    } else if ($("nEmp").style.display !== "none") {
+      await patch("cct_acessos", "id=eq." + id, { empresa_id: $("nEmpresa").value });
+    } else {
+      await patch("cct_acessos", "id=eq." + id, { nivel: $("nNivel").value });
+    }
+    fechar("mNivel"); msg("Nível alterado. O usuário vê a mudança no próximo login."); await carregarTudo();
+  } catch (e) { msg(e.message, "erro"); }
 }
 async function toggleAcesso(id, ativo) { try { await patch("cct_acessos", "id=eq." + id, { ativo }); await carregarTudo(); } catch (e) { msg(e.message, "erro"); } }
 function abrirUsu() { $("uNome").value = ""; $("uEmail").value = ""; $("uSenha").value = ""; $("uPapel").value = "usuario"; $("uEmpWrap").style.display = "none";
