@@ -31,7 +31,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.13.2"
+VERSAO = "0.14.0"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -116,22 +116,55 @@ def enviar_email(dest, assunto, html):
     return ("ENVIADA", ("parcial: " + "; ".join(falhas))[:400] if falhas else None, efetivos)
 
 
-def html_padrao(titulo, corpo):
-    return (f'<div style="font-family:Arial,sans-serif;max-width:640px"><div style="background:#1a5276;color:#fff;padding:12px 16px;border-radius:8px 8px 0 0">'
-            f'<b>CCT Monitor</b> · Artecon Artes Contábeis</div><div style="border:1px solid #d9e1e8;border-top:0;padding:16px;border-radius:0 0 8px 8px">'
-            f'<h3 style="margin:0 0 10px;color:#1a5276">{titulo}</h3>{corpo}'
-            f'<p style="font-size:12px;color:#7a8894;margin-top:16px">Acesse: https://arteconartescontabeis-design.github.io/rescisoes/cct.html</p></div></div>')
+COR_CCT = "#4a235a"
+LOGO_URL = "https://arteconartescontabeis-design.github.io/rescisoes/logo_artecon.png"
+APP_URL = "https://arteconartescontabeis-design.github.io/rescisoes/cct.html"
+CONTATO = "dp@artecon.cnt.br"
+MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
 
 
-def processar_testes_email(tenant):
-    """Pedidos de e-mail de teste feitos no app (cct_notificacoes tipo TESTE, status PENDENTE)."""
-    pend = sb_get("cct_notificacoes", {"tenant_id": f"eq.{tenant}", "tipo": "eq.TESTE", "status": "eq.PENDENTE", "select": "id,destinatarios"})
-    for n in pend:
-        st, erro, ef = enviar_email(n.get("destinatarios") or [], "TESTE – CCT Monitor – circuito de e-mail",
-                                    html_padrao("Teste de envio", f"<p>Se você recebeu esta mensagem, o CCT Monitor está conectado ao hub artecon-mail.</p><p>{datetime.now():%d/%m/%Y %H:%M}</p>"))
-        sb_patch("cct_notificacoes", {"id": f"eq.{n['id']}"}, {"status": st, "erro": erro, "tentativas": 1, "destinatarios": ef or n.get("destinatarios"),
-                                                              "enviada_em": datetime.now(timezone.utc).isoformat() if st == "ENVIADA" else None})
-        log(f"  E-MAIL DE TESTE (pedido no app) → {ef}: {st} {erro or ''}")
+def _data_extenso():
+    d = datetime.now(BRT)
+    return f"{DIAS[d.weekday()]}, {d:%d} de {MESES[d.month - 1]} de {d.year}"
+
+
+def html_padrao(titulo, corpo, faixa_sup="CCT Monitor · Aviso", botoes=None, cor=COR_CCT):
+    """Cartão único da Artecon (modelo aprovado em 04/09/2026): filete + logo/data + faixa de título centralizada +
+    conteúdo + botões + rodapé. `titulo` = título da faixa; `corpo` = HTML do conteúdo; `botoes` = [(texto, url), ...]."""
+    botoes = botoes or [("Abrir o CCT Monitor", APP_URL)]
+    b = "".join((f'<td style="padding-right:8px"><a href="{u}" style="display:inline-block;background:{cor};color:#fff;text-decoration:none;padding:12px 22px;border-radius:9px;font-size:13px;font-weight:700">{t}</a></td>' if i == 0 else
+                 f'<td style="padding-right:8px"><a href="{u}" style="display:inline-block;background:#fff;color:{cor};text-decoration:none;padding:11px 20px;border-radius:9px;font-size:13px;font-weight:700;border:1.5px solid {cor}">{t}</a></td>')
+                for i, (t, u) in enumerate(botoes))
+    return (f'<!doctype html><html><body style="margin:0;padding:0;background:#e9edf2;font-family:Segoe UI,Arial,Helvetica,sans-serif">'
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e9edf2;padding:24px 12px"><tr><td align="center">'
+            f'<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 6px 24px rgba(20,40,60,.10);color:#1f2d3a">'
+            f'<tr><td style="background:{cor};height:6px;font-size:0;line-height:0">&nbsp;</td></tr>'
+            f'<tr><td style="padding:22px 32px 18px;border-bottom:1px solid #edf1f5"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+            f'<td style="vertical-align:middle"><img src="{LOGO_URL}" alt="Artecon Artes Contábeis" width="170" style="display:block;max-width:170px;height:auto"></td>'
+            f'<td style="vertical-align:middle;text-align:right;font-size:12px;color:#7a8894;line-height:1.5">{_data_extenso()}<br><span style="color:#9aa7b3">Palhoça/SC</span></td></tr></table></td></tr>'
+            f'<tr><td style="background:{cor};padding:16px 32px;text-align:center">'
+            f'<div style="font-size:11px;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.8px;font-weight:700">{faixa_sup}</div>'
+            f'<div style="font-size:18px;color:#ffffff;font-weight:800;line-height:1.3;margin-top:2px">{titulo}</div></td></tr>'
+            f'<tr><td style="padding:24px 32px 8px;font-size:13.5px;line-height:1.55">{corpo}</td></tr>'
+            f'<tr><td style="padding:12px 32px 26px"><table role="presentation" cellpadding="0" cellspacing="0"><tr>{b}</tr></table></td></tr>'
+            f'<tr><td style="padding:16px 32px;background:#f7f9fb;border-top:1px solid #eceff3"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+            f'<td style="font-size:11px;color:#9aa7b3;line-height:1.6"><b style="color:#7a8894">Artecon Artes Contábeis</b> · Palhoça/SC<br>Mensagem automática — não responda a este e-mail. Dúvidas: {CONTATO}</td>'
+            f'<td style="text-align:right;font-size:11px;color:#9aa7b3">CCT Monitor v{VERSAO}</td></tr></table></td></tr>'
+            f'</table></td></tr></table></body></html>')
+
+
+def bloco_chave(pares, destaque=None):
+    """Bloco cinza de dados-chave: pares [(rótulo, valor)] à esquerda; destaque (rótulo, valor, sub) à direita."""
+    esq = "<br>".join(f'<b style="color:#1a2332">{r}:</b> {v}' for r, v in pares if v)
+    dir_ = (f'<td style="padding:14px 16px;text-align:right;vertical-align:top;white-space:nowrap"><div style="font-size:11px;color:#7a8894;text-transform:uppercase;letter-spacing:.5px">{destaque[0]}</div>'
+            f'<div style="font-size:22px;font-weight:800;color:#b9770e;line-height:1.2">{destaque[1]}</div><div style="font-size:11px;color:#7a8894">{destaque[2]}</div></td>') if destaque else ""
+    return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;border-radius:12px;margin:10px 0 6px"><tr>'
+            f'<td style="padding:14px 16px;font-size:12px;color:#5b6b7a;line-height:1.7">{esq}</td>{dir_}</tr></table>')
+
+
+def h2_email(t, cor=COR_CCT):
+    return f'<h2 style="margin:16px 0 8px;font-size:14px;color:{cor};text-transform:uppercase;letter-spacing:.5px">{t}</h2>'
 
 
 # ---------------------------------------------------------------- incidentes / notificações
@@ -144,9 +177,9 @@ def incidente(tenant, fingerprint, modulo, gravidade, mensagem, sindicato_id=Non
         log(f"  INCIDENTE {gravidade} [{modulo}] {mensagem[:120]}")
         inc = sb_get("cct_incidentes", {"id": f"eq.{inc_id}", "select": "id,ocorrencias,gravidade"})[0]
         if inc["ocorrencias"] in (1, 3, 10) and gravidade in ("ALTO", "CRITICO"):
-            notificar(tenant, "ERRO", f"ALERTA DE ERRO – {modulo} – {mensagem[:60]}",
-                      f"<p><b>Módulo:</b> {modulo}<br><b>Gravidade:</b> {gravidade}<br><b>Ocorrências:</b> {inc['ocorrencias']}"
-                      f"<br><b>Mensagem:</b> {mensagem}<br><b>Origem:</b> {ORIGEM} · {datetime.now():%d/%m/%Y %H:%M}</p>",
+            notificar(tenant, "ERRO", f"Artecon · CCT Monitor — Erro {gravidade.lower()} em {modulo}: {mensagem[:70]}",
+                      bloco_chave([("Módulo", modulo), ("Gravidade", gravidade), ("Ocorrências", inc["ocorrencias"]), ("Origem", f"{ORIGEM} · {datetime.now(BRT):%d/%m/%Y %H:%M}")])
+                      + f'<p style="margin:10px 0 0"><b>Mensagem:</b> {mensagem}</p><p style="font-size:12px;color:#7a8894">O incidente está registrado na Central de Erros com a trilha completa; se a etapa voltar a funcionar, ele é resolvido automaticamente e você recebe o aviso.</p>',
                       incidente_id=inc_id, tipo_dest=modulo)
         return inc_id
     except Exception as e:
@@ -181,7 +214,8 @@ def notificar(tenant, tipo, assunto, html, instrumento_id=None, incidente_id=Non
     dest = destinatarios(tenant, tipo_dest or tipo)
     reg = {"tenant_id": tenant, "tipo": tipo, "instrumento_id": instrumento_id, "incidente_id": incidente_id,
            "destinatarios": dest, "assunto": assunto, "status": "PENDENTE", "tentativas": 0}
-    st, erro, efetivos = enviar_email(dest, assunto, html_padrao(assunto, html))
+    faixa = "CCT Monitor · Alerta de erro do sistema" if tipo == "ERRO" else "CCT Monitor · Aviso"
+    st, erro, efetivos = enviar_email(dest, assunto, html_padrao(assunto, html, faixa, [("Abrir o CCT Monitor", APP_URL)] + ([("Central de Erros", APP_URL)] if tipo == "ERRO" else [])))
     reg.update(status=st, erro=erro, tentativas=1 if MAIL_KEY else 0, destinatarios=efetivos or dest,
                enviada_em=datetime.now(timezone.utc).isoformat() if st == "ENVIADA" else None)
     try:
@@ -468,18 +502,22 @@ def html_impacto(tenant, instrumento_id, empresa_id=None):
             vistos.add(k)
             v = varm.get(f"{r['descricao']}|{r['valor_texto']}")
             ant = f"{v['anterior']} ({v['variacao_pct']}%)" if v and v.get("variacao_pct") is not None else (v["anterior"] if v else "—")
-            linhas.append(f"<tr><td style='padding:4px 8px;border-bottom:1px solid #eee'>{r['tema']}</td><td style='padding:4px 8px;border-bottom:1px solid #eee'>{r['descricao']}</td>"
-                          f"<td style='padding:4px 8px;border-bottom:1px solid #eee;text-align:right'><b>{r['valor_texto']}</b></td><td style='padding:4px 8px;border-bottom:1px solid #eee;text-align:right'>{ant}</td>"
-                          f"<td style='padding:4px 8px;border-bottom:1px solid #eee'>cl. {r['clausula_ordem']}</td></tr>")
-        h = "<h4 style='margin:14px 0 6px;color:#1a5276'>Matriz de impacto</h4>"
+            TDs = 'style="padding:10px 12px;border-top:1px solid #eef1f4"'
+            linhas.append(f'<tr><td {TDs}>{r["tema"]}</td><td {TDs}>{r["descricao"]}</td><td align="right" {TDs}><b>{r["valor_texto"]}</b></td>'
+                          f'<td align="right" {TDs} style="padding:10px 12px;border-top:1px solid #eef1f4;color:#7a8894">{ant}</td><td {TDs}>{r["clausula_ordem"]}ª</td></tr>')
+        TH = "align=\"{a}\" style=\"padding:10px 12px;font-size:11px;color:#48586a;text-transform:uppercase;letter-spacing:.4px\""
+        h = h2_email("Matriz de impacto — valores da convenção")
         if linhas:
-            h += ("<table style='border-collapse:collapse;font-size:12.5px;width:100%'><tr style='background:#eef3f7'><th style='padding:4px 8px;text-align:left'>Tema</th><th style='padding:4px 8px;text-align:left'>Descrição</th>"
-                  "<th style='padding:4px 8px;text-align:right'>Valor</th><th style='padding:4px 8px;text-align:right'>Anterior</th><th style='padding:4px 8px;text-align:left'>Cláusula</th></tr>" + "".join(linhas) + "</table>")
+            h += ('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0;font-size:13px;border:1px solid #e6ebf0;border-radius:12px;overflow:hidden">'
+                  f'<tr style="background:#f4f6f8"><th {TH.format(a="left")}>Tema</th><th {TH.format(a="left")}>Descrição</th><th {TH.format(a="right")}>Valor</th><th {TH.format(a="right")}>Anterior</th><th {TH.format(a="left")}>Cláusula</th></tr>'
+                  + "".join(linhas) + "</table>")
         if an.get("resumo"):
-            h += f"<p style='margin:10px 0 4px'><b>Resumo:</b> {an['resumo']}</p>"
+            h += f'<p style="margin:12px 0 4px;font-size:13px;color:#1f2d3a"><b>Resumo:</b> {an["resumo"]}</p>'
         if an.get("providencias"):
-            h += "<p style='margin:8px 0 4px'><b>Providências:</b></p><ul style='margin:0;padding-left:18px'>" + "".join(
-                f"<li>{p.get('acao')}" + (f" <i>({p.get('prazo')})</i>" if p.get("prazo") else "") + "</li>" for p in an["providencias"]) + "</ul>"
+            h += h2_email("Providências para o DP") + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;line-height:1.55">' + "".join(
+                f'<tr><td style="padding:6px 0;border-bottom:1px solid #eef1f4"><span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:{COR_CCT};color:#fff;text-align:center;line-height:22px;font-size:11px;font-weight:700;margin-right:8px">{i + 1}</span>{p.get("acao")}'
+                + (f' <i style="color:#7a8894">({p.get("prazo")})</i>' if p.get("prazo") else "") + "</td></tr>" for i, p in enumerate(an["providencias"])) + "</table>"
+            h += '<p style="margin:10px 0 0;font-size:11px;color:#9aa7b3">Valores e cláusulas conferidos contra o texto registrado no Mediador. Confira sempre a cláusula antes de agir.</p>'
         return h
     except Exception as e:
         log(f"  !! matriz de impacto: {e}")
@@ -497,36 +535,44 @@ def processar_ciencias(tenant):
         ja_hoje = (c.get("ultimo_lembrete") or "")[:10] == hoje
         dest_resp = [c["responsavel_email"]] if c.get("responsavel_email") else []
         dest_ger = [c["gerente_email"]] if c.get("gerente_email") else []
-        cab = (f"<p><b>{c['tipo_instrumento']}</b> {c['numero_registro']} — {alvo}<br>Vigência {c.get('vigencia_inicio')} a {c.get('vigencia_fim')}"
-               f"<br><b>Prazo para ciência:</b> {c['prazo']}</p>")
+        pares = [("Convenção", f"{c['tipo_instrumento']} {c['numero_registro']}"), ("Sindicato", c.get("sindicato")), ("Empresa", c.get("empresa")),
+                 ("Vigência", f"{fmt_br(c.get('vigencia_inicio'))} a {fmt_br(c.get('vigencia_fim'))}"), ("Responsável", c.get("responsavel_email"))]
+        cab = bloco_chave(pares, ("Prazo para ciência", fmt_br(c.get("prazo")), c["situacao"].replace("_", " ").lower() if c.get("situacao") else ""))
+        botoes = [("Registrar ciência", APP_URL), ("Ver convenção completa", APP_URL)]
         if c["status"] == "PENDENTE" and dest_resp:
-            st = notificar_para(tenant, "NOVA_CCT", f"CONVENÇÃO COLETIVA REGISTRADA – {alvo} – {c['numero_registro']}",
-                                cab + html_impacto(tenant, c["instrumento_id"], c.get("empresa_id")) + "<p>Registre a ciência no CCT Monitor.</p>",
-                                dest_resp, ciencia_id=c["id"], instrumento_id=c["instrumento_id"])
+            st = notificar_para(tenant, "NOVA_CCT", f"Artecon · CCT Monitor — Nova {c['tipo_instrumento']} {c['numero_registro']} · {alvo} · ciência até {fmt_br(c.get('prazo'))}",
+                                html_padrao(f"Nova {c['tipo_instrumento']} registrada no Mediador", cab + html_impacto(tenant, c["instrumento_id"], c.get("empresa_id")),
+                                            "CCT Monitor · Aviso ao responsável", botoes), dest_resp, ciencia_id=c["id"], instrumento_id=c["instrumento_id"], pronto=True)
             if st == "ENVIADA":
                 sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"status": "NOTIFICADO", "notificado_em": datetime.now(timezone.utc).isoformat()})
             continue
         if c["situacao"] == "ATRASADA" and cfg.get("escalonar_apos_prazo", True) and c["status"] != "ESCALONADO":
-            st = notificar_para(tenant, "ESCALONAMENTO", f"CIÊNCIA PENDENTE – PRAZO VENCIDO – {alvo} – {c['numero_registro']}",
-                                cab + f"<p>Responsável ainda não registrou ciência ({c['dias_atraso']} dia(s) de atraso).</p>", dest_ger + dest_resp, ciencia_id=c["id"])
+            st = notificar_para(tenant, "ESCALONAMENTO", f"Artecon · CCT Monitor — Ciência pendente com prazo vencido · {alvo} · {c['numero_registro']}",
+                                html_padrao("Ciência pendente — prazo vencido", cab + f'<p style="color:#c0392b"><b>O responsável ainda não registrou ciência</b> ({c["dias_atraso"]} dia(s) de atraso). Este aviso foi escalonado ao gerente.</p>',
+                                            "CCT Monitor · Escalonamento ao gerente", botoes), dest_ger + dest_resp, ciencia_id=c["id"], pronto=True)
             sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"status": "ESCALONADO", "escalonado_em": datetime.now(timezone.utc).isoformat(),
                                                               "lembretes": c["lembretes"] + 1, "ultimo_lembrete": datetime.now(timezone.utc).isoformat()})
             continue
         if cfg.get("lembrete_diario", True) and not ja_hoje and (dest_resp or dest_ger):
             dest = dest_resp + (dest_ger if c["status"] == "ESCALONADO" else [])
-            notificar_para(tenant, "LEMBRETE", f"LEMBRETE – ciência pendente – {alvo} – {c['numero_registro']}", cab, dest, ciencia_id=c["id"])
+            notificar_para(tenant, "LEMBRETE", f"Artecon · CCT Monitor — Lembrete: ciência pendente · {alvo} · até {fmt_br(c.get('prazo'))}",
+                           html_padrao("Lembrete de ciência pendente", cab + "<p>Registre a ciência no CCT Monitor para encerrar este lembrete.</p>", "CCT Monitor · Lembrete", botoes), dest, ciencia_id=c["id"], pronto=True)
             sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"lembretes": c["lembretes"] + 1, "ultimo_lembrete": datetime.now(timezone.utc).isoformat()})
 
 
-def notificar_para(tenant, tipo, assunto, html, dest, instrumento_id=None, incidente_id=None, ciencia_id=None):
-    """Igual a notificar(), mas para destinatários explícitos (responsável/gerente)."""
+def fmt_br(d):
+    return f"{d[8:10]}/{d[5:7]}/{d[0:4]}" if d and len(str(d)) >= 10 else (d or "—")
+
+
+def notificar_para(tenant, tipo, assunto, html, dest, instrumento_id=None, incidente_id=None, ciencia_id=None, pronto=False):
+    """Igual a notificar(), mas para destinatários explícitos (responsável/gerente). pronto=True: html já é o cartão completo."""
     dest = [d for d in dict.fromkeys(dest) if d]
     reg = {"tenant_id": tenant, "tipo": tipo, "instrumento_id": instrumento_id, "incidente_id": incidente_id, "ciencia_id": ciencia_id,
            "destinatarios": dest, "assunto": assunto, "status": "PENDENTE", "tentativas": 0}
     if not dest:
         reg.update(status="NAO_ENVIADA", erro="sem responsável/gerente configurado")
     else:
-        st, erro, efetivos = enviar_email(dest, assunto, html_padrao(assunto, html))
+        st, erro, efetivos = enviar_email(dest, assunto, html if pronto else html_padrao(assunto, html))
         reg.update(status=st, erro=erro, tentativas=1 if MAIL_KEY else 0, destinatarios=efetivos or dest,
                    enviada_em=datetime.now(timezone.utc).isoformat() if st == "ENVIADA" else None)
     try:
@@ -685,8 +731,8 @@ def main():
     log(f"CCT Monitor robô v{VERSAO} — origem {ORIGEM}")
     teste = (os.environ.get("TESTE_EMAIL") or "").strip()
     if teste:
-        st, erro, ef = enviar_email([teste], "TESTE – CCT Monitor – circuito de e-mail", html_padrao("Teste de envio",
-                                    f"<p>Se você recebeu esta mensagem, o CCT Monitor está conectado ao hub artecon-mail.</p><p>{datetime.now():%d/%m/%Y %H:%M}</p>"))
+        st, erro, ef = enviar_email([teste], "Artecon · CCT Monitor — TESTE de envio", html_padrao("Teste de envio",
+                                    f"<p>Se você recebeu esta mensagem, o CCT Monitor está conectado ao hub artecon-mail.</p><p style='color:#7a8894;font-size:12px'>{datetime.now(BRT):%d/%m/%Y %H:%M} · pode ignorar/excluir.</p>", "CCT Monitor · Teste"))
         log(f"TESTE DE E-MAIL para {ef}: {st} {erro or ''}")
         sys.exit(0 if st == "ENVIADA" else 1)
     tenants = sb_get("resc_tenants", {"cnpj": f"eq.{TENANT_CNPJ}", "select": "id,nome"})
