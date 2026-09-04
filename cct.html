@@ -58,6 +58,13 @@
   .kpi.ok{border-left-color:var(--green)} .kpi.ok b{color:var(--green)}
   .bloco{margin-bottom:18px} .bloco-t{display:flex;align-items:center;gap:10px;margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
   .bloco-t svg{width:16px;height:16px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .a-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .a-n{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow)} .a-n b{font-family:var(--mono);font-size:30px;font-weight:500;display:block;line-height:1;color:var(--text)} .a-n span{display:block;color:var(--text-3);font-size:12px;margin-top:6px} .a-n .d{font-size:11px;margin-top:8px;font-weight:600;color:var(--text-3)}
+  .a-n.al b,.a-n.al .d{color:var(--amber)} .a-n.er b,.a-n.er .d{color:var(--red)} .a-n.ok b,.a-n.ok .d{color:var(--green)}
+  .a-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px} .ring{display:flex;align-items:center;gap:14px} .ring svg{width:92px;height:92px} .ring .lg{font-size:12.5px;color:var(--text-2)} .ring .lg b{display:block;font-size:20px;font-family:var(--mono);font-weight:500;color:var(--text)}
+  .ag{list-style:none;margin:0;padding:0} .ag li{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--surface-2);align-items:flex-start} .ag .dt{font-family:var(--mono);font-size:12px;color:var(--gold);min-width:70px;padding-top:2px} .ag .tx{font-size:13px;flex:1} .ag .tx small{display:block;color:var(--text-3)}
+  .saude div{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--surface-2);font-size:13px} .saude div:last-child{border:0}
+  @media(max-width:900px){.a-nums,.a-grid{grid-template-columns:1fr}}
   .hero{background:linear-gradient(135deg,#1a3a5c,#1a5276 55%,#2e86c1);color:#fff;border-radius:16px;padding:22px 26px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow-lg)}
   .hero h2{font-family:var(--display);font-size:26px;margin:0;color:#fff} .hero .sub{opacity:.85;font-size:13px;margin-top:4px}
   .hero .estado{display:flex;gap:10px;flex-wrap:wrap} .hero .est{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:10px 14px;min-width:150px}
@@ -118,10 +125,11 @@
     <div class="msg" id="msg"></div>
 
     <section data-sec="painel">
-      <div class="hero" id="hero"></div>
-      <div id="kpis"></div>
-      <div id="painelExtra"></div>
-      <div class="card" style="margin-top:16px"><h2>Últimas convenções detectadas</h2><div id="painelNovos"></div></div>
+      <div class="topo" style="align-items:flex-end;margin-bottom:16px"><div><h2 style="font-family:var(--display);font-size:28px;margin:0" id="painelTit">Painel</h2><div style="color:var(--text-3);font-size:13px;margin-top:4px" id="painelSub"></div></div></div>
+      <div class="a-nums" id="kpis"></div>
+      <div class="a-grid"><div><div class="card"><h2>Agenda dos próximos 90 dias</h2><ul class="ag" id="agenda"></ul></div>
+        <div class="card"><h2>Últimas convenções detectadas</h2><div id="painelNovos"></div></div></div>
+        <div><div class="card"><h2>Cobertura</h2><div id="cobertura"></div></div><div class="card" id="saudeCard"><h2>Saúde do sistema</h2><div class="saude" id="saude"></div></div><div id="painelExtra"></div></div></div>
       <div class="card"><h2>Como funciona</h2>
         <div class="aviso">O robô roda nos dias úteis às 06h (GitHub Actions), consulta o Mediador para cada sindicato marcado como "monitorar", baixa e importa as Convenções e Termos Aditivos vigentes que ainda não constam aqui, e registra incidentes quando qualquer etapa falha. Falha de acesso <b>nunca</b> é registrada como "não existe CCT".</div>
       </div>
@@ -142,7 +150,9 @@
       <div class="card"><h2>Parâmetros de ciência</h2>
         <div class="grid g3"><div><label>Prazo para ciência (dias úteis)</label><input id="cfgPrazo" type="number" min="1" max="30"></div>
           <div><label>Lembrete diário</label><select id="cfgLemb"><option value="true">Sim</option><option value="false">Não</option></select></div>
-          <div><label>Escalonar ao gerente após o prazo</label><select id="cfgEsc"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
+          <div><label>Escalonar ao gerente após o prazo</label><select id="cfgEsc"><option value="true">Sim</option><option value="false">Não</option></select></div>
+          <div><label>Histórico: anos a importar</label><input id="cfgHistAnos" type="number" min="1" max="15"></div>
+          <div><label>Histórico: downloads por execução</label><input id="cfgHistMax" type="number" min="1" max="30"></div></div>
         <div style="margin-top:10px"><button class="b" onclick="salvarConfig()">Salvar parâmetros</button></div></div>
     </section>
 
@@ -177,6 +187,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.10.0</td><td>03/09/2026</td><td>Painel no modelo Executivo (números com tendência, agenda dos próximos 90 dias, cobertura das empresas, saúde do sistema). Sindicato pode ser cadastrado sem tipo: o robô define laboral/patronal pelas partes do extrato da primeira CCT e cadastra as demais partes (sem monitorar). Histórico: botão "Importar últimos N anos" por sindicato (ou em lote); o robô percorre todas as páginas do Mediador (a paginação não exige novo reCAPTCHA) e importa aos poucos — no máximo N downloads por execução, com pausas — para não provocar bloqueio; convenções históricas não geram ciência nem e-mail. Banco <code>setup_cct_v0.10.0.sql</code>.</td></tr>
           <tr><td>v0.9.0</td><td>03/09/2026</td><td>Níveis de acesso: <b>Usuário</b> (equipe), <b>Gerente do escritório</b> (tudo + usuários + alertas de erro) e <b>Empresa</b> (cliente: vê só as convenções, o impacto e as ciências da própria empresa, e registra a ciência) — aplicado no banco por RLS. Aba Usuários cria os três tipos. Erros do aplicativo (ALTO/CRÍTICO) passam a notificar sempre os gerentes/administradores, além dos destinatários configurados. IA: "Comentários do analista" separados dos fatos conferidos, rotulados e com aviso de que podem conter erro. Menu Sistema corrigido (abria atrás da barra). Painel redesenhado por blocos. Banco <code>setup_cct_v0.9.0.sql</code>.</td></tr>
           <tr><td>v0.8.0</td><td>03/09/2026</td><td>IA com ancoragem obrigatória: cada destaque, providência e alerta precisa citar a cláusula e trazer um trecho literal dela; o robô confere trecho e números contra o texto importado e <b>descarta</b> o que não bate (a aba Análise mostra os descartados e o motivo). Menu "Sistema" agrupa Consultas, Central de Erros e Versões. Painel reformulado: vencimentos de vigência e data-base, ciências, robô, cadastro. Cadastro em lote de empresas e sindicatos por lista de CNPJs com consulta à Receita (BrasilAPI/Minha Receita) e vínculo opcional.</td></tr>
           <tr><td>v0.7.1</td><td>03/09/2026</td><td>Parecer por IA sem custo via GitHub Models (GPT-4o com o token do próprio Actions, permissão <code>models: read</code>); material compactado para o limite do nível gratuito. Anthropic continua como opção se a chave existir.</td></tr>
@@ -203,7 +214,7 @@
 <div class="modal" id="mSind"><div class="card"><h2 id="mSindTit">Sindicato</h2>
   <input type="hidden" id="sId">
   <div class="grid g2"><div><label>CNPJ</label><div style="display:flex;gap:6px"><input id="sCnpj" maxlength="18"><button class="b sec sm" type="button" onclick="receita('s')" style="white-space:nowrap">Buscar na Receita</button></div><small id="sRfb" style="color:var(--text-3)"></small></div><div><label>Nome</label><input id="sNome"></div>
-    <div><label>Tipo</label><select id="sTipo"><option value="laboral">Laboral (empregados)</option><option value="patronal">Patronal</option></select></div>
+    <div><label>Tipo</label><select id="sTipo"><option value="">— definir automaticamente pela CCT —</option><option value="laboral">Laboral (empregados)</option><option value="patronal">Patronal</option></select></div>
     <div><label>UF</label><input id="sUf" maxlength="2" placeholder="SC"></div><div><label>Município (sede)</label><input id="sMun"></div><div><label>CNAE</label><input id="sCnae" placeholder="9420-1/00"></div>
     <div><label>Categoria</label><input id="sCat" placeholder="ex.: Comerciários"></div>
     <div><label>Monitorar</label><select id="sMon"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
@@ -235,7 +246,7 @@
 
 <div class="modal" id="mLote"><div class="card" style="max-width:820px"><h2 id="mLoteTit">Cadastro em lote</h2>
   <div class="grid g2"><div style="grid-column:span 2"><label>CNPJs (um por linha, ou separados por vírgula/espaço — com ou sem pontuação)</label><textarea id="lCnpjs" rows="6" placeholder="84.307.370/0001-66&#10;05.021.016/0001-02"></textarea></div>
-    <div id="lOptS"><label>Tipo dos sindicatos</label><select id="lTipo"><option value="laboral">Laboral (empregados)</option><option value="patronal">Patronal</option></select></div>
+    <div id="lOptS"><label>Tipo dos sindicatos</label><select id="lTipo"><option value="">— definir automaticamente pela CCT —</option><option value="laboral">Laboral (empregados)</option><option value="patronal">Patronal</option></select></div>
     <div id="lOptE"><label>Vincular todas ao sindicato (opcional)</label><select id="lSind"><option value="">— não vincular agora —</option></select></div>
     <div id="lOptE2"><label>E-mail do responsável (opcional, para todas)</label><input id="lResp" type="email"></div></div>
   <div class="aviso">Para cada CNPJ o app consulta a Receita Federal (BrasilAPI, reserva Minha Receita), preenche razão social, UF, município e CNAE e cadastra. CNPJ já cadastrado é atualizado com os dados da Receita. Falha na consulta não cadastra — fica listada para você tratar.</div>
@@ -267,7 +278,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.9.0" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.10.0" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const $ = id => document.getElementById(id);
@@ -360,51 +371,60 @@ async function carregarTudo() {
 const ICO = { mon: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>', cct: '<svg viewBox="0 0 24 24"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M9 13h6M9 17h6"/></svg>',
   cie: '<svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>', sis: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>' };
 function renderPainel() {
-  const d = APP.dados, hoje = new Date(), dias = n => new Date(Date.now() + n * 864e5), h24 = Date.now() - 864e5;
+  const d = APP.dados, hoje = new Date(), dias = n => new Date(Date.now() + n * 864e5), h24 = Date.now() - 864e5, emp = APP.nivel === "empresa";
   const abertos = d.inc.filter(i => ["NOVO","EM_NOVA_TENTATIVA","PERSISTENTE","EM_ANALISE"].includes(i.status));
   const conf = d.conf || [], ab = c => ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(c.status);
   const ultRobo = d.cons.filter(c => c.origem === "github-actions")[0], ult = d.cons[0];
   const vig = i => i.vigencia_fim ? new Date(i.vigencia_fim + "T12:00:00") : null;
-  const vencendo = d.inst.filter(i => vig(i) && vig(i) >= hoje && vig(i) <= dias(90)).sort((a, b) => a.vigencia_fim.localeCompare(b.vigencia_fim));
-  const vencidas = d.inst.filter(i => vig(i) && vig(i) < hoje && !d.inst.some(j => j.id !== i.id && j.sindicato_id === i.sindicato_id && j.vigencia_inicio > i.vigencia_inicio));
-  const sindSemConsulta = d.sind.filter(s => s.monitorar && s.ativo && (!s.ultima_consulta || new Date(s.ultima_consulta) < dias(-2)));
-  const empSemVinc = (d.emp || []).filter(e => e.ativo && !(e.vinculos || []).length);
+  const vigentes = d.inst.filter(i => vig(i) && vig(i) >= hoje), novas7 = d.inst.filter(i => new Date(i.detectado_em) > dias(-7) && i.origem !== "historico");
   const roboOk = ultRobo && new Date(ultRobo.executada_em) > dias(-1.5);
   const hoje_txt = hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
-  $("hero").innerHTML = `<div><h2>${APP.nivel === "empresa" ? "Minhas convenções" : "Painel"}</h2><div class="sub">${hoje_txt.charAt(0).toUpperCase() + hoje_txt.slice(1)} · ${esc(APP.email)} · ${APP.nivel === "gerente" ? "gerente do escritório" : APP.nivel === "empresa" ? "acesso da empresa" : "equipe"}</div></div>
-    <div class="estado">${APP.nivel !== "empresa" ? `<div class="est ${roboOk ? "ok" : "erro"}"><b>${ultRobo ? fmtDT(ultRobo.executada_em) : "nunca"}</b><span>robô · última execução</span></div>
-    <div class="est ${abertos.length ? "erro" : "ok"}"><b>${abertos.length}</b><span>incidentes abertos</span></div>` : ""}
-    <div class="est ${conf.filter(c => c.situacao === "ATRASADA").length ? "erro" : "ok"}"><b>${conf.filter(ab).length}</b><span>ciências pendentes</span></div>
-    <div class="est"><b>${d.inst.filter(i => vig(i) && vig(i) >= hoje).length}</b><span>convenções vigentes</span></div></div>`;
-  const kpi = (l, v, c) => `<div class="kpi ${v ? c : ""}"><b>${esc(v)}</b><span>${l}</span></div>`;
-  const bloco = (t, ico, itens) => `<div class="bloco"><div class="bloco-t">${ico}${t}</div><div class="kpis">${itens.join("")}</div></div>`;
-  let h = "";
-  if (APP.nivel !== "empresa") h += bloco("Monitoramento", ICO.mon, [kpi("Sindicatos monitorados", d.sind.filter(s => s.monitorar && s.ativo).length, "info"), kpi("Empresas vinculadas", (d.emp || []).filter(e => e.ativo && (e.vinculos || []).length).length, "info"),
-    kpi("Empresas sem vínculo sindical", empSemVinc.length, "alerta"), kpi("Sindicatos sem consulta há 2+ dias", sindSemConsulta.length, "erro")]);
-  h += bloco("Convenções", ICO.cct, [kpi("Novas nos últimos 7 dias", d.inst.filter(i => new Date(i.detectado_em) > dias(-7)).length, "alerta"), kpi("Vigência vence em 90 dias", vencendo.length, "alerta"), kpi("Vencidas sem renovação registrada", vencidas.length, "erro"),
-    ...(APP.nivel !== "empresa" ? [kpi("Importações não concluídas", d.inst.filter(i => i.status_importacao !== "IMPORTADO").length, "erro"), kpi("Pareceres pendentes", d.inst.filter(i => i.status_importacao === "IMPORTADO" && i.analise_status !== "CONCLUIDA").length, "alerta")] : [])]);
-  h += bloco("Ciência dos responsáveis", ICO.cie, [kpi("Pendentes", conf.filter(ab).length, "alerta"), kpi("Vencem hoje", conf.filter(c => c.situacao === "VENCE_HOJE").length, "alerta"), kpi("Atrasadas", conf.filter(c => c.situacao === "ATRASADA").length, "erro"), kpi("Escalonadas ao gerente", conf.filter(c => c.status === "ESCALONADO").length, "erro"), kpi("Cientes", conf.filter(c => c.status === "CIENTE").length, "ok")]);
-  if (APP.nivel !== "empresa") h += bloco("Sistema", ICO.sis, [kpi("Incidentes abertos", abertos.length, "erro"), kpi("Erros nas últimas 24h", d.inc.filter(i => new Date(i.ultima_ocorrencia) > h24).length, "erro"), kpi("Notificações não enviadas", d.notif.filter(n => n.status === "NAO_ENVIADA").length, "alerta"),
-    `<div class="kpi ${ult && ult.status === "CONSULTA_NAO_CONCLUIDA" ? "erro" : ult && ult.status === "CONSULTA_COM_ALERTA" ? "alerta" : "ok"}"><b style="font-size:15px;padding-top:6px">${ult ? ult.status.replace("CONSULTA_", "").replace(/_/g, " ") : "—"}</b><span>última consulta ${ult ? fmtDT(ult.executada_em) : ""}</span></div>`]);
-  $("kpis").innerHTML = h;
-  let extra = "";
-  if (vencendo.length || vencidas.length) extra += `<div class="card"><h2>Vigências a vencer / vencidas</h2><table><tr><th>Registro</th><th>Sindicato</th><th>Categoria</th><th>Vigência</th><th>Data-base</th><th>Situação</th></tr>` +
-    [...vencidas, ...vencendo].map(i => { const dd = Math.round((vig(i) - hoje) / 864e5); return `<tr><td><b>${esc(i.numero_registro)}</b></td><td>${esc(i.sindicato?.nome || "")}</td><td>${esc(i.categoria || "")}</td><td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${esc(i.data_base || "—")}</td><td>${dd < 0 ? `<span class="tag erro">vencida há ${-dd} dias — renovação ainda não registrada</span>` : `<span class="tag alerta">vence em ${dd} dias</span>`}</td></tr>`; }).join("") + `</table><div class="aviso">O robô continua consultando o sindicato diariamente; a renovação aparece aqui assim que for registrada no Mediador.</div></div>`;
-  if (conf.filter(ab).length) extra += `<div class="card"><h2>Ciências pendentes</h2><table><tr><th>Convenção</th><th>Empresa</th><th>Responsável</th><th>Prazo</th><th>Situação</th><th></th></tr>` + conf.filter(ab).slice(0, 8).map(c => `<tr><td>${esc(c.numero_registro)}</td><td>${esc(c.empresa || "(sindicato)")}</td><td>${esc(c.responsavel_email || "—")}</td><td>${fmtD(c.prazo)}</td><td>${esc((c.situacao || "").replace(/_/g, " "))}</td><td><button class="b sm" onclick="registrarCiencia('${c.id}')">Registrar ciência</button></td></tr>`).join("") + `</table></div>`;
-  $("painelExtra").innerHTML = extra;
-  $("painelNovos").innerHTML = tabInst(d.inst.slice(0, 8));
+  $("painelTit").textContent = emp ? "Minhas convenções" : "Painel"; $("painelSub").textContent = hoje_txt.charAt(0).toUpperCase() + hoje_txt.slice(1) + " · " + APP.email + (emp ? " · acesso da empresa" : APP.nivel === "gerente" ? " · gerente do escritório" : "");
+  const pend = conf.filter(ab), atras = conf.filter(c => c.situacao === "ATRASADA"), proxPrazo = pend.map(c => c.prazo).sort()[0];
+  const num = (v, l, det, cls) => `<div class="a-n ${cls || ""}"><b>${esc(v)}</b><span>${l}</span><div class="d">${det}</div></div>`;
+  $("kpis").innerHTML = num(vigentes.length, "convenções vigentes", novas7.length ? `+${novas7.length} nos últimos 7 dias` : "sem novas na semana", "") +
+    num(pend.length, "ciências pendentes", atras.length ? `${atras.length} atrasada(s)` : proxPrazo ? "próximo prazo " + fmtD(proxPrazo) : "todas registradas", atras.length ? "er" : pend.length ? "al" : "ok") +
+    (emp ? num(vigentes.filter(i => i.analise_status === "CONCLUIDA").length, "pareceres disponíveis", "conferidos contra o texto", "") :
+      num(abertos.length, "incidentes abertos", roboOk ? "robô OK · " + fmtDT(ultRobo.executada_em) : "robô atrasado", abertos.length ? "er" : roboOk ? "ok" : "er")) +
+    (emp ? num(d.sind.length, "sindicatos da empresa", "", "") : num(d.sind.filter(s => s.monitorar && s.ativo).length, "sindicatos monitorados", ult ? "última consulta " + fmtDT(ult.executada_em) : "sem consultas", ""));
+  // agenda 90 dias: prazos de ciência, fim de vigência, datas-base, vencidas sem renovação, histórico pendente
+  const ev = [];
+  pend.forEach(c => c.prazo && ev.push({ d: c.prazo, t: `Prazo de ciência — ${c.numero_registro}`, s: `${c.empresa || c.sindicato || ""} · ${c.responsavel_email || "responsável não informado"}`, tag: c.situacao === "ATRASADA" ? ["erro", "atrasada"] : ["alerta", "ciência"] }));
+  d.inst.forEach(i => { if (vig(i) && vig(i) >= hoje && vig(i) <= dias(90)) ev.push({ d: i.vigencia_fim, t: `Fim da vigência — ${i.numero_registro}`, s: `${i.sindicato?.nome || ""} · ${i.categoria || ""}`, tag: ["alerta", "vigência"] });
+    if (vig(i) && vig(i) < hoje && !d.inst.some(j => j.id !== i.id && j.sindicato_id === i.sindicato_id && j.vigencia_inicio > i.vigencia_inicio)) ev.push({ d: i.vigencia_fim, t: `Vencida sem renovação registrada — ${i.numero_registro}`, s: `${i.sindicato?.nome || ""} · o robô avisa quando a renovação for registrada`, tag: ["erro", "vencida"] }); });
+  const mes = { janeiro:0, fevereiro:1, março:2, abril:3, maio:4, junho:5, julho:6, agosto:7, setembro:8, outubro:9, novembro:10, dezembro:11 };
+  const bases = {}; d.inst.forEach(i => { const m = /(\d{1,2})º?\s+de\s+(\w+)/i.exec(i.data_base || ""); if (m && mes[m[2].toLowerCase()] != null) { let dt = new Date(hoje.getFullYear(), mes[m[2].toLowerCase()], +m[1]); if (dt < hoje) dt.setFullYear(dt.getFullYear() + 1); const k = (i.sindicato?.nome || "") + dt.toISOString(); if (!bases[k] && dt <= dias(90)) { bases[k] = 1; ev.push({ d: dt.toISOString().slice(0, 10), t: `Data-base — ${i.sindicato?.nome || ""}`, s: "renovação esperada; o robô avisa quando registrar", tag: ["info", "data-base"] }); } } });
+  if (!emp) d.sind.filter(x => ["PENDENTE","EM_ANDAMENTO"].includes(x.historico_status)).forEach(x => ev.push({ d: hoje.toISOString().slice(0, 10), t: `Histórico em importação — ${x.nome}`, s: x.historico_obs || "aos poucos, nas próximas execuções", tag: ["info", "histórico"] }));
+  ev.sort((a, b) => a.d.localeCompare(b.d));
+  $("agenda").innerHTML = ev.length ? ev.slice(0, 12).map(e => `<li><span class="dt">${fmtD(e.d.slice(0, 10))}</span><div class="tx">${esc(e.t)}<small>${esc(e.s)}</small></div><span class="tag ${e.tag[0]}">${e.tag[1]}</span></li>`).join("") : `<li><div class="tx" style="color:var(--text-3)">Nada agendado para os próximos 90 dias.</div></li>`;
+  // cobertura
+  const emps = (d.emp || []).filter(e => e.ativo), sindVig = new Set(vigentes.map(i => i.sindicato_id)), cob = emps.filter(e => (e.vinculos || []).some(v => sindVig.has(v.sindicato_id))).length, pct = emps.length ? Math.round(cob / emps.length * 100) : 0;
+  $("cobertura").innerHTML = `<div class="ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#eef1f5" stroke-width="3.5"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#1a5276" stroke-width="3.5" stroke-dasharray="${pct} 100" transform="rotate(-90 18 18)"/><text x="18" y="21" text-anchor="middle" font-size="8" font-family="DM Mono" fill="#1a2332">${pct}%</text></svg><div class="lg"><b>${cob} de ${emps.length}</b>empresas com convenção vigente${emps.length ? "" : "<br><small style='color:var(--text-3)'>cadastre as empresas para medir</small>"}${(d.emp || []).filter(e => e.ativo && !(e.vinculos || []).length).length ? `<br><small style="color:var(--amber)">${(d.emp || []).filter(e => e.ativo && !(e.vinculos || []).length).length} sem vínculo sindical</small>` : ""}</div></div>`;
+  // saúde
+  $("saudeCard").style.display = emp ? "none" : "block";
+  const t = (c, x) => `<span class="tag ${c}">${x}</span>`;
+  $("saude").innerHTML = `<div><span>Robô (06h dias úteis)</span>${roboOk ? t("ok", "executou " + fmtDT(ultRobo.executada_em)) : t("erro", ultRobo ? "atrasado · " + fmtDT(ultRobo.executada_em) : "nunca executou")}</div>
+    <div><span>Mediador</span>${ult ? (ult.status === "CONSULTA_CONFIRMADA" ? t("ok", "confirmada") : ult.status === "CONSULTA_COM_ALERTA" ? t("alerta", "com alerta") : t("erro", "não concluída")) : t("cinza", "—")}</div>
+    <div><span>Incidentes abertos</span>${abertos.length ? t("erro", abertos.length + " · ver Central") : t("ok", "nenhum")}</div>
+    <div><span>E-mail</span>${d.notif[0] ? (d.notif[0].status === "ENVIADA" ? t("ok", "enviando" + (APP.dados.cfg.email_destino_teste ? " · modo teste" : "")) : t("alerta", "última não enviada")) : t("cinza", "sem envios")}</div>
+    <div><span>Parecer por IA</span>${d.inst.some(i => i.analise_status === "CONCLUIDA") ? t("ok", "ativo") : t("alerta", "pendente")}</div>
+    <div><span>Importações não concluídas</span>${d.inst.filter(i => i.status_importacao !== "IMPORTADO").length ? t("erro", d.inst.filter(i => i.status_importacao !== "IMPORTADO").length) : t("ok", "0")}</div>`;
+  $("painelExtra").innerHTML = "";
+  $("painelNovos").innerHTML = tabInst(d.inst.filter(i => i.origem !== "historico").slice(0, 6));
 }
 function renderSind() {
-  $("tabSind").innerHTML = `<table><tr><th>CNPJ</th><th>Nome</th><th>Tipo</th><th>UF</th><th>Monitorar</th><th>Última consulta</th><th>Status</th><th></th></tr>` +
-    APP.dados.sind.map(s => `<tr><td>${fmtCnpj(s.cnpj)}</td><td>${esc(s.nome)}<br><small style="color:var(--cinza)">${esc(s.categoria||"")}</small></td><td>${s.tipo}</td><td>${s.uf||""}</td>
-      <td>${s.monitorar && s.ativo ? '<span class="tag ok">sim</span>' : '<span class="tag cinza">não</span>'}</td><td>${fmtDT(s.ultima_consulta)}</td><td>${s.ultimo_status ? tagStatus(s.ultimo_status) : "—"}</td>
+  const hist = s => s.historico_status === "CONCLUIDO" ? `<span class="tag ok">${APP.dados.cfg.historico_anos || 5} anos ✓</span>` : s.historico_status ? `<span class="tag alerta">${s.historico_status === "EM_ANDAMENTO" ? "importando…" : "na fila"}</span>` : `<button class="b sec sm" onclick="pedirHistorico('${s.id}')">Importar ${APP.dados.cfg.historico_anos || 5} anos</button>`;
+  $("tabSind").innerHTML = `<div class="topo"><small style="color:var(--text-3)">Histórico: o robô importa aos poucos (${APP.dados.cfg.historico_max_por_execucao || 8} downloads por execução, com pausas) para não provocar bloqueio no Mediador. <a href="#" onclick="pedirHistoricoTodos();return false">Importar histórico de todos os monitorados</a></small></div>
+    <table><tr><th>CNPJ</th><th>Nome</th><th>Tipo</th><th>UF</th><th>Monitorar</th><th>Última consulta</th><th>Status</th><th>Histórico</th><th></th></tr>` +
+    APP.dados.sind.map(s => `<tr><td>${fmtCnpj(s.cnpj)}</td><td>${esc(s.nome)}<br><small style="color:var(--cinza)">${esc(s.categoria||"")}</small></td><td>${s.tipo ? esc(s.tipo) + (s.tipo_origem === "cct" ? ' <small style="color:var(--text-3)">(pela CCT)</small>' : "") : '<span class="tag cinza">a definir pela CCT</span>'}</td><td>${s.uf||""}</td>
+      <td>${s.monitorar && s.ativo ? '<span class="tag ok">sim</span>' : '<span class="tag cinza">não</span>'}</td><td>${fmtDT(s.ultima_consulta)}</td><td>${s.ultimo_status ? tagStatus(s.ultimo_status) : "—"}</td><td>${hist(s)}${s.historico_obs ? `<br><small style="color:var(--text-3)">${esc(s.historico_obs)}</small>` : ""}</td>
       <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirSind('${s.id}')">Editar</button> <button class="b sec sm" onclick="excluirSind('${s.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
     (APP.dados.sind.length ? "" : `<div class="aviso">Nenhum sindicato cadastrado. Cadastre o sindicato laboral (e, se quiser, o patronal) de cada cliente.</div>`);
 }
 function abrirSind(id) {
   const s = APP.dados.sind.find(x => x.id === id) || {};
   $("mSindTit").textContent = id ? "Editar sindicato" : "Novo sindicato";
-  $("sId").value = id || ""; $("sCnpj").value = s.cnpj ? fmtCnpj(s.cnpj) : ""; $("sNome").value = s.nome || ""; $("sTipo").value = s.tipo || "laboral";
+  $("sId").value = id || ""; $("sCnpj").value = s.cnpj ? fmtCnpj(s.cnpj) : ""; $("sNome").value = s.nome || ""; $("sTipo").value = s.tipo || "";
   $("sUf").value = s.uf || ""; $("sCat").value = s.categoria || ""; $("sMon").value = String(s.monitorar ?? true); $("sObs").value = s.observacoes || "";
   $("sResp").value = s.responsavel_email || ""; $("sGer").value = s.gerente_email || ""; $("sMun").value = s.municipio || ""; $("sCnae").value = s.cnae || ""; $("sRfb").textContent = s.receita_em ? "Receita consultada em " + fmtDT(s.receita_em) + (s.situacao_cadastral ? " · " + s.situacao_cadastral : "") : "";
   $("mSind").classList.add("on");
@@ -412,13 +432,15 @@ function abrirSind(id) {
 async function salvarSind() {
   const cnpj = $("sCnpj").value.replace(/\D/g, "");
   if (cnpj.length !== 14 || !$("sNome").value.trim()) return msg("Informe CNPJ (14 dígitos) e nome.", "erro");
-  const d = { tenant_id: APP.tenantId, cnpj, nome: $("sNome").value.trim(), tipo: $("sTipo").value, uf: $("sUf").value.trim().toUpperCase() || null,
+  const d = { tenant_id: APP.tenantId, cnpj, nome: $("sNome").value.trim(), tipo: $("sTipo").value || null, tipo_origem: $("sTipo").value ? "manual" : null, uf: $("sUf").value.trim().toUpperCase() || null,
     categoria: $("sCat").value.trim() || null, monitorar: $("sMon").value === "true", observacoes: $("sObs").value.trim() || null,
     responsavel_email: $("sResp").value.trim().toLowerCase() || null, gerente_email: $("sGer").value.trim().toLowerCase() || null,
     municipio: $("sMun").value.trim() || null, cnae: $("sCnae").value.trim() || null, ...(APP.rfb && APP.rfb.cnpj === cnpj ? { situacao_cadastral: APP.rfb.situacao, receita_em: new Date().toISOString() } : {}) };
   try { if ($("sId").value) await patch("cct_sindicatos", "id=eq." + $("sId").value, d); else await post("cct_sindicatos", d);
     fechar("mSind"); msg("Sindicato salvo."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
+async function pedirHistorico(id) { try { await patch("cct_sindicatos", "id=eq." + id, { historico_status: "PENDENTE", historico_obs: null }); msg("Histórico na fila — o robô importa nas próximas execuções."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); } }
+async function pedirHistoricoTodos() { const l = APP.dados.sind.filter(s => s.monitorar && s.ativo && !s.historico_status); if (!l.length) return msg("Nenhum sindicato monitorado sem histórico solicitado."); if (!confirm(`Colocar ${l.length} sindicato(s) na fila do histórico?`)) return; for (const s of l) await patch("cct_sindicatos", "id=eq." + s.id, { historico_status: "PENDENTE" }); msg("Fila criada."); await carregarTudo(); }
 async function excluirSind(id) {
   if (!confirm("Excluir o sindicato? As convenções já importadas permanecem na base (sem vínculo).")) return;
   try { await del("cct_sindicatos", "id=eq." + id); msg("Excluído."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
@@ -427,7 +449,7 @@ async function excluirSind(id) {
 function tabInst(lista) {
   if (!lista.length) return `<div class="aviso">Nenhuma convenção na base ainda — o robô preenche na próxima execução.</div>`;
   return `<table><tr><th>Registro</th><th>Tipo</th><th>Sindicato</th><th>Categoria</th><th>Vigência</th><th>Registro MTE</th><th>Detectada</th><th>Importação</th><th>Análise</th><th>Ciência</th><th class="r">Cláus.</th><th></th></tr>` +
-    lista.map(i => `<tr><td><b>${esc(i.numero_registro)}</b></td><td>${esc(i.tipo||"")}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.categoria||"")}</td>
+    lista.map(i => `<tr><td><b>${esc(i.numero_registro)}</b>${i.origem === "historico" ? '<br><span class="tag cinza">histórico</span>' : ""}</td><td>${esc(i.tipo||"")}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.categoria||"")}</td>
       <td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${fmtD(i.data_registro)}</td><td>${fmtDT(i.detectado_em)}</td><td>${tagStatus(i.status_importacao)}</td><td>${i.analise_status ? tagStatus(i.analise_status === "CONCLUIDA" ? "IMPORTADO" : "ATENCAO").replace(/>[^<]+</, ">" + (i.analise_status === "CONCLUIDA" ? "concluída" : "IA pendente") + "<") : "—"}</td>
       <td>${tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td style="white-space:nowrap"><button class="b sec sm" onclick="abrirInst('${i.id}')">Abrir</button> <button class="b sec sm" onclick="pdfCct('${i.id}')">PDF</button></td></tr>`).join("") + `</table>`;
 }
@@ -659,13 +681,13 @@ async function rodarLote() {
       if (alvo === "s") {
         const sindical = String(d.cnae || "").replace(/\D/g, "").startsWith("9420");
         const ex = APP.dados.sind.find(x => x.cnpj === cnpj);
-        if (ex) await patch("cct_sindicatos", "id=eq." + ex.id, { ...comum, nome: d.razao }); else await post("cct_sindicatos", { ...comum, nome: d.razao, tipo, monitorar: true });
+        if (ex) await patch("cct_sindicatos", "id=eq." + ex.id, { ...comum, nome: d.razao }); else await post("cct_sindicatos", { ...comum, nome: d.razao, tipo: tipo || null, tipo_origem: tipo ? "manual" : null, monitorar: true });
         l.tag = (ex ? '<span class="tag info">atualizado</span>' : '<span class="tag ok">cadastrado</span>') + (sindical ? "" : ' <span class="tag alerta">CNAE não sindical</span>');
       } else {
         const ex = (APP.dados.emp || []).find(x => x.cnpj === cnpj); let id;
         const dados = { ...comum, razao_social: d.razao, cnae_descricao: d.cnae_descricao || null, ...(resp ? { responsavel_email: resp } : {}) };
         if (ex) { await patch("cct_empresas", "id=eq." + ex.id, dados); id = ex.id; } else id = (await post("cct_empresas", dados))[0].id;
-        if (sindId && !(ex && (ex.vinculos || []).some(v => v.sindicato_id === sindId))) { const sx = APP.dados.sind.find(x => x.id === sindId); await post("cct_empresa_sindicato", { tenant_id: APP.tenantId, empresa_id: id, sindicato_id: sindId, papel: sx ? sx.tipo : "laboral" }); }
+        if (sindId && !(ex && (ex.vinculos || []).some(v => v.sindicato_id === sindId))) { const sx = APP.dados.sind.find(x => x.id === sindId); await post("cct_empresa_sindicato", { tenant_id: APP.tenantId, empresa_id: id, sindicato_id: sindId, papel: (sx && sx.tipo) || "laboral" }); }
         l.tag = (ex ? '<span class="tag info">atualizada</span>' : '<span class="tag ok">cadastrada</span>') + (String(d.situacao || "").toUpperCase() !== "ATIVA" ? ` <span class="tag erro">${esc(d.situacao || "situação?")}</span>` : "") + (sindId ? ' <span class="tag info">vinculada</span>' : "");
       }
     } catch (e) { l.tag = `<span class="tag erro">${esc(e.message)}</span>`; }
@@ -773,7 +795,7 @@ async function salvarEmp() {
     for (const v of atuais) if (!marcados.includes(v.sindicato_id)) await del("cct_empresa_sindicato", "id=eq." + v.id);
     for (const sid of marcados) if (!atuais.find(v => v.sindicato_id === sid)) {
       const s = APP.dados.sind.find(x => x.id === sid);
-      await post("cct_empresa_sindicato", { tenant_id: APP.tenantId, empresa_id: id, sindicato_id: sid, papel: s ? s.tipo : "laboral" });
+      await post("cct_empresa_sindicato", { tenant_id: APP.tenantId, empresa_id: id, sindicato_id: sid, papel: (s && s.tipo) || "laboral" });
     }
     fechar("mEmp"); msg("Empresa salva."); await carregarTudo();
   } catch (e) { msg(e.message, "erro"); }
@@ -794,7 +816,7 @@ function renderConf() {
       <td style="white-space:nowrap">${ab(c) ? `<button class="b sm" onclick="registrarCiencia('${c.id}')">Registrar ciência</button>` : ""} <button class="b sec sm" onclick="abrirInst('${c.instrumento_id}')">Ver CCT</button></td></tr>`).join("") + `</table>` +
     (l.length ? "" : `<div class="aviso">Nada aqui.</div>`);
   $("cfgDestTeste").value = APP.dados.cfg.email_destino_teste || "";
-  $("cfgPrazo").value = APP.dados.cfg.prazo_ciencia_dias_uteis; $("cfgLemb").value = String(APP.dados.cfg.lembrete_diario); $("cfgEsc").value = String(APP.dados.cfg.escalonar_apos_prazo);
+  $("cfgPrazo").value = APP.dados.cfg.prazo_ciencia_dias_uteis; $("cfgHistAnos").value = APP.dados.cfg.historico_anos || 5; $("cfgHistMax").value = APP.dados.cfg.historico_max_por_execucao || 8; $("cfgLemb").value = String(APP.dados.cfg.lembrete_diario); $("cfgEsc").value = String(APP.dados.cfg.escalonar_apos_prazo);
 }
 async function registrarCiencia(id) {
   const obs = prompt("Observação (opcional) para o registro de ciência:") ;
@@ -808,7 +830,7 @@ async function registrarCiencia(id) {
   } catch (e) { msg(e.message, "erro"); }
 }
 async function salvarDestTeste() {
-  const d = { tenant_id: APP.tenantId, email_destino_teste: $("cfgDestTeste").value.trim().toLowerCase() || null, updated_at: new Date().toISOString() };
+  const d = { tenant_id: APP.tenantId, email_destino_teste: $("cfgDestTeste").value.trim().toLowerCase() || null, prazo_ciencia_dias_uteis: APP.dados.cfg.prazo_ciencia_dias_uteis || 2, historico_anos: APP.dados.cfg.historico_anos || 5, historico_max_por_execucao: APP.dados.cfg.historico_max_por_execucao || 8, updated_at: new Date().toISOString() };
   try { await api("cct_config?on_conflict=tenant_id", { method:"POST", body: JSON.stringify(d), headers:{ Prefer: "resolution=merge-duplicates,return=representation" } }); msg(d.email_destino_teste ? "Modo teste ativo: tudo vai para " + d.email_destino_teste : "Modo produção: e-mails vão aos destinatários reais."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
 async function pedirTeste() {
@@ -817,7 +839,7 @@ async function pedirTeste() {
     msg("Pedido registrado para " + para + ". Rode o robô (Actions → Run workflow) para enviar."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
 async function salvarConfig() {
-  const d = { tenant_id: APP.tenantId, prazo_ciencia_dias_uteis: +$("cfgPrazo").value || 2, lembrete_diario: $("cfgLemb").value === "true", escalonar_apos_prazo: $("cfgEsc").value === "true", email_destino_teste: APP.dados.cfg.email_destino_teste || null, updated_at: new Date().toISOString() };
+  const d = { tenant_id: APP.tenantId, prazo_ciencia_dias_uteis: +$("cfgPrazo").value || 2, lembrete_diario: $("cfgLemb").value === "true", escalonar_apos_prazo: $("cfgEsc").value === "true", email_destino_teste: APP.dados.cfg.email_destino_teste || null, historico_anos: +$("cfgHistAnos").value || 5, historico_max_por_execucao: +$("cfgHistMax").value || 8, updated_at: new Date().toISOString() };
   try { await api("cct_config?on_conflict=tenant_id", { method:"POST", body: JSON.stringify(d), headers:{ Prefer: "resolution=merge-duplicates,return=representation" } }); msg("Parâmetros salvos."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
 
