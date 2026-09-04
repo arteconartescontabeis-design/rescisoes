@@ -192,7 +192,7 @@
         <div class="grid g3"><div><label>Horários de consulta (Brasília, separados por vírgula)</label><input id="cfgHorarios" placeholder="06:00,13:00"></div>
           <div><label>Intervalo entre sindicatos (segundos)</label><input id="cfgIntervalo" type="number" min="5" max="600"></div>
           <div><label>Máximo de sindicatos por execução (0 = todos)</label><input id="cfgMaxSind" type="number" min="0" max="500"></div></div>
-        <div class="aviso">O robô roda de hora em hora (06h–20h, dias úteis) e só consulta nas horas marcadas aqui. As consultas formam uma fila: os sindicatos consultados há mais tempo vão primeiro, com o intervalo definido entre um e outro — mais espaço entre consultas = menos risco de bloqueio. Com muitos sindicatos, use dois ou três horários e um máximo por execução.</div>
+        <div class="aviso">O robô roda de hora em hora (24 h, aos 5 minutos de cada hora, só em dias úteis) e consulta apenas nas horas marcadas aqui — o minuto é ignorado: "13:00" roda às 13h05. As consultas formam uma fila: os sindicatos consultados há mais tempo vão primeiro, com o intervalo definido entre um e outro — mais espaço entre consultas = menos risco de bloqueio. Com muitos sindicatos, use dois ou três horários e um máximo por execução.</div>
         <h2 style="margin-top:18px">Parecer por IA</h2>
         <div class="grid g3"><div><label>Gerar parecer por IA</label><select id="cfgIa"><option value="true">Sim</option><option value="false">Não</option></select></div>
           <div><label>Limite de pareceres por mês</label><input id="cfgIaLim" type="number" min="0" max="5000"></div>
@@ -215,6 +215,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.12.3</td><td>03/09/2026</td><td>Disparo do robô ampliado para 24 h (de hora em hora, aos 5 minutos); dias úteis e horas continuam definidos em Configurações. O minuto informado no horário é ignorado: "23:00" e "23:06" rodam às 23h05.</td></tr>
           <tr><td>v0.12.2</td><td>03/09/2026</td><td>Alterar nível passa a usar função do banco com privilégio (a política do Rescisões não permitia alterar a linha de outro usuário); validações de único gerente e auto-rebaixamento no banco. Banco <code>setup_cct_v0.12.2.sql</code>.</td></tr>
           <tr><td>v0.12.1</td><td>03/09/2026</td><td>Usuários: botão "Alterar nível" — muda entre Usuário e Gerente (equipe) e, nos acessos de cliente, troca a empresa; impede rebaixar o último gerente ou a si mesmo.</td></tr>
           <tr><td>v0.12.0</td><td>03/09/2026</td><td>Aba <b>Configurações</b> (Sistema): todos os parâmetros num só lugar — ciência, histórico (com "importar automaticamente os últimos N anos" para todo sindicato novo), consultas (horários/fila), IA e e-mail modo teste; só o gerente altera. <b>Histórico de alterações</b> (Sistema): auditoria automática do banco — quem alterou o quê e quando em sindicatos, empresas, vínculos, configurações, ciências, incidentes, destinatários, acessos e convenções, com antes/depois. Convenções: ordenação por qualquer coluna e filtros por tipo, sindicato, categoria, importação e origem.</td></tr>
@@ -317,7 +318,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.12.2" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.12.3" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const $ = id => document.getElementById(id);
