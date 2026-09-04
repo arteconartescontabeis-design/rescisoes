@@ -29,7 +29,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.6.0"
+VERSAO = "0.8.0"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -284,7 +284,7 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
         dados = dados or carregar_dados_instrumento(inst_id)
         ant_id = sb_rpc("cct_anterior", {"p_instrumento": inst_id})
         anterior = carregar_dados_instrumento(ant_id) if ant_id else None
-        r = analisar_cct.analisar(dados, anterior, usar_ia=bool(os.environ.get("ANTHROPIC_API_KEY")))
+        r = analisar_cct.analisar(dados, anterior, usar_ia=bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("GITHUB_TOKEN")))
         versao = 1 + len(sb_get("cct_analises", {"instrumento_id": f"eq.{inst_id}", "select": "id"}))
         an = sb_insert("cct_analises", {"tenant_id": tenant, "instrumento_id": inst_id, "anterior_id": ant_id, "versao": versao, "status": r["status"],
                                         "modelo": r["modelo"], "erro_ia": r["erro_ia"], "resumo": r["resumo"], "destaques": r["destaques"],
@@ -297,7 +297,7 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
         sb_patch("cct_instrumentos", {"id": f"eq.{inst_id}"}, {"analise_status": r["status"], "analise_em": datetime.now(timezone.utc).isoformat()})
         if r["status"] == "CONCLUIDA":
             resolver(tenant, f"IA:{inst_id}")
-        elif os.environ.get("ANTHROPIC_API_KEY"):  # sem chave configurada não é incidente, é estado
+        elif os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("GITHUB_TOKEN"):  # sem provedor configurado não é incidente, é estado
             incidente(tenant, f"IA:{inst_id}", "IA", "ATENCAO", f"ANÁLISE POR IA NÃO CONCLUÍDA – {dados['metadados']['numero_registro']}: {r['erro_ia']} (valores e comparação gravados)", sindicato_id, inst_id)
         log(f"  ANÁLISE {dados['metadados']['numero_registro']}: {r['status']} — {len(r['valores'])} valores, "
             f"{'comparada com ' + anterior['metadados']['numero_registro'] if anterior else 'sem anterior'}, {r['duracao_ms']} ms")
