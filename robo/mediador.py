@@ -60,7 +60,7 @@ def total_e_paginas(html_resp: str):
     return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (None, None, None)
 
 
-def consultar(page, cnpj: str, tipo="Convenção Coletiva", vigencia="Vigentes", uf=""):
+def consultar(page, cnpj: str, tipo="Convenção Coletiva", vigencia="Vigentes", uf="", on_pagina=None):
     """Preenche o formulário real e captura a resposta AJAX. Retorna dict com status explícito."""
     r = {"cnpj": cnpj, "tipo": tipo, "vigencia": vigencia, "uf": uf,
          "status": "CONSULTA_NAO_CONCLUIDA", "erro": None, "http": None,
@@ -117,8 +117,28 @@ def consultar(page, cnpj: str, tipo="Convenção Coletiva", vigencia="Vigentes",
         if r["registros"]:
             r["status"] = "CONSULTA_CONFIRMADA"
             et.append(f"{len(r['registros'])} registro(s); site informa {r['total_site']} em {r['paginas']} página(s)")
+            if on_pagina:
+                on_pagina(1, r["registros"])
             if r["paginas"] and r["paginas"] > 1:
-                et.append("AVISO: mais de uma página — paginação ainda não implementada")
+                # funcPaginar() da própria página: não exige novo reCAPTCHA (confirmado no código do site)
+                total = r["total_site"] or 0
+                for pg in range(2, r["paginas"] + 1):
+                    del capturas[:]
+                    page.evaluate(f"funcPaginar({pg}, {total})")
+                    deadline = time.time() + 45
+                    while not capturas and time.time() < deadline:
+                        page.wait_for_timeout(300)
+                    if not capturas or capturas[-1].status != 200:
+                        et.append(f"página {pg}: sem resposta/erro — parcial")
+                        r["status"] = "CONSULTA_COM_ALERTA"
+                        r["erro"] = f"paginação incompleta (página {pg})"
+                        break
+                    regs_pg = parse_registros(capturas[-1].text())
+                    r["registros"] += regs_pg
+                    et.append(f"página {pg}: {len(regs_pg)} registro(s)")
+                    if on_pagina:
+                        on_pagina(pg, regs_pg)
+                    time.sleep(2)
         elif r["total_site"] == 0 or re.search(r"nenhum (registro|instrumento)|n[ãa]o foram encontrados", corpo, re.I):
             r["status"] = "CONSULTA_COM_ALERTA"
             r["erro"] = "Site respondeu zero instrumentos para os filtros — não é prova de inexistência"
