@@ -31,7 +31,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.12.0"
+VERSAO = "0.12.3"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -700,6 +700,8 @@ def main():
         # roda de hora em hora; só executa nas horas configuradas (BRT). Manual (FORCAR) sempre executa.
         agora = datetime.now(BRT)
         horas = {h.strip()[:2] for h in (cfg0.get("horarios_consulta") or "06:00").split(",") if h.strip()}
+        if agora.weekday() >= 5:
+            log(f"fim de semana ({agora:%d/%m %H:%M} BRT) — sem consulta"); processar_testes_email(tenant); return
         if f"{agora:%H}" not in horas:
             log(f"fora dos horários configurados ({cfg0.get('horarios_consulta')}) — agora {agora:%H:%M} BRT; nada a fazer")
             processar_testes_email(tenant)  # pedidos de teste são atendidos mesmo fora do horário
