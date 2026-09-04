@@ -192,7 +192,7 @@
         <div class="grid g3"><div><label>Horários de consulta (Brasília, separados por vírgula)</label><input id="cfgHorarios" placeholder="06:00,13:00"></div>
           <div><label>Intervalo entre sindicatos (segundos)</label><input id="cfgIntervalo" type="number" min="5" max="600"></div>
           <div><label>Máximo de sindicatos por execução (0 = todos)</label><input id="cfgMaxSind" type="number" min="0" max="500"></div></div>
-        <div class="aviso">O robô roda de hora em hora (24 h, aos 5 minutos de cada hora, só em dias úteis) e consulta apenas nas horas marcadas aqui — o minuto é ignorado: "13:00" roda às 13h05. As consultas formam uma fila: os sindicatos consultados há mais tempo vão primeiro, com o intervalo definido entre um e outro — mais espaço entre consultas = menos risco de bloqueio. Com muitos sindicatos, use dois ou três horários e um máximo por execução.</div>
+        <div class="aviso">O GitHub dispara o robô de hora em hora (aos 5 minutos). Para cada horário marcado aqui (HH:MM, Brasília), o robô executa no <b>primeiro disparo após esse horário</b>, se ainda não tiver rodado desde então — "13:00" roda às 13h05, "23:17" às 00h05; atraso máximo de 1 h. Fins de semana não consultam. As consultas formam uma fila: os sindicatos consultados há mais tempo vão primeiro, com o intervalo definido entre um e outro — mais espaço entre consultas = menos risco de bloqueio. Com muitos sindicatos, use dois ou três horários e um máximo por execução.</div>
         <h2 style="margin-top:18px">Parecer por IA</h2>
         <div class="grid g3"><div><label>Gerar parecer por IA</label><select id="cfgIa"><option value="true">Sim</option><option value="false">Não</option></select></div>
           <div><label>Limite de pareceres por mês</label><input id="cfgIaLim" type="number" min="0" max="5000"></div>
@@ -215,6 +215,8 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.13.1</td><td>03/09/2026</td><td>Horários de consulta: o robô executa no primeiro disparo (aos :05 de cada hora, 24 h) após cada horário configurado, se ainda não rodou desde então — "23:17" passa a ser atendido às 00h05; atraso máximo de 1 h. Fins de semana não consultam. Limpeza de registros: exclusiva do superadministrador (mantido).</td></tr>
+          <tr><td>v0.13.0</td><td>03/09/2026</td><td>Quatro níveis de acesso: <b>Superadministrador</b> (tudo, incluindo configurações críticas — IA, horários/fila — e limpeza de registros), <b>Administrador</b> (usuários, cadastros, configurações operacionais, relatórios), <b>Operador/Analista</b> (cadastros e operação do dia a dia) e <b>Cliente</b> (só a própria empresa). Regras aplicadas no banco por funções com privilégio. Cabeçalho mostra o nível de quem está logado. Botão <b>"Analisar com IA"</b> na convenção (fila para a próxima execução do robô, dentro do limite mensal). "Limpar registros de teste" só para superadministrador. Banco <code>setup_cct_v0.13.0.sql</code> (define o titular como superadministrador).</td></tr>
           <tr><td>v0.12.3</td><td>03/09/2026</td><td>Disparo do robô ampliado para 24 h (de hora em hora, aos 5 minutos); dias úteis e horas continuam definidos em Configurações. O minuto informado no horário é ignorado: "23:00" e "23:06" rodam às 23h05.</td></tr>
           <tr><td>v0.12.2</td><td>03/09/2026</td><td>Alterar nível passa a usar função do banco com privilégio (a política do Rescisões não permitia alterar a linha de outro usuário); validações de único gerente e auto-rebaixamento no banco. Banco <code>setup_cct_v0.12.2.sql</code>.</td></tr>
           <tr><td>v0.12.1</td><td>03/09/2026</td><td>Usuários: botão "Alterar nível" — muda entre Usuário e Gerente (equipe) e, nos acessos de cliente, troca a empresa; impede rebaixar o último gerente ou a si mesmo.</td></tr>
@@ -271,9 +273,9 @@
 <div class="modal" id="mUsu"><div class="card" style="max-width:560px"><h2>Novo usuário</h2>
   <div class="grid g2"><div><label>Nome</label><input id="uNome"></div><div><label>E-mail (login)</label><input id="uEmail" type="email"></div>
     <div><label>Senha inicial</label><input id="uSenha" type="password" autocomplete="new-password" placeholder="mínimo 8 caracteres"></div>
-    <div><label>Nível de acesso</label><select id="uPapel" onchange="$('uEmpWrap').style.display=this.value==='empresa'?'block':'none'"><option value="usuario">Usuário (equipe do escritório)</option><option value="diretoria">Gerente do escritório</option><option value="empresa">Empresa (cliente)</option></select></div>
+    <div><label>Nível de acesso</label><select id="uPapel" onchange="$('uEmpWrap').style.display=this.value==='empresa'?'block':'none'"><option value="usuario">3. Operador / Analista</option><option value="diretoria">2. Administrador</option><option value="superadmin" id="optSuper">1. Superadministrador</option><option value="empresa">4. Cliente (empresa)</option></select></div>
     <div id="uEmpWrap" style="display:none;grid-column:span 2"><label>Empresa(s) que este usuário pode ver</label><div id="uEmps" style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;font-size:13px;max-height:180px;overflow:auto"></div></div></div>
-  <div class="aviso"><b>Usuário</b> e <b>Gerente</b> usam o login único da Artecon (também entram no Rescisões Pro). <b>Empresa</b> é o acesso do cliente: enxerga só as convenções, o impacto e as ciências da(s) empresa(s) marcada(s), e pode registrar a ciência.</div>
+  <div class="aviso"><b>1. Superadministrador</b>: acesso total (configurações críticas, limpeza, usuários). <b>2. Administrador</b>: usuários, cadastros, configurações operacionais e relatórios. <b>3. Operador/Analista</b>: inclui, altera e processa (sindicatos, empresas, ciências, análises). <b>4. Cliente</b>: só as convenções, o impacto e as ciências da(s) empresa(s) marcada(s). Os níveis 1–3 usam o login único da Artecon (também entram no Rescisões Pro).</div>
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mUsu')">Cancelar</button><button class="b" onclick="salvarUsu()">Criar usuário</button></div>
 </div></div>
 
@@ -304,7 +306,7 @@
 
 <div class="modal" id="mInst"><div class="card"><div class="topo"><h2 id="mInstTit">Convenção</h2><div style="display:flex;gap:8px"><button class="b sec sm" onclick="pdfCct(APP.instAtual.id)">Gerar PDF</button><button class="b sec sm" id="btnBaixar">Baixar extrato (.doc)</button><button class="b sec sm" onclick="fechar('mInst')">Fechar</button></div></div>
   <div id="mInstCab" style="font-size:13px;margin-bottom:10px"></div>
-  <div style="display:flex;gap:6px;margin-bottom:10px"><button class="b sm" id="tabAn" onclick="abaInst('an')">Análise</button><button class="b sec sm" id="tabCl" onclick="abaInst('cl')">Cláusulas</button><button class="b sec sm" id="tabImp" onclick="abaInst('imp')">Impacto por empresa</button><button class="b sec sm" onclick="reprocessar()">Reprocessar análise</button></div>
+  <div style="display:flex;gap:6px;margin-bottom:10px"><button class="b sm" id="tabAn" onclick="abaInst('an')">Análise</button><button class="b sec sm" id="tabCl" onclick="abaInst('cl')">Cláusulas</button><button class="b sec sm" id="tabImp" onclick="abaInst('imp')">Impacto por empresa</button><button class="b sm" id="btnIA" onclick="reprocessar()">Analisar com IA</button></div>
   <div id="mInstAn"></div>
   <div id="mInstImp" style="display:none"></div>
   <div id="mInstClWrap" style="display:none"><input id="fCl" placeholder="buscar nas cláusulas…" oninput="renderCl()" style="margin-bottom:10px"><div id="mInstCl"></div></div>
@@ -318,9 +320,11 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.12.3" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.13.1" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
+const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
+const podeAdm = () => ["gerente","superadmin"].includes(APP.nivel), superadm = () => APP.nivel === "superadmin", interno = () => APP.nivel !== "empresa";
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmtCnpj = c => (c||"").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
@@ -367,14 +371,16 @@ async function iniciar() {
   if (!tenant) { $("lMsg").textContent = "Usuário sem acesso ao CCT Monitor. Peça ao gerente do escritório para cadastrá-lo."; return; }
   APP.tenantId = tenant;
   try { APP.nivel = await api("rpc/cct_nivel", { method: "POST", body: "{}" }); } catch (e) { APP.nivel = "usuario"; }
-  APP.admin = APP.nivel === "gerente";
-  $("navUsuarios").style.display = APP.admin ? "flex" : "none"; $("btnLimpar").style.display = APP.admin ? "inline-flex" : "none";
+  APP.admin = podeAdm();
+  $("navUsuarios").style.display = APP.admin ? "flex" : "none"; $("btnLimpar").style.display = superadm() ? "inline-flex" : "none";
+  $("usuario").innerHTML = esc(APP.email) + ` · <span class="badge">${NIVEIS[APP.nivel] || APP.nivel}</span>`;
   // nível empresa: só Painel, Convenções e Confirmações
   const soEmpresa = APP.nivel === "empresa";
   document.querySelectorAll("nav button[data-aba]").forEach(b => { if (!["painel","instrumentos","confirmacoes"].includes(b.dataset.aba)) b.style.display = soEmpresa ? "none" : ""; });
   $("navSis").parentElement.style.display = soEmpresa ? "none" : ""; if (!soEmpresa && !APP.admin) $("navUsuarios").style.display = "none";
+  $("painelSub") && ($("painelSub").dataset.nivel = NIVEIS[APP.nivel] || "");
   $("login").style.display = "none"; $("app").style.display = "block"; $("nav").style.display = "flex";
-  $("usuario").textContent = APP.email; $("btnSair").style.display = "inline-block";
+  $("usuario").innerHTML = esc(APP.email) + (APP.nivel ? ` · <span class="badge">${NIVEIS[APP.nivel] || APP.nivel}</span>` : ""); $("btnSair").style.display = "inline-block";
   await carregarTudo(); mostrar("painel");
 }
 function sair() { sessionStorage.removeItem("cct_sess"); location.reload(); }
@@ -421,7 +427,7 @@ function renderPainel() {
   const vigentes = d.inst.filter(i => vig(i) && vig(i) >= hoje), novas7 = d.inst.filter(i => new Date(i.detectado_em) > dias(-7) && i.origem !== "historico");
   const roboOk = ultRobo && new Date(ultRobo.executada_em) > dias(-1.5);
   const hoje_txt = hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
-  $("painelTit").textContent = emp ? "Minhas convenções" : "Painel"; $("painelSub").textContent = hoje_txt.charAt(0).toUpperCase() + hoje_txt.slice(1) + " · " + APP.email + (emp ? " · acesso da empresa" : APP.nivel === "gerente" ? " · gerente do escritório" : "");
+  $("painelTit").textContent = emp ? "Minhas convenções" : "Painel"; $("painelSub").textContent = hoje_txt.charAt(0).toUpperCase() + hoje_txt.slice(1) + " · " + APP.email + " · " + (NIVEIS[APP.nivel] || "");
   const pend = conf.filter(ab), atras = conf.filter(c => c.situacao === "ATRASADA"), proxPrazo = pend.map(c => c.prazo).sort()[0];
   const num = (v, l, det, cls) => `<div class="a-n ${cls || ""}"><b>${esc(v)}</b><span>${l}</span><div class="d">${det}</div></div>`;
   $("kpis").innerHTML = num(vigentes.length, "convenções vigentes", novas7.length ? `+${novas7.length} nos últimos 7 dias` : "sem novas na semana", "") +
@@ -518,6 +524,7 @@ async function abrirInst(id) {
   const cis = (APP.dados.conf||[]).filter(c => c.instrumento_id === id);
   if (cis.length) $("mInstCab").innerHTML += `<div style="margin-top:8px"><b>Ciências:</b> ` + cis.map(c => `${esc(c.empresa||"sindicato")}: ${tagStatus(c.status)} (prazo ${fmtD(c.prazo)})`).join(" · ") + `</div>`;
   $("btnBaixar").style.display = i.arquivo_path ? "inline-block" : "none";
+  $("btnIA").style.display = interno() ? "inline-flex" : "none"; $("btnIA").disabled = false; $("btnIA").textContent = i.analise_status === "CONCLUIDA" ? "Nova análise com IA" : i.analise_status === null && i.status_importacao === "IMPORTADO" ? "Na fila para análise" : "Analisar com IA"; if (i.analise_status === null && i.status_importacao === "IMPORTADO") $("btnIA").disabled = true;
   $("btnBaixar").onclick = () => baixar(i.arquivo_path);
   $("fCl").value = ""; $("mInstCl").innerHTML = "carregando…"; $("mInstAn").innerHTML = "carregando…"; abaInst("an"); $("mInst").classList.add("on");
   try {
@@ -627,18 +634,21 @@ function renderAn(an, val) {
   $("mInstAn").innerHTML = h;
 }
 async function reprocessar() {
-  if (!APP.instAtual || !confirm("Marcar para nova análise na próxima execução do robô?")) return;
-  try { await patch("cct_instrumentos", "id=eq." + APP.instAtual.id, { analise_status: null }); msg("Marcada para reprocessamento."); } catch (e) { msg(e.message, "erro"); }
+  if (!APP.instAtual) return;
+  const cf = APP.dados.cfg || {}, uso = APP.dados.iaUso ?? 0;
+  if (!interno()) return msg("Somente a equipe do escritório solicita análise.", "erro");
+  if (cf.ia_ativa === false) return msg("O parecer por IA está desligado em Configurações.", "erro");
+  if (uso >= (cf.ia_limite_mes ?? 60)) return msg(`Limite mensal de pareceres atingido (${uso}/${cf.ia_limite_mes}).`, "erro");
+  if (!confirm(`Colocar ${APP.instAtual.numero_registro} na fila de análise com IA? Será processada na próxima execução do robô (uso do mês: ${uso}/${cf.ia_limite_mes ?? 60}).`)) return;
+  try { await patch("cct_instrumentos", "id=eq." + APP.instAtual.id, { analise_status: null }); msg("Na fila: o robô gera o parecer na próxima execução."); $("btnIA").textContent = "Na fila para análise"; $("btnIA").disabled = true; } catch (e) { msg(e.message, "erro"); }
 }
 
 async function limparTestes() {
   if (!confirm("Apagar consultas, incidentes, notificações e ciências de TESTE? Sindicatos, empresas e convenções são mantidos. Use uma vez, ao começar oficialmente.")) return;
   if (prompt('Digite LIMPAR para confirmar') !== "LIMPAR") return;
   try {
-    for (const t of ["cct_notificacoes", "cct_incidentes", "cct_consultas", "cct_ciencias"]) await del(t, "tenant_id=eq." + APP.tenantId);
-    await patch("cct_sindicatos", "tenant_id=eq." + APP.tenantId, { ultima_consulta: null, ultimo_status: null });
-    await patch("cct_instrumentos", "tenant_id=eq." + APP.tenantId, { status_ciencia: "PENDENTE" });
-    msg("Registros de teste apagados. Uso oficial pode começar."); await carregarTudo();
+    const r = await api("rpc/cct_limpar_registros_teste", { method: "POST", body: JSON.stringify({ p_tenant: APP.tenantId }) });
+    msg(`Registros de teste apagados (${r.consultas} consultas, ${r.incidentes} incidentes, ${r.notificacoes} notificações, ${r.ciencias} ciências). Uso oficial pode começar.`); await carregarTudo();
   } catch (e) { msg(e.message, "erro"); }
 }
 
@@ -657,19 +667,20 @@ function renderAud() {
 // ---------- usuários (mesmo modelo do Rescisões Pro) ----------
 function renderUsu() {
   const l = APP.dados.usu || [], ac = APP.dados.acessos || [];
-  const nivelDe = p => ["diretoria","superadmin","admin"].includes(p) ? "gerente do escritório" : "usuário";
+  const nivelDe = p => p === "superadmin" ? NIVEIS.superadmin : ["diretoria","admin"].includes(p) ? NIVEIS.gerente : NIVEIS.usuario;
   $("tabUsu").innerHTML = `<table><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>Empresa</th><th>Status</th><th></th></tr>` +
-    l.map(u => `<tr><td>${esc(u.colaborador?.nome||"")}</td><td>${esc(u.colaborador?.email||"")}</td><td>${tagStatus(nivelDe(u.papel) === "usuário" ? "IMPORTADO" : "INFORMATIVO").replace(/>[^<]+</, ">" + nivelDe(u.papel) + "<")}</td><td>—</td><td>${esc(u.colaborador?.status||"")}</td>
+    l.map(u => `<tr><td>${esc(u.colaborador?.nome||"")}</td><td>${esc(u.colaborador?.email||"")}</td><td>${tagStatus(u.papel === "superadmin" ? "CRITICO" : nivelDe(u.papel) === NIVEIS.usuario ? "IMPORTADO" : "INFORMATIVO").replace(/>[^<]+</, ">" + nivelDe(u.papel) + "<")}</td><td>—</td><td>${esc(u.colaborador?.status||"")}</td>
       <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirNivel('resc','${u.auth_id}','${esc(u.colaborador?.nome||u.colaborador?.email||"")}','${u.papel}')">Alterar nível</button> ${u.colaborador?.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(u.colaborador.email)}')">Redefinir senha</button>` : ""}</td></tr>`).join("") +
-    ac.map(a => `<tr><td>${esc(a.nome||"")}</td><td>${esc(a.email||"")}</td><td>${tagStatus(a.nivel === "empresa" ? "ATENCAO" : "INFORMATIVO").replace(/>[^<]+</, ">" + (a.nivel === "empresa" ? "empresa (cliente)" : a.nivel) + "<")}</td><td>${esc(a.empresa?.razao_social||"")}</td><td>${a.ativo ? "ativo" : "inativo"}</td>
+    ac.map(a => `<tr><td>${esc(a.nome||"")}</td><td>${esc(a.email||"")}</td><td>${tagStatus(a.nivel === "empresa" ? "ATENCAO" : "INFORMATIVO").replace(/>[^<]+</, ">" + (NIVEIS[a.nivel] || a.nivel) + "<")}</td><td>${esc(a.empresa?.razao_social||"")}</td><td>${a.ativo ? "ativo" : "inativo"}</td>
       <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirNivel('cct','${a.id}','${esc(a.nome||a.email||"")}','${a.nivel}','${a.empresa_id||""}')">Alterar nível</button> ${a.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(a.email)}')">Redefinir senha</button>` : ""} <button class="b sec sm" onclick="toggleAcesso('${a.id}',${!a.ativo})">${a.ativo ? "Desativar" : "Ativar"}</button></td></tr>`).join("") + `</table>`;
 }
 function abrirNivel(tipo, id, nome, nivel, empresaId) {
-  $("nTipo").value = tipo; $("nId").value = id; $("nQuem").innerHTML = `<b>${esc(nome)}</b> · nível atual: ${esc(nivel === "diretoria" ? "gerente do escritório" : nivel)}`;
+  $("nTipo").value = tipo; $("nId").value = id; $("nQuem").innerHTML = `<b>${esc(nome)}</b> · nível atual: ${esc(nivel === "diretoria" || nivel === "admin" ? NIVEIS.gerente : NIVEIS[nivel] || nivel)}`;
   const emp = tipo === "cct" && nivel === "empresa";
   $("nEquipe").style.display = emp ? "none" : "block"; $("nEmp").style.display = emp ? "block" : "none";
   if (emp) $("nEmpresa").innerHTML = (APP.dados.emp || []).filter(e => e.ativo).map(e => `<option value="${e.id}" ${e.id === empresaId ? "selected" : ""}>${esc(e.razao_social)}</option>`).join("");
-  else { $("nNivel").innerHTML = tipo === "resc" ? `<option value="usuario">Usuário (equipe do escritório)</option><option value="diretoria">Gerente do escritório</option>` : `<option value="usuario">Usuário (equipe do escritório)</option><option value="gerente">Gerente do escritório</option>`; $("nNivel").value = nivel === "diretoria" || nivel === "gerente" ? (tipo === "resc" ? "diretoria" : "gerente") : "usuario"; }
+  else { $("nNivel").innerHTML = tipo === "resc" ? `<option value="usuario">3. Operador / Analista</option><option value="diretoria">2. Administrador</option>${superadm() ? '<option value="superadmin">1. Superadministrador</option>' : ""}` : `<option value="usuario">3. Operador / Analista</option><option value="gerente">2. Administrador</option>${superadm() ? '<option value="superadmin">1. Superadministrador</option>' : ""}`;
+    $("nNivel").value = nivel === "superadmin" ? "superadmin" : (nivel === "diretoria" || nivel === "gerente" || nivel === "admin") ? (tipo === "resc" ? "diretoria" : "gerente") : "usuario"; }
   $("mNivel").classList.add("on");
 }
 async function salvarNivel() {
@@ -687,7 +698,7 @@ async function salvarNivel() {
   } catch (e) { msg(e.message, "erro"); }
 }
 async function toggleAcesso(id, ativo) { try { await patch("cct_acessos", "id=eq." + id, { ativo }); await carregarTudo(); } catch (e) { msg(e.message, "erro"); } }
-function abrirUsu() { $("uNome").value = ""; $("uEmail").value = ""; $("uSenha").value = ""; $("uPapel").value = "usuario"; $("uEmpWrap").style.display = "none";
+function abrirUsu() { $("uNome").value = ""; $("uEmail").value = ""; $("uSenha").value = ""; $("uPapel").value = "usuario"; $("uEmpWrap").style.display = "none"; $("optSuper").disabled = !superadm();
   $("uEmps").innerHTML = (APP.dados.emp || []).filter(e => e.ativo).map(e => `<label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" style="width:auto" data-eid="${e.id}"> ${esc(e.razao_social)}</label>`).join("") || "<small>Cadastre empresas primeiro.</small>";
   $("mUsu").classList.add("on"); }
 async function salvarUsu() {
@@ -917,8 +928,11 @@ function renderConf() {
   $("cfgHorarios").value = cf.horarios_consulta || "06:00"; $("cfgIntervalo").value = cf.intervalo_consultas_s || 20; $("cfgMaxSind").value = cf.max_sindicatos_por_execucao || 0;
   $("cfgHistAuto").value = String(cf.historico_automatico ?? false); $("cfgQuem").textContent = APP.admin ? "Você é gerente do escritório: alterações aqui valem para toda a equipe." : "Somente o gerente do escritório altera estes parâmetros.";
   $("cfgIa").value = String(cf.ia_ativa ?? true); $("cfgIaLim").value = cf.ia_limite_mes ?? 60; $("cfgIaHist").value = String(cf.ia_historico ?? false);
-  $("cfgIaUso").innerHTML = `Uso no mês: <b>${APP.dados.iaUso ?? "?"}</b> de ${cf.ia_limite_mes ?? 60} pareceres. ${APP.admin ? "" : "Somente o gerente do escritório altera estes parâmetros."}`;
-  document.querySelectorAll("[id^=cfg]").forEach(el => { if (el.tagName === "INPUT" || el.tagName === "SELECT") el.disabled = !APP.admin; }); document.querySelectorAll("button[onclick^='salvarConfig'],button[onclick^='salvarDestTeste']").forEach(b => b.disabled = !APP.admin); $("cfgLemb").value = String(APP.dados.cfg.lembrete_diario); $("cfgEsc").value = String(APP.dados.cfg.escalonar_apos_prazo);
+  $("cfgIaUso").innerHTML = `Uso no mês: <b>${APP.dados.iaUso ?? "?"}</b> de ${cf.ia_limite_mes ?? 60} pareceres.` + (superadm() ? "" : " IA, horários/fila e limpeza são configurações críticas: somente o superadministrador altera.");
+  const criticos = ["cfgIa","cfgIaLim","cfgIaHist","cfgHorarios","cfgIntervalo","cfgMaxSind"];
+  document.querySelectorAll("[id^=cfg]").forEach(el => { if (el.tagName === "INPUT" || el.tagName === "SELECT") el.disabled = criticos.includes(el.id) ? !superadm() : !podeAdm(); });
+  document.querySelectorAll("button[onclick^='salvarConfig'],button[onclick^='salvarDestTeste']").forEach(b => b.disabled = !podeAdm());
+  $("cfgQuem").textContent = superadm() ? "Você é superadministrador: acesso total às configurações." : podeAdm() ? "Você é administrador: altera as configurações operacionais; as críticas (IA, horários/fila) são do superadministrador." : "Somente administradores alteram estes parâmetros."; $("cfgLemb").value = String(APP.dados.cfg.lembrete_diario); $("cfgEsc").value = String(APP.dados.cfg.escalonar_apos_prazo);
 }
 async function registrarCiencia(id) {
   const obs = prompt("Observação (opcional) para o registro de ciência:") ;
@@ -933,7 +947,7 @@ async function registrarCiencia(id) {
 }
 async function salvarDestTeste() {
   const d = { tenant_id: APP.tenantId, email_destino_teste: $("cfgDestTeste").value.trim().toLowerCase() || null, prazo_ciencia_dias_uteis: APP.dados.cfg.prazo_ciencia_dias_uteis || 2, historico_anos: APP.dados.cfg.historico_anos || 5, historico_max_por_execucao: APP.dados.cfg.historico_max_por_execucao || 8, updated_at: new Date().toISOString() };
-  try { await api("cct_config?on_conflict=tenant_id", { method:"POST", body: JSON.stringify(d), headers:{ Prefer: "resolution=merge-duplicates,return=representation" } }); msg(d.email_destino_teste ? "Modo teste ativo: tudo vai para " + d.email_destino_teste : "Modo produção: e-mails vão aos destinatários reais."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
+  try { await api("rpc/cct_salvar_config", { method:"POST", body: JSON.stringify({ p: { tenant_id: APP.tenantId, email_destino_teste: d.email_destino_teste || "" } }) }); msg(d.email_destino_teste ? "Modo teste ativo: tudo vai para " + d.email_destino_teste : "Modo produção: e-mails vão aos destinatários reais."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
 async function pedirTeste() {
   const para = ($("cfgDestTeste").value.trim() || APP.email).toLowerCase();
@@ -944,7 +958,7 @@ async function salvarConfig() {
   const d = { tenant_id: APP.tenantId, prazo_ciencia_dias_uteis: +$("cfgPrazo").value || 2, lembrete_diario: $("cfgLemb").value === "true", escalonar_apos_prazo: $("cfgEsc").value === "true", email_destino_teste: APP.dados.cfg.email_destino_teste || null, historico_anos: +$("cfgHistAnos").value || 5, historico_max_por_execucao: +$("cfgHistMax").value || 8,
     horarios_consulta: ($("cfgHorarios").value.match(/\d{1,2}:\d{2}/g) || ["06:00"]).map(h => h.padStart(5, "0")).join(","), intervalo_consultas_s: Math.max(5, +$("cfgIntervalo").value || 20), max_sindicatos_por_execucao: Math.max(0, +$("cfgMaxSind").value || 0),
     ia_ativa: $("cfgIa").value === "true", ia_limite_mes: Math.max(0, +$("cfgIaLim").value || 0), ia_historico: $("cfgIaHist").value === "true", historico_automatico: $("cfgHistAuto").value === "true", updated_at: new Date().toISOString() };
-  try { await api("cct_config?on_conflict=tenant_id", { method:"POST", body: JSON.stringify(d), headers:{ Prefer: "resolution=merge-duplicates,return=representation" } });
+  try { await api("rpc/cct_salvar_config", { method:"POST", body: JSON.stringify({ p: d }) });
     if (d.historico_automatico) { const n = await api("rpc/cct_enfileirar_historico", { method: "POST", body: JSON.stringify({ p_tenant: APP.tenantId }) }); if (n) msg(`Parâmetros salvos. ${n} sindicato(s) entraram na fila do histórico.`); else msg("Parâmetros salvos."); } else msg("Parâmetros salvos.");
     await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
