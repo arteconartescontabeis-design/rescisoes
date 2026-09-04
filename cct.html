@@ -160,6 +160,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.6.0</td><td>03/09/2026</td><td>Cadastro pela Receita Federal: botão "Buscar na Receita" no CNPJ de sindicato e empresa (BrasilAPI com reserva Minha Receita) preenche razão social, UF, município, CNAE e situação cadastral, e avisa se o CNPJ não é de entidade sindical. Sugestão de sindicato (seções 5–10): ao cadastrar a empresa, o app pontua os sindicatos por CNAE, município, abrangência das CCTs e vínculos já confirmados — sempre com confirmação humana. Matriz de impacto (seção 53): aba "Impacto" na convenção com empresas vinculadas × itens-chave, e o e-mail ao responsável passa a trazer a matriz da sua empresa. Banco <code>setup_cct_v0.6.0.sql</code> validado localmente.</td></tr>
           <tr><td>v0.5.2</td><td>03/09/2026</td><td>Modo teste de e-mail configurado no app (Destinatários → "redirecionar todos os e-mails para"), substituindo o secret MAIL_DESTINO_UNICO; botão "Solicitar e-mail de teste" atendido pelo robô na próxima execução. Banco <code>setup_cct_v0.5.2.sql</code>.</td></tr>
           <tr><td>v0.5.1</td><td>03/09/2026</td><td>Layout alinhado ao Rescisões Pro (mesmas cores, tipografia, cartões, tabelas, indicadores, modais e tela de login com o logo da Artecon), mantendo a barra de navegação horizontal.</td></tr>
           <tr><td>v0.5.0</td><td>03/09/2026</td><td>E-mail ligado ao hub artecon-mail (mesmo contrato da bright-task: x-api-key, um destinatário por chamada, app "CCT Monitor"); modelo visual padrão nas mensagens; modo teste MAIL_DESTINO_UNICO (redireciona tudo para um endereço) e execução "só testar e-mail" no workflow.</td></tr>
@@ -180,9 +181,9 @@
 
 <div class="modal" id="mSind"><div class="card"><h2 id="mSindTit">Sindicato</h2>
   <input type="hidden" id="sId">
-  <div class="grid g2"><div><label>CNPJ</label><input id="sCnpj" maxlength="18"></div><div><label>Nome</label><input id="sNome"></div>
+  <div class="grid g2"><div><label>CNPJ</label><div style="display:flex;gap:6px"><input id="sCnpj" maxlength="18"><button class="b sec sm" type="button" onclick="receita('s')" style="white-space:nowrap">Buscar na Receita</button></div><small id="sRfb" style="color:var(--text-3)"></small></div><div><label>Nome</label><input id="sNome"></div>
     <div><label>Tipo</label><select id="sTipo"><option value="laboral">Laboral (empregados)</option><option value="patronal">Patronal</option></select></div>
-    <div><label>UF (referência)</label><input id="sUf" maxlength="2" placeholder="SC"></div>
+    <div><label>UF</label><input id="sUf" maxlength="2" placeholder="SC"></div><div><label>Município (sede)</label><input id="sMun"></div><div><label>CNAE</label><input id="sCnae" placeholder="9420-1/00"></div>
     <div><label>Categoria</label><input id="sCat" placeholder="ex.: Comerciários"></div>
     <div><label>Monitorar</label><select id="sMon"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
   <div class="grid g2" style="margin-top:8px"><div><label>E-mail do responsável padrão (ciência)</label><input id="sResp" type="email" placeholder="usado quando a empresa não tem o seu"></div><div><label>E-mail do gerente (escalonamento)</label><input id="sGer" type="email"></div></div>
@@ -192,11 +193,13 @@
 
 <div class="modal" id="mEmp"><div class="card"><h2 id="mEmpTit">Empresa</h2>
   <input type="hidden" id="eId">
-  <div class="grid g3"><div><label>CNPJ</label><input id="eCnpj" maxlength="18"></div><div style="grid-column:span 2"><label>Razão social</label><input id="eNome"></div>
+  <div class="grid g3"><div><label>CNPJ</label><div style="display:flex;gap:6px"><input id="eCnpj" maxlength="18"><button class="b sec sm" type="button" onclick="receita('e')" style="white-space:nowrap">Buscar na Receita</button></div><small id="eRfb" style="color:var(--text-3)"></small></div><div style="grid-column:span 2"><label>Razão social</label><input id="eNome"></div>
     <div><label>UF</label><input id="eUf" maxlength="2"></div><div><label>Município</label><input id="eMun"></div><div><label>CNAE principal</label><input id="eCnae" placeholder="0000-0/00"></div>
     <div><label>Responsável (nome)</label><input id="eRespN"></div><div><label>Responsável (e-mail)</label><input id="eRespE" type="email"></div><div><label>Monitorar ACT da empresa</label><select id="eAct"><option value="false">Não</option><option value="true">Sim</option></select></div>
     <div><label>Gerente (nome)</label><input id="eGerN"></div><div><label>Gerente (e-mail)</label><input id="eGerE" type="email"></div><div><label>Ativa</label><select id="eAtivo"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
-  <div style="margin-top:10px"><label>Sindicatos vinculados (enquadramento)</label><div id="eSinds" style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;font-size:13px"></div></div>
+  <div style="margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center"><label style="margin:0">Sindicatos vinculados (enquadramento)</label><button class="b sec sm" type="button" onclick="sugerir()">Sugerir sindicatos</button></div>
+    <div id="eSug" style="font-size:12.5px;margin:6px 0"></div>
+    <div id="eSinds" style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;font-size:13px"></div></div>
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mEmp')">Cancelar</button><button class="b" onclick="salvarEmp()">Salvar</button></div>
 </div></div>
 
@@ -210,8 +213,9 @@
 
 <div class="modal" id="mInst"><div class="card"><div class="topo"><h2 id="mInstTit">Convenção</h2><div style="display:flex;gap:8px"><button class="b sec sm" id="btnBaixar">Baixar extrato (.doc)</button><button class="b sec sm" onclick="fechar('mInst')">Fechar</button></div></div>
   <div id="mInstCab" style="font-size:13px;margin-bottom:10px"></div>
-  <div style="display:flex;gap:6px;margin-bottom:10px"><button class="b sm" id="tabAn" onclick="abaInst('an')">Análise</button><button class="b sec sm" id="tabCl" onclick="abaInst('cl')">Cláusulas</button><button class="b sec sm" onclick="reprocessar()">Reprocessar análise</button></div>
+  <div style="display:flex;gap:6px;margin-bottom:10px"><button class="b sm" id="tabAn" onclick="abaInst('an')">Análise</button><button class="b sec sm" id="tabCl" onclick="abaInst('cl')">Cláusulas</button><button class="b sec sm" id="tabImp" onclick="abaInst('imp')">Impacto por empresa</button><button class="b sec sm" onclick="reprocessar()">Reprocessar análise</button></div>
   <div id="mInstAn"></div>
+  <div id="mInstImp" style="display:none"></div>
   <div id="mInstClWrap" style="display:none"><input id="fCl" placeholder="buscar nas cláusulas…" oninput="renderCl()" style="margin-bottom:10px"><div id="mInstCl"></div></div>
 </div></div>
 
@@ -223,7 +227,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.5.2" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.6.0" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const $ = id => document.getElementById(id);
@@ -332,7 +336,7 @@ function abrirSind(id) {
   $("mSindTit").textContent = id ? "Editar sindicato" : "Novo sindicato";
   $("sId").value = id || ""; $("sCnpj").value = s.cnpj ? fmtCnpj(s.cnpj) : ""; $("sNome").value = s.nome || ""; $("sTipo").value = s.tipo || "laboral";
   $("sUf").value = s.uf || ""; $("sCat").value = s.categoria || ""; $("sMon").value = String(s.monitorar ?? true); $("sObs").value = s.observacoes || "";
-  $("sResp").value = s.responsavel_email || ""; $("sGer").value = s.gerente_email || "";
+  $("sResp").value = s.responsavel_email || ""; $("sGer").value = s.gerente_email || ""; $("sMun").value = s.municipio || ""; $("sCnae").value = s.cnae || ""; $("sRfb").textContent = s.receita_em ? "Receita consultada em " + fmtDT(s.receita_em) + (s.situacao_cadastral ? " · " + s.situacao_cadastral : "") : "";
   $("mSind").classList.add("on");
 }
 async function salvarSind() {
@@ -340,7 +344,8 @@ async function salvarSind() {
   if (cnpj.length !== 14 || !$("sNome").value.trim()) return msg("Informe CNPJ (14 dígitos) e nome.", "erro");
   const d = { tenant_id: APP.tenantId, cnpj, nome: $("sNome").value.trim(), tipo: $("sTipo").value, uf: $("sUf").value.trim().toUpperCase() || null,
     categoria: $("sCat").value.trim() || null, monitorar: $("sMon").value === "true", observacoes: $("sObs").value.trim() || null,
-    responsavel_email: $("sResp").value.trim().toLowerCase() || null, gerente_email: $("sGer").value.trim().toLowerCase() || null };
+    responsavel_email: $("sResp").value.trim().toLowerCase() || null, gerente_email: $("sGer").value.trim().toLowerCase() || null,
+    municipio: $("sMun").value.trim() || null, cnae: $("sCnae").value.trim() || null, ...(APP.rfb && APP.rfb.cnpj === cnpj ? { situacao_cadastral: APP.rfb.situacao, receita_em: new Date().toISOString() } : {}) };
   try { if ($("sId").value) await patch("cct_sindicatos", "id=eq." + $("sId").value, d); else await post("cct_sindicatos", d);
     fechar("mSind"); msg("Sindicato salvo."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
@@ -374,7 +379,7 @@ async function abrirInst(id) {
   try {
     const [cl, an, val] = await Promise.all([get(`cct_clausulas?instrumento_id=eq.${id}&select=ordem,numero_extenso,titulo,grupo,subgrupo,texto&order=ordem`),
       get(`cct_analises?instrumento_id=eq.${id}&order=versao.desc&limit=1`), get(`cct_valores?instrumento_id=eq.${id}&order=clausula_ordem`)]);
-    APP.clAtual = cl; renderCl(); renderAn(an[0], val);
+    APP.clAtual = cl; APP.anAtual = an[0]; renderCl(); renderAn(an[0], val);
   } catch (e) { $("mInstCl").innerHTML = $("mInstAn").innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
 }
 function renderCl() {
@@ -447,7 +452,9 @@ function renderNotif() {
 }
 
 // ---------- análise ----------
-function abaInst(a) { $("mInstAn").style.display = a === "an" ? "block" : "none"; $("mInstClWrap").style.display = a === "cl" ? "block" : "none"; $("tabAn").className = "b sm" + (a === "an" ? "" : " sec"); $("tabCl").className = "b sm" + (a === "cl" ? "" : " sec"); }
+function abaInst(a) { $("mInstAn").style.display = a === "an" ? "block" : "none"; $("mInstClWrap").style.display = a === "cl" ? "block" : "none"; $("mInstImp").style.display = a === "imp" ? "block" : "none";
+  $("tabAn").className = "b sm" + (a === "an" ? "" : " sec"); $("tabCl").className = "b sm" + (a === "cl" ? "" : " sec"); $("tabImp").className = "b sm" + (a === "imp" ? "" : " sec");
+  if (a === "imp" && APP.instAtual) renderImpacto(APP.instAtual); }
 function renderAn(an, val) {
   const cl = o => `<a href="#" onclick="abaInst('cl');$('fCl').value='';renderCl();document.getElementById('cl-'+${o})?.scrollIntoView();return false" style="font-size:12px">cl. ${o}</a>`;
   let h = "";
@@ -477,6 +484,70 @@ async function reprocessar() {
   try { await patch("cct_instrumentos", "id=eq." + APP.instAtual.id, { analise_status: null }); msg("Marcada para reprocessamento."); } catch (e) { msg(e.message, "erro"); }
 }
 
+// ---------- Receita Federal (BrasilAPI → Minha Receita) ----------
+async function consultarCnpj(cnpj) {
+  const fontes = [
+    { nome: "BrasilAPI", url: "https://brasilapi.com.br/api/cnpj/v1/" + cnpj, map: d => ({ razao: d.razao_social, fantasia: d.nome_fantasia, uf: d.uf, municipio: d.municipio, cnae: d.cnae_fiscal, cnae_descricao: d.cnae_fiscal_descricao, situacao: d.descricao_situacao_cadastral }) },
+    { nome: "Minha Receita", url: "https://minhareceita.org/" + cnpj, map: d => ({ razao: d.razao_social, fantasia: d.nome_fantasia, uf: d.uf, municipio: d.municipio, cnae: d.cnae_fiscal, cnae_descricao: d.cnae_fiscal_descricao, situacao: d.descricao_situacao_cadastral }) }];
+  let ultimoErro = "";
+  for (const f of fontes) {
+    try { const r = await fetch(f.url, { signal: AbortSignal.timeout(12000) }); if (!r.ok) { ultimoErro = `${f.nome}: HTTP ${r.status}`; continue; }
+      const m = f.map(await r.json()); if (!m.razao) { ultimoErro = f.nome + ": sem razão social"; continue; }
+      return { ...m, fonte: f.nome, cnpj }; }
+    catch (e) { ultimoErro = `${f.nome}: ${e.message}`; }
+  }
+  throw new Error("Consulta à Receita não concluída — " + ultimoErro);
+}
+const fmtCnae = c => { const d = String(c || "").replace(/\D/g, ""); return d.length === 7 ? `${d.slice(0,4)}-${d[4]}/${d.slice(5)}` : String(c || ""); };
+const titulo = t => (t || "").toLowerCase().replace(/(^|\s)\S/g, x => x.toUpperCase());
+async function receita(alvo) {
+  const idC = alvo === "s" ? "sCnpj" : "eCnpj", cnpj = $(idC).value.replace(/\D/g, "");
+  if (cnpj.length !== 14) return msg("Informe o CNPJ completo.", "erro");
+  const info = $(alvo === "s" ? "sRfb" : "eRfb"); info.textContent = "consultando a Receita…";
+  try {
+    const d = await consultarCnpj(cnpj); APP.rfb = d;
+    if (alvo === "s") {
+      $("sNome").value = d.razao; $("sUf").value = d.uf || ""; $("sMun").value = titulo(d.municipio); $("sCnae").value = fmtCnae(d.cnae);
+      const sindical = String(d.cnae || "").replace(/\D/g, "").startsWith("9420");
+      info.innerHTML = `${esc(d.fonte)} · ${esc(d.situacao || "")}` + (sindical ? "" : ` · <span style="color:var(--amber)">atenção: CNAE ${esc(fmtCnae(d.cnae))} não é de entidade sindical (94.20-1)</span>`);
+    } else {
+      $("eNome").value = d.razao; $("eUf").value = d.uf || ""; $("eMun").value = titulo(d.municipio); $("eCnae").value = fmtCnae(d.cnae);
+      info.innerHTML = `${esc(d.fonte)} · ${esc(d.situacao || "")} · ${esc(d.cnae_descricao || "")}`;
+      if (String(d.situacao || "").toUpperCase() !== "ATIVA") info.innerHTML += ` · <span style="color:var(--red)">situação não ativa</span>`;
+      sugerir();
+    }
+  } catch (e) { info.innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`; }
+}
+// ---------- sugestão de sindicato ----------
+async function sugerir() {
+  const cnae = $("eCnae").value.trim(), uf = $("eUf").value.trim().toUpperCase(), mun = $("eMun").value.trim();
+  if (!cnae && !mun) { $("eSug").innerHTML = `<span style="color:var(--text-3)">Informe CNAE e município (ou use "Buscar na Receita") para sugerir.</span>`; return; }
+  $("eSug").innerHTML = "calculando…";
+  try {
+    const r = await api("rpc/cct_sugerir_sindicatos", { method: "POST", body: JSON.stringify({ p_tenant: APP.tenantId, p_cnae: cnae || null, p_uf: uf || null, p_municipio: mun || null }) });
+    if (!r.length) { $("eSug").innerHTML = `<span style="color:var(--text-3)">Sem base para sugerir ainda — a sugestão aprende com os vínculos confirmados e com as CCTs importadas.</span>`; return; }
+    $("eSug").innerHTML = `<div class="aviso" style="margin:0"><b>Sugestões</b> (confirme marcando abaixo): ` + r.map(x => `<div>${esc(x.nome)} <small>(${x.tipo})</small> — <b>${x.pontos} pts</b>: ${esc((x.motivos||[]).join("; "))} <a href="#" onclick="document.querySelector('#eSinds input[data-sid=\'${x.sindicato_id}\']').checked=true;return false">marcar</a></div>`).join("") + `</div>`;
+  } catch (e) { $("eSug").innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`; }
+}
+// ---------- matriz de impacto ----------
+async function renderImpacto(inst) {
+  const el = $("mInstImp"); el.innerHTML = "carregando…";
+  try {
+    const rows = await get(`cct_v_impacto?instrumento_id=eq.${inst.id}&order=empresa,clausula_ordem`);
+    if (!rows.length) { el.innerHTML = `<div class="aviso">Nenhuma empresa vinculada ao sindicato desta convenção. Vincule as empresas na aba Empresas para gerar a matriz.</div>`; return; }
+    const emps = {}; rows.forEach(r => { (emps[r.empresa_id] ||= { nome: r.empresa, resp: r.responsavel_email, itens: [] }); if (r.chave) emps[r.empresa_id].itens.push(r); });
+    const an = APP.anAtual, comp = an && an.comparacao, varMap = {}; (comp && comp.valores || []).forEach(v => varMap[v.descricao + "|" + v.atual] = v);
+    let h = `<div class="aviso">Itens-chave da convenção aplicados a cada empresa vinculada; providências vêm do parecer. O e-mail ao responsável traz esta matriz.</div>`;
+    for (const e of Object.values(emps)) {
+      h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">${esc(e.nome)} <small style="font-family:var(--font);color:var(--text-3);font-weight:400">· responsável: ${esc(e.resp || "não informado")}</small></h2>`;
+      h += e.itens.length ? `<table><tr><th>Tema</th><th>Descrição</th><th class="r">Valor</th><th class="r">Anterior</th><th>Cláusula</th></tr>` + e.itens.map(i => { const v = varMap[i.descricao + "|" + i.valor_texto]; return `<tr><td>${esc(i.tema)}</td><td>${esc(i.descricao)}</td><td class="r"><b>${esc(i.valor_texto)}</b></td><td class="r">${v ? esc(v.anterior) + (v.variacao_pct != null ? ` (${v.variacao_pct}%)` : "") : "—"}</td><td>cl. ${i.clausula_ordem} <small>${esc(i.clausula_titulo||"")}</small></td></tr>`; }).join("") + `</table>` : `<small>Sem valores extraídos.</small>`;
+      if (an && (an.providencias||[]).length) h += `<div style="margin-top:8px"><b>Providências:</b><ul style="margin:4px 0 0;padding-left:18px">${an.providencias.map(p => `<li>${esc(p.acao)}${p.prazo ? ` <small>(${esc(p.prazo)})</small>` : ""}</li>`).join("")}</ul></div>`;
+      h += `</div>`;
+    }
+    el.innerHTML = h;
+  } catch (e) { el.innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
+}
+
 // ---------- empresas ----------
 function renderEmp() {
   const nomeS = id => (APP.dados.sind.find(s => s.id === id) || {}).nome || "?";
@@ -493,7 +564,7 @@ function abrirEmp(id) {
   $("mEmpTit").textContent = id ? "Editar empresa" : "Nova empresa";
   $("eId").value = id || ""; $("eCnpj").value = e.cnpj ? fmtCnpj(e.cnpj) : ""; $("eNome").value = e.razao_social || ""; $("eUf").value = e.uf || ""; $("eMun").value = e.municipio || ""; $("eCnae").value = e.cnae || "";
   $("eRespN").value = e.responsavel_nome || ""; $("eRespE").value = e.responsavel_email || ""; $("eGerN").value = e.gerente_nome || ""; $("eGerE").value = e.gerente_email || "";
-  $("eAct").value = String(e.monitorar_act ?? false); $("eAtivo").value = String(e.ativo ?? true);
+  $("eAct").value = String(e.monitorar_act ?? false); $("eAtivo").value = String(e.ativo ?? true); $("eSug").innerHTML = ""; $("eRfb").textContent = e.receita_em ? "Receita consultada em " + fmtDT(e.receita_em) + (e.situacao_cadastral ? " · " + e.situacao_cadastral : "") : "";
   const vinc = new Set((e.vinculos||[]).map(v => v.sindicato_id));
   $("eSinds").innerHTML = APP.dados.sind.map(s => `<label style="display:flex;gap:6px;align-items:center;font-size:13px;color:inherit"><input type="checkbox" style="width:auto" data-sid="${s.id}" ${vinc.has(s.id) ? "checked" : ""}> ${esc(s.nome)} <small style="color:var(--cinza)">(${s.tipo})</small></label>`).join("") || `<small>Cadastre sindicatos primeiro.</small>`;
   $("mEmp").classList.add("on");
@@ -503,7 +574,7 @@ async function salvarEmp() {
   if (cnpj.length !== 14 || !$("eNome").value.trim()) return msg("Informe CNPJ (14 dígitos) e razão social.", "erro");
   const d = { tenant_id: APP.tenantId, cnpj, razao_social: $("eNome").value.trim(), uf: $("eUf").value.trim().toUpperCase() || null, municipio: $("eMun").value.trim() || null, cnae: $("eCnae").value.trim() || null,
     responsavel_nome: $("eRespN").value.trim() || null, responsavel_email: $("eRespE").value.trim().toLowerCase() || null, gerente_nome: $("eGerN").value.trim() || null, gerente_email: $("eGerE").value.trim().toLowerCase() || null,
-    monitorar_act: $("eAct").value === "true", ativo: $("eAtivo").value === "true" };
+    monitorar_act: $("eAct").value === "true", ativo: $("eAtivo").value === "true", ...(APP.rfb && APP.rfb.cnpj === cnpj ? { cnae_descricao: APP.rfb.cnae_descricao, situacao_cadastral: APP.rfb.situacao, receita_em: new Date().toISOString() } : {}) };
   try {
     let id = $("eId").value;
     if (id) await patch("cct_empresas", "id=eq." + id, d); else id = (await post("cct_empresas", d))[0].id;
