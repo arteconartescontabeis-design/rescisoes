@@ -2,13 +2,17 @@ name: CCT Monitor - consulta diaria
 
 on:
   schedule:
-    - cron: "0 9 * * 1-5"      # 06h00 em Brasilia (UTC-3), dias uteis
+    - cron: "5 9-23 * * 1-5"   # de hora em hora, 06h-20h de Brasilia (UTC-3), dias uteis; o robo so consulta nas horas configuradas no app
   workflow_dispatch:
     inputs:
       apenas_cnpj:
         description: "Rodar so para um CNPJ de sindicato (opcional)"
         required: false
         default: ""
+      forcar:
+        description: "Executar agora, ignorando os horarios configurados"
+        required: false
+        default: "true"
       teste_email:
         description: "So testar o e-mail: informe um endereco e nada mais e executado"
         required: false
@@ -17,6 +21,10 @@ on:
 concurrency:
   group: cct-monitor
   cancel-in-progress: false
+
+permissions:
+  contents: read
+  models: read      # GitHub Models (IA gratuita) com o GITHUB_TOKEN
 
 jobs:
   monitorar:
@@ -41,8 +49,11 @@ jobs:
           MAIL_API_KEY: ${{ secrets.MAIL_API_KEY }}
           MAIL_DESTINO_UNICO: ${{ secrets.MAIL_DESTINO_UNICO }}
           TESTE_EMAIL: ${{ inputs.teste_email }}
+          FORCAR: ${{ inputs.forcar }}
           APENAS_CNPJ: ${{ inputs.apenas_cnpj }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_MODEL: openai/gpt-4o
           ORIGEM: github-actions
         run: xvfb-run -a python monitor_cct.py
       - name: Guardar log e extratos da execucao
