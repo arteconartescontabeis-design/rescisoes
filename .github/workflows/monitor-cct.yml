@@ -2,7 +2,7 @@ name: CCT Monitor - consulta diaria
 
 on:
   schedule:
-    - cron: "5 9-23 * * 1-5"   # de hora em hora, 06h-20h de Brasilia (UTC-3), dias uteis; o robo so consulta nas horas configuradas no app
+    - cron: "5 * * * *"        # de hora em hora, 24h, todos os dias; o robo so consulta nas horas (e dias uteis) configuradas no app
   workflow_dispatch:
     inputs:
       apenas_cnpj:
