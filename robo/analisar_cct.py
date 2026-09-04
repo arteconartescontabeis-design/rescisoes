@@ -14,6 +14,8 @@ import time
 import unicodedata
 
 MODELO_IA = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+MODELO_GITHUB = os.environ.get("GITHUB_MODEL", "openai/gpt-4o")   # GitHub Models (grátis via GITHUB_TOKEN + permissions: models: read)
+LIMITE_CHARS_GITHUB = 22000   # nível gratuito tem janela menor: compactamos o material enviado
 
 # ----------------------------------------------------------------------------- utilidades
 def norm(s):
@@ -165,65 +167,155 @@ def comparar(anterior, atual):
 
 
 # ----------------------------------------------------------------------------- 3) parecer (IA opcional)
-PROMPT_SISTEMA = """Você é analista de Departamento Pessoal de um escritório de contabilidade brasileiro.
-Receberá as cláusulas de uma Convenção Coletiva de Trabalho (CCT) registrada no Mediador/MTE, os valores já extraídos
-e, se houver, a comparação com a versão anterior. Produza um parecer objetivo para o DP.
-Responda SOMENTE com JSON válido, sem markdown, no formato:
-{"resumo": "3 a 6 frases", 
- "destaques": [{"tema": "...", "texto": "...", "clausulas": [ordem, ...]}],
- "providencias": [{"acao": "...", "prazo": "...", "clausulas": [ordem, ...]}],
- "alertas": ["..."],
- "pontos_incertos": ["..."]}
-Regras: cite SEMPRE o número de ordem da cláusula em "clausulas"; não invente valores — use apenas os que constam no texto;
-se algo não estiver claro, coloque em pontos_incertos em vez de afirmar."""
+PROMPT_SISTEMA = """Você é analista de Departamento Pessoal de um escritório de contabilidade brasileiro e vai produzir um parecer
+sobre uma Convenção Coletiva de Trabalho (CCT) registrada no Mediador/MTE, para uso interno do DP.
+
+REGRA ABSOLUTA: o parecer só pode conter o que está ESCRITO nas cláusulas fornecidas. Nada de interpretação, inferência,
+conhecimento externo, legislação não citada no texto, estimativas ou suposições. Se algo não estiver no texto, não mencione.
+
+Para garantir isso, CADA destaque, providência e alerta deve trazer:
+- "clausulas": números de ordem [n] das cláusulas de origem (obrigatório);
+- "trecho": cópia LITERAL (caractere por caractere, sem reticências, sem resumir) de um trecho contínuo de 30 a 300
+  caracteres da cláusula citada, que sustenta a afirmação. Itens cujo trecho não for encontrado no texto serão descartados.
+Valores, percentuais, datas e prazos devem ser reproduzidos exatamente como aparecem no texto (mesma grafia).
+
+Seja DETALHADO: percorra todos os grupos de cláusulas (salários, gratificações/auxílios, contrato, relações de trabalho,
+jornada, férias/licenças, saúde/segurança, relações sindicais, disposições gerais) e registre um destaque para cada
+obrigação, valor, prazo ou condição relevante para o DP. As providências são apenas as ações que decorrem de obrigação
+EXPRESSA no texto (ex.: "recolher a contribuição até dia X" quando a cláusula fixa a data).
+
+Responda SOMENTE com JSON válido, sem markdown:
+{"resumo": "parágrafo só com fatos presentes no texto, com os números exatamente como no texto",
+ "destaques": [{"tema": "...", "texto": "...", "clausulas": [n], "trecho": "..."}],
+ "providencias": [{"acao": "...", "prazo": "...", "clausulas": [n], "trecho": "..."}],
+ "alertas": [{"texto": "...", "clausulas": [n], "trecho": "..."}],
+ "pontos_incertos": ["o que o texto deixa em aberto — sem completar com suposições"]}"""
+
+
+def _norm_txt(t):
+    t = unicodedata.normalize("NFKD", t or "").encode("ascii", "ignore").decode().lower()
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _numeros(t):
+    return re.findall(r"R\$\s*[\d\.]+,\d{2}|\d{1,3}(?:[.,]\d{1,2})?\s*%|\d{1,2}/\d{1,2}/\d{2,4}|\b\d{1,2}º?\s+de\s+[a-zç]+\b", t or "", re.I)
 
 
 def _validar_refs(parecer, dados, valores):
+    """Regra absoluta: só sobrevive o que está no texto. Cada item precisa de cláusula existente + trecho literal
+    localizado nela + todos os números/percentuais/datas do item presentes nas cláusulas citadas. O resto é DESCARTADO."""
     ordens = {c["ordem"]: c for c in dados.get("clausulas", [])}
-    problemas = []
-    for grupo in ("destaques", "providencias"):
+    texto_total = _norm_txt(" ".join(c["texto"] for c in ordens.values()))
+    descartados = []
+
+    def valida(item, grupo):
+        refs = [o for o in (item.get("clausulas") or []) if isinstance(o, int) and o in ordens]
+        if not refs:
+            return "sem cláusula de origem válida"
+        item["clausulas"] = refs
+        base = _norm_txt(" ".join(ordens[o]["texto"] + " " + (ordens[o].get("titulo") or "") for o in refs))
+        trecho = _norm_txt(item.get("trecho") or "")
+        if len(trecho) < 20:
+            return "sem trecho literal"
+        if trecho not in base:
+            return "trecho não encontrado literalmente na(s) cláusula(s) citada(s)"
+        corpo = (item.get("texto") or "") + " " + (item.get("acao") or "") + " " + (item.get("prazo") or "")
+        faltando = [n for n in _numeros(corpo) if _norm_txt(n).replace(" ", "") not in base.replace(" ", "")]
+        if faltando:
+            return f"valor(es) {faltando} não constam na(s) cláusula(s) citada(s)"
+        item["confianca"] = "ALTA"
+        return None
+
+    for grupo in ("destaques", "providencias", "alertas"):
+        mantidos = []
         for item in parecer.get(grupo, []) or []:
-            refs = [o for o in (item.get("clausulas") or []) if isinstance(o, int)]
-            item["clausulas"] = [o for o in refs if o in ordens]
-            if len(item["clausulas"]) != len(refs):
-                problemas.append(f"{grupo}: referência a cláusula inexistente removida")
-            texto = " ".join(ordens[o]["texto"] for o in item["clausulas"])
-            nums = re.findall(r"R\$\s*[\d\.]+,\d{2}|\d{1,3}(?:[.,]\d{1,2})?\s*%", item.get("texto") or item.get("acao") or "")
-            faltando = [n for n in nums if n.replace(" ", "") not in texto.replace(" ", "")]
-            item["confianca"] = "ALTA" if item["clausulas"] and not faltando else "NECESSITA_VALIDACAO"
-            if faltando:
-                problemas.append(f"{grupo}: valor(es) {faltando} não localizados na(s) cláusula(s) citada(s)")
-    parecer["validacao"] = problemas
+            if isinstance(item, str):
+                item = {"texto": item, "clausulas": [], "trecho": ""}
+            motivo = valida(item, grupo)
+            if motivo:
+                descartados.append({"grupo": grupo, "item": (item.get("texto") or item.get("acao") or "")[:160], "motivo": motivo})
+            else:
+                mantidos.append(item)
+        parecer[grupo] = mantidos
+    # resumo: frase com número que não existe no texto da CCT é removida
+    frases, resumo_ok = re.split(r"(?<=[.;])\s+", parecer.get("resumo") or ""), []
+    for f in frases:
+        nums = _numeros(f)
+        if all(_norm_txt(n).replace(" ", "") in texto_total.replace(" ", "") for n in nums):
+            resumo_ok.append(f)
+        else:
+            descartados.append({"grupo": "resumo", "item": f[:160], "motivo": "número não localizado no texto da CCT"})
+    parecer["resumo"] = " ".join(resumo_ok).strip()
+    parecer["pontos_incertos"] = [p for p in (parecer.get("pontos_incertos") or []) if isinstance(p, str)][:10]
+    parecer["descartados"] = descartados
+    parecer["validacao"] = [f"{d['grupo']}: {d['motivo']}" for d in descartados]
     return parecer
 
 
+def _material(dados, valores, comparacao, limite_chars=None):
+    """Monta o texto enviado ao modelo; com limite, encurta as cláusulas priorizando as com valores extraídos."""
+    meta = dados.get("metadados", {})
+    cab = (f"CCT {meta.get('numero_registro')} — vigência {dados.get('vigencia')} — categoria {dados.get('categoria')} — "
+           f"abrangência {dados.get('abrangencia_territorial')}\nPartes: {[p['nome'] for p in dados.get('partes', [])]}\n\n"
+           f"VALORES EXTRAÍDOS (determinísticos):\n{json.dumps(valores, ensure_ascii=False)[:6000 if not limite_chars else 3000]}\n\n")
+    if comparacao:
+        comp = {k: comparacao[k] for k in ("novas", "excluidas", "alteradas", "valores")}
+        cab += f"COMPARAÇÃO COM A ANTERIOR ({comparacao.get('anterior')}):\n{json.dumps(comp, ensure_ascii=False)[:8000 if not limite_chars else 2500]}\n\n"
+    com_valor = {v["clausula_ordem"] for v in valores}
+    cls = dados["clausulas"]
+    if not limite_chars:
+        corpo = "\n\n".join(f"[{c['ordem']}] {c['grupo']} > {c['subgrupo']} > {c['titulo']}\n{c['texto'][:2500]}" for c in cls)
+        return cab + "CLÁUSULAS:\n" + corpo
+    orcamento = max(4000, limite_chars - len(cab))
+    por_clausula = max(160, orcamento // max(1, len(cls)))
+    partes = []
+    for c in cls:
+        lim = por_clausula * 2 if c["ordem"] in com_valor else por_clausula
+        t = c["texto"] if len(c["texto"]) <= lim else c["texto"][:lim] + " (...)"
+        partes.append(f"[{c['ordem']}] {c['grupo']} > {c['titulo']}\n{t}")
+    return (cab + "CLÁUSULAS (resumidas por limite de tamanho):\n" + "\n\n".join(partes))[:limite_chars]
+
+
+def _parse_json(txt):
+    txt = re.sub(r"^```(?:json)?|```$", "", txt.strip(), flags=re.M).strip()
+    i, j = txt.find("{"), txt.rfind("}")
+    return json.loads(txt[i:j + 1] if i >= 0 and j > i else txt)
+
+
 def parecer_ia(dados, valores, comparacao=None, api_key=None, timeout=120):
+    """Anthropic (ANTHROPIC_API_KEY) ou, na ausência, GitHub Models grátis (GITHUB_TOKEN). Retorna (parecer, erro)."""
     import requests
     key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-    if not key:
-        return None, "ANTHROPIC_API_KEY não configurada"
-    cls = "\n\n".join(f"[{c['ordem']}] {c['grupo']} > {c['subgrupo']} > {c['titulo']}\n{c['texto'][:2500]}" for c in dados["clausulas"])
-    meta = dados.get("metadados", {})
-    corpo = (f"CCT {meta.get('numero_registro')} — vigência {dados.get('vigencia')} — categoria {dados.get('categoria')} — "
-             f"abrangência {dados.get('abrangencia_territorial')}\nPartes: {[p['nome'] for p in dados.get('partes', [])]}\n\n"
-             f"VALORES EXTRAÍDOS (determinísticos):\n{json.dumps(valores, ensure_ascii=False)[:6000]}\n\n"
-             + (f"COMPARAÇÃO COM A ANTERIOR ({comparacao.get('anterior')}):\n{json.dumps({k: comparacao[k] for k in ('novas','excluidas','alteradas','valores')}, ensure_ascii=False)[:8000]}\n\n" if comparacao else "")
-             + f"CLÁUSULAS:\n{cls}")
+    gh = os.environ.get("GITHUB_TOKEN")
     t0 = time.time()
-    r = requests.post("https://api.anthropic.com/v1/messages", timeout=timeout,
-                      headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                      json={"model": MODELO_IA, "max_tokens": 3000, "system": PROMPT_SISTEMA,
-                            "messages": [{"role": "user", "content": corpo[:180000]}]})
-    if r.status_code != 200:
-        return None, f"API HTTP {r.status_code}: {r.text[:300]}"
-    txt = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
-    txt = re.sub(r"^```json|```$", "", txt.strip(), flags=re.M).strip()
+    if key:
+        corpo = _material(dados, valores, comparacao)
+        r = requests.post("https://api.anthropic.com/v1/messages", timeout=timeout,
+                          headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                          json={"model": MODELO_IA, "max_tokens": 6000, "system": PROMPT_SISTEMA,
+                                "messages": [{"role": "user", "content": corpo[:180000]}]})
+        if r.status_code != 200:
+            return None, f"Anthropic HTTP {r.status_code}: {r.text[:300]}"
+        txt = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
+        modelo = MODELO_IA
+    elif gh:
+        corpo = _material(dados, valores, comparacao, LIMITE_CHARS_GITHUB)
+        r = requests.post("https://models.github.ai/inference/chat/completions", timeout=timeout,
+                          headers={"Authorization": f"Bearer {gh}", "Content-Type": "application/json", "Accept": "application/vnd.github+json"},
+                          json={"model": MODELO_GITHUB, "max_tokens": 2500, "temperature": 0.2,
+                                "messages": [{"role": "system", "content": PROMPT_SISTEMA}, {"role": "user", "content": corpo}]})
+        if r.status_code != 200:
+            return None, f"GitHub Models HTTP {r.status_code}: {r.text[:300]}"
+        txt = r.json()["choices"][0]["message"]["content"]
+        modelo = "github:" + MODELO_GITHUB
+    else:
+        return None, "nenhum provedor de IA configurado (ANTHROPIC_API_KEY ou GITHUB_TOKEN)"
     try:
-        parecer = json.loads(txt)
+        parecer = _parse_json(txt)
     except Exception as e:
         return None, f"resposta da IA não é JSON válido: {e}"
     parecer = _validar_refs(parecer, dados, valores)
-    parecer["modelo"] = MODELO_IA
+    parecer["modelo"] = modelo
     parecer["duracao_ms"] = int((time.time() - t0) * 1000)
     return parecer, None
 
@@ -234,6 +326,8 @@ def analisar(dados, anterior=None, usar_ia=True):
     valores = extrair_valores(dados)
     comparacao = comparar(anterior, dados) if anterior else None
     parecer, erro = (parecer_ia(dados, valores, comparacao) if usar_ia else (None, "IA desligada"))
+    if parecer is None and usar_ia:
+        erro = erro or "IA não respondeu"
     return {
         "status": "CONCLUIDA" if parecer else "ANALISE_IA_NAO_CONCLUIDA",
         "erro_ia": erro, "modelo": (parecer or {}).get("modelo"),
@@ -241,6 +335,7 @@ def analisar(dados, anterior=None, usar_ia=True):
         "resumo": (parecer or {}).get("resumo"), "destaques": (parecer or {}).get("destaques", []),
         "providencias": (parecer or {}).get("providencias", []), "alertas": (parecer or {}).get("alertas", []),
         "pontos_incertos": (parecer or {}).get("pontos_incertos", []), "validacao": (parecer or {}).get("validacao", []),
+        "descartados": (parecer or {}).get("descartados", []),
         "duracao_ms": int((time.time() - t0) * 1000),
     }
 
