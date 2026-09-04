@@ -91,7 +91,7 @@
 </header>
 <nav id="nav" style="display:none">
   <button data-aba="painel" class="on">Painel</button><button data-aba="sindicatos">Sindicatos</button><button data-aba="empresas">Empresas</button><button data-aba="instrumentos">Convenções</button><button data-aba="confirmacoes">Confirmações</button>
-  <button data-aba="consultas">Consultas</button><button data-aba="erros">Central de Erros</button><button data-aba="destinatarios">Destinatários</button><button data-aba="versoes">Versões</button>
+  <button data-aba="consultas">Consultas</button><button data-aba="erros">Central de Erros</button><button data-aba="destinatarios">Destinatários</button><button data-aba="usuarios" id="navUsuarios" style="display:none">Usuários</button><button data-aba="versoes">Versões</button>
 </nav>
 <main>
   <div id="login"><div class="auth-wrap">
@@ -157,9 +157,15 @@
       </div>
     </section>
 
+    <section data-sec="usuarios" style="display:none">
+      <div class="card"><div class="topo"><h2>Usuários do escritório</h2><button class="b" onclick="abrirUsu()">+ Novo usuário</button></div><div id="tabUsu"></div>
+        <div class="aviso">Os usuários são os mesmos do Rescisões Pro (login único da Artecon). "Diretoria" administra usuários; "Usuário" acessa e opera. A senha inicial deve ser informada ao criar; o próprio usuário pode trocá-la pelo e-mail de redefinição.</div></div>
+    </section>
+
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.7.0</td><td>03/09/2026</td><td>Aba Usuários (só para diretoria/admin): lista os usuários do escritório, cria novo usuário (mesmo modelo do Rescisões Pro — login + colaborador + papel), envia e-mail de redefinição de senha. Convenções: botão "PDF" que gera a convenção completa (capa com registro, partes, vigência, categoria, abrangência, todas as cláusulas por grupo/subgrupo, anexos) pela impressão do navegador → "Salvar como PDF".</td></tr>
           <tr><td>v0.6.0</td><td>03/09/2026</td><td>Cadastro pela Receita Federal: botão "Buscar na Receita" no CNPJ de sindicato e empresa (BrasilAPI com reserva Minha Receita) preenche razão social, UF, município, CNAE e situação cadastral, e avisa se o CNPJ não é de entidade sindical. Sugestão de sindicato (seções 5–10): ao cadastrar a empresa, o app pontua os sindicatos por CNAE, município, abrangência das CCTs e vínculos já confirmados — sempre com confirmação humana. Matriz de impacto (seção 53): aba "Impacto" na convenção com empresas vinculadas × itens-chave, e o e-mail ao responsável passa a trazer a matriz da sua empresa. Banco <code>setup_cct_v0.6.0.sql</code> validado localmente.</td></tr>
           <tr><td>v0.5.2</td><td>03/09/2026</td><td>Modo teste de e-mail configurado no app (Destinatários → "redirecionar todos os e-mails para"), substituindo o secret MAIL_DESTINO_UNICO; botão "Solicitar e-mail de teste" atendido pelo robô na próxima execução. Banco <code>setup_cct_v0.5.2.sql</code>.</td></tr>
           <tr><td>v0.5.1</td><td>03/09/2026</td><td>Layout alinhado ao Rescisões Pro (mesmas cores, tipografia, cartões, tabelas, indicadores, modais e tela de login com o logo da Artecon), mantendo a barra de navegação horizontal.</td></tr>
@@ -203,6 +209,13 @@
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mEmp')">Cancelar</button><button class="b" onclick="salvarEmp()">Salvar</button></div>
 </div></div>
 
+<div class="modal" id="mUsu"><div class="card" style="max-width:560px"><h2>Novo usuário</h2>
+  <div class="grid g2"><div><label>Nome</label><input id="uNome"></div><div><label>E-mail (login)</label><input id="uEmail" type="email"></div>
+    <div><label>Senha inicial</label><input id="uSenha" type="password" autocomplete="new-password" placeholder="mínimo 8 caracteres"></div>
+    <div><label>Papel</label><select id="uPapel"><option value="usuario">Usuário</option><option value="diretoria">Diretoria (admin)</option></select></div></div>
+  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mUsu')">Cancelar</button><button class="b" onclick="salvarUsu()">Criar usuário</button></div>
+</div></div>
+
 <div class="modal" id="mDest"><div class="card" style="max-width:560px"><h2>Destinatário de alertas</h2>
   <input type="hidden" id="dId">
   <div class="grid g2"><div><label>Nome</label><input id="dNome"></div><div><label>E-mail</label><input id="dEmail" type="email"></div>
@@ -211,7 +224,7 @@
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mDest')">Cancelar</button><button class="b" onclick="salvarDest()">Salvar</button></div>
 </div></div>
 
-<div class="modal" id="mInst"><div class="card"><div class="topo"><h2 id="mInstTit">Convenção</h2><div style="display:flex;gap:8px"><button class="b sec sm" id="btnBaixar">Baixar extrato (.doc)</button><button class="b sec sm" onclick="fechar('mInst')">Fechar</button></div></div>
+<div class="modal" id="mInst"><div class="card"><div class="topo"><h2 id="mInstTit">Convenção</h2><div style="display:flex;gap:8px"><button class="b sec sm" onclick="pdfCct(APP.instAtual.id)">Gerar PDF</button><button class="b sec sm" id="btnBaixar">Baixar extrato (.doc)</button><button class="b sec sm" onclick="fechar('mInst')">Fechar</button></div></div>
   <div id="mInstCab" style="font-size:13px;margin-bottom:10px"></div>
   <div style="display:flex;gap:6px;margin-bottom:10px"><button class="b sm" id="tabAn" onclick="abaInst('an')">Análise</button><button class="b sec sm" id="tabCl" onclick="abaInst('cl')">Cláusulas</button><button class="b sec sm" id="tabImp" onclick="abaInst('imp')">Impacto por empresa</button><button class="b sec sm" onclick="reprocessar()">Reprocessar análise</button></div>
   <div id="mInstAn"></div>
@@ -227,7 +240,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.6.0" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.7.0" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const $ = id => document.getElementById(id);
@@ -270,9 +283,10 @@ async function entrar() {
   } catch (e) { $("lMsg").textContent = e.message; }
 }
 async function iniciar() {
-  const u = await get(`resc_usuarios?select=tenant_id&auth_id=eq.${APP.uid}&limit=1`);
+  const u = await get(`resc_usuarios?select=tenant_id,papel&auth_id=eq.${APP.uid}&limit=1`);
   if (!u.length) { $("lMsg").textContent = "Usuário sem vínculo de tenant (resc_usuarios)."; return; }
-  APP.tenantId = u[0].tenant_id;
+  APP.tenantId = u[0].tenant_id; APP.papel = u[0].papel; APP.admin = ["diretoria","superadmin","admin"].includes(APP.papel);
+  $("navUsuarios").style.display = APP.admin ? "flex" : "none";
   $("login").style.display = "none"; $("app").style.display = "block"; $("nav").style.display = "flex";
   $("usuario").textContent = APP.email; $("btnSair").style.display = "inline-block";
   await carregarTudo(); mostrar("painel");
@@ -302,6 +316,7 @@ async function carregarTudo() {
     get(`cct_config?tenant_id=eq.${t}`)]);
   APP.dados = { sind, inst, cons, inc, dest, notif, emp, conf, cfg: cfg[0] || { prazo_ciencia_dias_uteis: 2, lembrete_diario: true, escalonar_apos_prazo: true } };
   renderPainel(); renderSind(); renderInst(); renderCons(); renderInc(); renderDest(); renderNotif(); renderEmp(); renderConf();
+  if (APP.admin) { try { APP.dados.usu = await get(`resc_usuarios?select=auth_id,papel,colaborador:resc_colaboradores(nome,email,status)&order=papel`); } catch (e) { APP.dados.usu = []; } renderUsu(); }
 }
 
 function renderPainel() {
@@ -359,7 +374,7 @@ function tabInst(lista) {
   return `<table><tr><th>Registro</th><th>Tipo</th><th>Sindicato</th><th>Categoria</th><th>Vigência</th><th>Registro MTE</th><th>Detectada</th><th>Importação</th><th>Análise</th><th>Ciência</th><th class="r">Cláus.</th><th></th></tr>` +
     lista.map(i => `<tr><td><b>${esc(i.numero_registro)}</b></td><td>${esc(i.tipo||"")}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.categoria||"")}</td>
       <td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${fmtD(i.data_registro)}</td><td>${fmtDT(i.detectado_em)}</td><td>${tagStatus(i.status_importacao)}</td><td>${i.analise_status ? tagStatus(i.analise_status === "CONCLUIDA" ? "IMPORTADO" : "ATENCAO").replace(/>[^<]+</, ">" + (i.analise_status === "CONCLUIDA" ? "concluída" : "IA pendente") + "<") : "—"}</td>
-      <td>${tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td><button class="b sec sm" onclick="abrirInst('${i.id}')">Abrir</button></td></tr>`).join("") + `</table>`;
+      <td>${tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td style="white-space:nowrap"><button class="b sec sm" onclick="abrirInst('${i.id}')">Abrir</button> <button class="b sec sm" onclick="pdfCct('${i.id}')">PDF</button></td></tr>`).join("") + `</table>`;
 }
 function renderInst() {
   const f = ($("fInst").value || "").toLowerCase();
@@ -482,6 +497,75 @@ function renderAn(an, val) {
 async function reprocessar() {
   if (!APP.instAtual || !confirm("Marcar para nova análise na próxima execução do robô?")) return;
   try { await patch("cct_instrumentos", "id=eq." + APP.instAtual.id, { analise_status: null }); msg("Marcada para reprocessamento."); } catch (e) { msg(e.message, "erro"); }
+}
+
+// ---------- usuários (mesmo modelo do Rescisões Pro) ----------
+function renderUsu() {
+  const l = APP.dados.usu || [];
+  $("tabUsu").innerHTML = `<table><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Status</th><th></th></tr>` +
+    l.map(u => `<tr><td>${esc(u.colaborador?.nome||"")}</td><td>${esc(u.colaborador?.email||"")}</td><td>${tagStatus(["diretoria","superadmin","admin"].includes(u.papel) ? "INFORMATIVO" : "IMPORTADO").replace(/>[^<]+</, ">" + esc(u.papel) + "<")}</td><td>${esc(u.colaborador?.status||"")}</td>
+      <td>${u.colaborador?.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(u.colaborador.email)}')">Redefinir senha</button>` : ""}</td></tr>`).join("") + `</table>`;
+}
+function abrirUsu() { $("uNome").value = ""; $("uEmail").value = ""; $("uSenha").value = ""; $("uPapel").value = "usuario"; $("mUsu").classList.add("on"); }
+async function salvarUsu() {
+  const nome = $("uNome").value.trim(), email = $("uEmail").value.trim().toLowerCase(), senha = $("uSenha").value, papel = $("uPapel").value;
+  if (!nome || !email.includes("@") || senha.length < 8) return msg("Informe nome, e-mail válido e senha com 8+ caracteres.", "erro");
+  try {
+    // 1) conta de login (não troca a sessão do admin: o token retornado é ignorado)
+    const r = await fetch(CONFIG.url + "/auth/v1/signup", { method:"POST", headers:{ apikey: CONFIG.key, "Content-Type":"application/json" }, body: JSON.stringify({ email, password: senha, data: { nome, papel } }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { let m = d.error_description || d.msg || d.error || d.message || ("Erro " + r.status);
+      if (/signups? not allowed/i.test(m)) m = "Cadastro de novos usuários está desativado no Supabase (Auth → Providers → Email → desmarque \"Disable signups\").";
+      if (/already/i.test(m)) m = "Este e-mail já possui login."; throw new Error(m); }
+    if (d.user && Array.isArray(d.user.identities) && d.user.identities.length === 0) throw new Error("Este e-mail já possui login.");
+    const uid = (d.user && d.user.id) || d.id; if (!uid) throw new Error("Login criado, mas sem ID retornado.");
+    // 2) colaborador + usuário (idempotente)
+    let rows = await get(`resc_colaboradores?select=id&auth_id=eq.${uid}`); let colabId = rows[0]?.id;
+    if (!colabId) { try { colabId = (await post("resc_colaboradores", { tenant_id: APP.tenantId, auth_id: uid, nome, email, status: "ativo" }))[0].id; } catch (e) { if (!/duplicate|23505/i.test(e.message)) throw e; rows = await get(`resc_colaboradores?select=id&auth_id=eq.${uid}`); colabId = rows[0]?.id; } }
+    const us = await get(`resc_usuarios?select=auth_id&auth_id=eq.${uid}`);
+    if (!us.length) await post("resc_usuarios", { tenant_id: APP.tenantId, auth_id: uid, colaborador_id: colabId, papel }, "return=minimal");
+    fechar("mUsu"); msg("Usuário criado. Ele já pode entrar com o e-mail e a senha informados."); await carregarTudo();
+  } catch (e) { msg(e.message, "erro"); }
+}
+async function redefinirSenha(email) {
+  if (!confirm("Enviar e-mail de redefinição de senha para " + email + "?")) return;
+  try { const r = await fetch(CONFIG.url + "/auth/v1/recover", { method:"POST", headers:{ apikey: CONFIG.key, "Content-Type":"application/json" }, body: JSON.stringify({ email }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).msg || "Erro " + r.status); msg("E-mail de redefinição enviado."); } catch (e) { msg(e.message, "erro"); }
+}
+
+// ---------- PDF da convenção completa (impressão do navegador → Salvar como PDF) ----------
+async function pdfCct(id) {
+  const i = APP.dados.inst.find(x => x.id === id); if (!i) return;
+  let cls = APP.instAtual && APP.instAtual.id === id ? APP.clAtual : null;
+  try { if (!cls) cls = await get(`cct_clausulas?instrumento_id=eq.${id}&select=ordem,numero_extenso,titulo,grupo,subgrupo,texto&order=ordem`); } catch (e) { return msg(e.message, "erro"); }
+  const partes = (i.partes||[]).map(p => `<li><b>${esc(p.nome||p)}</b>${p.cnpj ? ` — CNPJ ${esc(p.cnpj)}` : ""}${p.representante ? `, representado(a) por ${esc(p.representante)}` : ""}</li>`).join("");
+  let g = "", sg = "", corpo = "";
+  for (const c of cls) {
+    if (c.grupo && c.grupo !== g) { g = c.grupo; sg = ""; corpo += `<h2>${esc(g)}</h2>`; }
+    if (c.subgrupo && c.subgrupo !== sg) { sg = c.subgrupo; corpo += `<h3>${esc(sg)}</h3>`; }
+    corpo += `<div class="cl"><h4>CLÁUSULA ${esc(c.numero_extenso || c.ordem)} — ${esc(c.titulo)}</h4><p>${esc(c.texto)}</p></div>`;
+  }
+  const anexos = (i.anexos||[]).filter(a => !/^anexos$/i.test(a)).map(esc).join("; ");
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${esc(i.tipo||"Instrumento")} ${esc(i.numero_registro)}</title>
+  <style>@page{size:A4;margin:18mm 16mm 20mm}body{font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#111;line-height:1.45}
+  .capa{border-bottom:2px solid #1a5276;padding-bottom:10px;margin-bottom:16px}.capa h1{font-size:18pt;color:#1a5276;margin:0 0 4px}.capa .sub{color:#555;font-size:10pt}
+  table.meta{border-collapse:collapse;font-size:10.5pt;margin:10px 0}table.meta td{padding:3px 10px 3px 0;vertical-align:top}table.meta td:first-child{color:#555;white-space:nowrap}
+  h2{font-size:12.5pt;color:#1a5276;border-bottom:1px solid #ccd;margin:20px 0 6px;text-transform:uppercase;page-break-after:avoid}h3{font-size:11pt;color:#333;margin:12px 0 4px;page-break-after:avoid}
+  .cl{page-break-inside:avoid;margin:0 0 10px}.cl h4{font-size:11pt;margin:0 0 3px}.cl p{margin:0;white-space:pre-wrap;text-align:justify}
+  ul{margin:4px 0;padding-left:18px}.rodape{margin-top:24px;border-top:1px solid #ccd;padding-top:6px;font-size:9pt;color:#666}
+  @media print{.nao{display:none}}</style></head><body>
+  <div class="nao" style="background:#eef3f7;padding:8px 12px;margin-bottom:12px;font-size:10pt">Para gerar o PDF: na janela de impressão escolha <b>Salvar como PDF</b>. <button onclick="window.print()">Imprimir / Salvar PDF</button></div>
+  <div class="capa"><h1>${esc(i.tipo||"Instrumento Coletivo")} ${esc(i.numero_registro)}</h1><div class="sub">${esc(i.denominacao||"")} · Reprodução do extrato registrado no Sistema Mediador (MTE) · CCT Monitor — Artecon Artes Contábeis</div>
+  <table class="meta"><tr><td>Número de registro</td><td><b>${esc(i.numero_registro)}</b></td></tr><tr><td>Solicitação</td><td>${esc(i.numero_solicitacao||"—")}</td></tr><tr><td>Processo</td><td>${esc(i.numero_processo||"—")}</td></tr>
+  <tr><td>Registro no MTE</td><td>${fmtD(i.data_registro)}</td></tr><tr><td>Protocolo</td><td>${fmtD(i.data_protocolo)}</td></tr><tr><td>Vigência</td><td>${fmtD(i.vigencia_inicio)} a ${fmtD(i.vigencia_fim)}${i.data_base ? ` · data-base ${esc(i.data_base)}` : ""}</td></tr>
+  <tr><td>Categoria</td><td>${esc(i.categoria||"—")}</td></tr><tr><td>Abrangência</td><td>${esc(i.abrangencia||"—")}</td></tr></table>
+  <b>Partes:</b><ul>${partes}</ul></div>
+  ${corpo}
+  ${anexos ? `<h2>Anexos</h2><p>${anexos} (arquivos anexos constam apenas no Mediador)</p>` : ""}
+  <div class="rodape">Gerado pelo CCT Monitor em ${new Date().toLocaleString("pt-BR")} a partir do extrato ${esc(i.numero_registro)} (SHA-256 ${esc((i.sha256||"").slice(0,16))}…). Confira a autenticidade em https://mediador.trabalho.gov.br/sistemas/mediador/.</div>
+  <script>window.addEventListener("load", () => setTimeout(() => window.print(), 400));<\/script></body></html>`;
+  const w = window.open("", "_blank"); if (!w) return msg("O navegador bloqueou a janela — permita pop-ups para este site.", "erro");
+  w.document.open(); w.document.write(html); w.document.close();
 }
 
 // ---------- Receita Federal (BrasilAPI → Minha Receita) ----------
