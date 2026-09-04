@@ -215,6 +215,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.14.0</td><td>04/09/2026</td><td>E-mails no modelo único da Artecon (logo novo, faixa de título centralizada em índigo, bloco de dados-chave com prazo em destaque, matriz de impacto e providências numeradas, botões "Registrar ciência" e "Ver convenção", rodapé com contato). Assuntos padronizados "Artecon · CCT Monitor — …". Requer <code>logo_artecon.png</code> na raiz do repositório.</td></tr>
           <tr><td>v0.13.2</td><td>03/09/2026</td><td>Fila entre disparos: o robô continua nos disparos seguintes enquanto houver sindicato não consultado desde o último horário configurado (o que não coube nos 45 min do Actions segue na hora seguinte).</td></tr>
           <tr><td>v0.13.1</td><td>03/09/2026</td><td>Horários de consulta: o robô executa no primeiro disparo (aos :05 de cada hora, 24 h) após cada horário configurado, se ainda não rodou desde então — "23:17" passa a ser atendido às 00h05; atraso máximo de 1 h. O que não couber em um disparo (limite de 45 min do GitHub ≈ 45 sindicatos) continua no disparo seguinte. Fins de semana não consultam. Limpeza de registros: exclusiva do superadministrador (mantido).</td></tr>
           <tr><td>v0.13.0</td><td>03/09/2026</td><td>Quatro níveis de acesso: <b>Superadministrador</b> (tudo, incluindo configurações críticas — IA, horários/fila — e limpeza de registros), <b>Administrador</b> (usuários, cadastros, configurações operacionais, relatórios), <b>Operador/Analista</b> (cadastros e operação do dia a dia) e <b>Cliente</b> (só a própria empresa). Regras aplicadas no banco por funções com privilégio. Cabeçalho mostra o nível de quem está logado. Botão <b>"Analisar com IA"</b> na convenção (fila para a próxima execução do robô, dentro do limite mensal). "Limpar registros de teste" só para superadministrador. Banco <code>setup_cct_v0.13.0.sql</code> (define o titular como superadministrador).</td></tr>
@@ -321,7 +322,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.13.2" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.14.0" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
