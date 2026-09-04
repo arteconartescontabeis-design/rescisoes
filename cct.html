@@ -70,6 +70,10 @@
   .hero .estado{display:flex;gap:10px;flex-wrap:wrap} .hero .est{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:10px 14px;min-width:150px}
   .hero .est b{display:block;font-family:var(--mono);font-size:15px;font-weight:500} .hero .est span{font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.06em}
   .hero .est.ok{border-color:#7dcea0} .hero .est.erro{border-color:#f1948a;background:rgba(192,57,43,.25)}
+  .menu-wrap{position:relative;display:inline-block} .menu{display:none;position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px;min-width:210px;z-index:150}
+  .menu.on{display:block} .menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:7px;font:inherit;font-size:13px;color:var(--text);cursor:pointer}
+  .menu button:hover:not(:disabled){background:var(--gold-lt);color:var(--gold)} .menu button:disabled{color:var(--text-3);cursor:default} .menu .sep{height:1px;background:var(--border);margin:4px 0}
+  td.cnpj{font-family:var(--mono);font-size:12px;white-space:nowrap} td.nome{max-width:300px}
   .aviso{font-size:12.5px;color:var(--text-2);border-left:3px solid var(--gold);padding:10px 13px;background:var(--gold-lt);border-radius:0 9px 9px 0;margin:10px 0;line-height:1.6}
   .aviso code,.cfg code{background:var(--surface);padding:1px 6px;border-radius:5px;font-family:var(--mono);font-size:11.5px}
   /* ===== MODAL ===== */
@@ -215,6 +219,8 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.14.2</td><td>04/09/2026</td><td>Convenções: um único botão <b>Ações ▾</b> por linha reúne Abrir (parecer e análise), Cláusulas, Impacto por empresa, Gerar PDF, Baixar extrato (.doc), Analisar com IA e Registrar ciência. Sindicatos e Empresas: CNPJ em coluna própria, em uma linha só (fonte mono), com o nome quebrando quando longo.</td></tr>
+          <tr><td>v0.14.1</td><td>04/09/2026</td><td>Sindicatos, Empresas, Confirmações e Destinatários ganham o mesmo padrão de consulta de Convenções: busca livre, filtros por coluna (tipo, UF, monitorar, histórico, vínculo, ACT, situação, empresa, sindicato, grupo…) e ordenação clicando no título da coluna, com contador "N de M".</td></tr>
           <tr><td>v0.14.0</td><td>04/09/2026</td><td>E-mails no modelo único da Artecon (logo novo, faixa de título centralizada em índigo, bloco de dados-chave com prazo em destaque, matriz de impacto e providências numeradas, botões "Registrar ciência" e "Ver convenção", rodapé com contato). Assuntos padronizados "Artecon · CCT Monitor — …". Requer <code>logo_artecon.png</code> na raiz do repositório.</td></tr>
           <tr><td>v0.13.2</td><td>03/09/2026</td><td>Fila entre disparos: o robô continua nos disparos seguintes enquanto houver sindicato não consultado desde o último horário configurado (o que não coube nos 45 min do Actions segue na hora seguinte).</td></tr>
           <tr><td>v0.13.1</td><td>03/09/2026</td><td>Horários de consulta: o robô executa no primeiro disparo (aos :05 de cada hora, 24 h) após cada horário configurado, se ainda não rodou desde então — "23:17" passa a ser atendido às 00h05; atraso máximo de 1 h. O que não couber em um disparo (limite de 45 min do GitHub ≈ 45 sindicatos) continua no disparo seguinte. Fins de semana não consultam. Limpeza de registros: exclusiva do superadministrador (mantido).</td></tr>
@@ -322,7 +328,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.14.0" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.14.2" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
@@ -463,13 +469,24 @@ function renderPainel() {
   $("painelNovos").innerHTML = tabInst(d.inst.filter(i => i.origem !== "historico").slice(0, 6));
 }
 function renderSind() {
+  const all = APP.dados.sind, tab = "sind", fn = "renderSind";
   const hist = s => s.historico_status === "CONCLUIDO" ? `<span class="tag ok">${APP.dados.cfg.historico_anos || 5} anos ✓</span>` : s.historico_status ? `<span class="tag alerta">${s.historico_status === "EM_ANDAMENTO" ? "importando…" : "na fila"}</span>` : `<button class="b sec sm" onclick="pedirHistorico('${s.id}')">Importar ${APP.dados.cfg.historico_anos || 5} anos</button>`;
-  $("tabSind").innerHTML = `<div class="topo"><small style="color:var(--text-3)">Histórico: o robô importa aos poucos (${APP.dados.cfg.historico_max_por_execucao || 8} downloads por execução, com pausas) para não provocar bloqueio no Mediador. <a href="#" onclick="pedirHistoricoTodos();return false">Importar histórico de todos os monitorados</a></small></div>
-    <table><tr><th>CNPJ</th><th>Nome</th><th>Tipo</th><th>UF</th><th>Monitorar</th><th>Última consulta</th><th>Status</th><th>Histórico</th><th></th></tr>` +
-    APP.dados.sind.map(s => `<tr><td>${fmtCnpj(s.cnpj)}</td><td>${esc(s.nome)}<br><small style="color:var(--cinza)">${esc(s.categoria||"")}</small></td><td>${s.tipo ? esc(s.tipo) + (s.tipo_origem === "cct" ? ' <small style="color:var(--text-3)">(pela CCT)</small>' : "") : '<span class="tag cinza">a definir pela CCT</span>'}</td><td>${s.uf||""}</td>
-      <td>${s.monitorar && s.ativo ? '<span class="tag ok">sim</span>' : '<span class="tag cinza">não</span>'}</td><td>${fmtDT(s.ultima_consulta)}</td><td>${s.ultimo_status ? tagStatus(s.ultimo_status) : "—"}</td><td>${hist(s)}${s.historico_obs ? `<br><small style="color:var(--text-3)">${esc(s.historico_obs)}</small>` : ""}</td>
+  const g = id => (document.getElementById(id) || {}).value || "";
+  const barra = barraConsulta(tab, [{ id: "fs_tipo", label: "Tipo", opts: [["laboral","laboral"],["patronal","patronal"],["_","a definir"]], w: 140 }, { id: "fs_uf", label: "UF", opts: uniq(all.map(x => x.uf)), w: 110 },
+    { id: "fs_mon", label: "Monitorar", opts: [["sim","sim"],["nao","não"]], w: 140 }, { id: "fs_st", label: "Última consulta", opts: [["CONSULTA_CONFIRMADA","confirmada"],["CONSULTA_COM_ALERTA","com alerta"],["CONSULTA_NAO_CONCLUIDA","não concluída"],["_","nunca"]], w: 170 },
+    { id: "fs_hist", label: "Histórico", opts: [["CONCLUIDO","concluído"],["PENDENTE","na fila"],["EM_ANDAMENTO","importando"],["_","não pedido"]], w: 150 }], fn);
+  const q = g("q_" + tab).toLowerCase(), ft = g("fs_tipo"), fu = g("fs_uf"), fm = g("fs_mon"), fst = g("fs_st"), fh = g("fs_hist");
+  let l = all.filter(x => (!q || [x.nome, x.cnpj, fmtCnpj(x.cnpj), x.categoria, x.municipio, x.responsavel_email].join(" ").toLowerCase().includes(q))
+    && (!ft || (ft === "_" ? !x.tipo : x.tipo === ft)) && (!fu || x.uf === fu) && (!fm || ((x.monitorar && x.ativo) === (fm === "sim")))
+    && (!fst || (fst === "_" ? !x.ultimo_status : x.ultimo_status === fst)) && (!fh || (fh === "_" ? !x.historico_status : x.historico_status === fh)));
+  l = aplicarOrd(tab, l.map(x => ({ ...x, monitora: !!(x.monitorar && x.ativo) })));
+  const th = (t, c, cls) => thOrd(tab, t, c, fn, cls);
+  $("tabSind").innerHTML = `<div class="topo"><small style="color:var(--text-3)">Histórico: o robô importa aos poucos (${APP.dados.cfg.historico_max_por_execucao || 8} downloads por execução, com pausas) para não provocar bloqueio no Mediador. <a href="#" onclick="pedirHistoricoTodos();return false">Importar histórico de todos os monitorados</a></small></div>` + barra + contador(l.length, all.length) +
+    `<table><tr>${th("CNPJ","cnpj")}${th("Nome","nome")}${th("Tipo","tipo")}${th("UF","uf")}${th("Monitorar","monitora")}${th("Última consulta","ultima_consulta")}${th("Status","ultimo_status")}${th("Histórico","historico_status")}<th></th></tr>` +
+    l.map(s => `<tr><td class="cnpj">${fmtCnpj(s.cnpj)}</td><td class="nome">${esc(s.nome)}<br><small style="color:var(--cinza)">${esc(s.categoria||"")}</small></td><td>${s.tipo ? esc(s.tipo) + (s.tipo_origem === "cct" ? ' <small style="color:var(--text-3)">(pela CCT)</small>' : "") : '<span class="tag cinza">a definir pela CCT</span>'}</td><td>${s.uf||""}</td>
+      <td>${s.monitora ? '<span class="tag ok">sim</span>' : '<span class="tag cinza">não</span>'}</td><td>${fmtDT(s.ultima_consulta)}</td><td>${s.ultimo_status ? tagStatus(s.ultimo_status) : "—"}</td><td>${hist(s)}${s.historico_obs ? `<br><small style="color:var(--text-3)">${esc(s.historico_obs)}</small>` : ""}</td>
       <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirSind('${s.id}')">Editar</button> <button class="b sec sm" onclick="excluirSind('${s.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
-    (APP.dados.sind.length ? "" : `<div class="aviso">Nenhum sindicato cadastrado. Cadastre o sindicato laboral (e, se quiser, o patronal) de cada cliente.</div>`);
+    (all.length ? "" : `<div class="aviso">Nenhum sindicato cadastrado. Cadastre o sindicato laboral (e, se quiser, o patronal) de cada cliente.</div>`);
 }
 function abrirSind(id) {
   const s = APP.dados.sind.find(x => x.id === id) || {};
@@ -496,15 +513,51 @@ async function excluirSind(id) {
   try { await del("cct_sindicatos", "id=eq." + id); msg("Excluído."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
 
+function abrirMenu(btn) {
+  document.querySelectorAll(".menu.on").forEach(m => { if (m !== btn.nextElementSibling) m.classList.remove("on"); });
+  const m = btn.nextElementSibling, r = btn.getBoundingClientRect();
+  m.classList.toggle("on");
+  if (m.classList.contains("on")) { const h = m.offsetHeight || 260; m.style.top = (r.bottom + h > innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4) + "px"; m.style.left = Math.max(8, Math.min(r.right - m.offsetWidth, innerWidth - m.offsetWidth - 8)) + "px"; }
+}
+document.addEventListener("click", () => document.querySelectorAll(".menu.on").forEach(m => m.classList.remove("on")));
+document.addEventListener("scroll", () => document.querySelectorAll(".menu.on").forEach(m => m.classList.remove("on")), true);
+function menuInst(i) {
+  const ia = i.status_importacao !== "IMPORTADO" ? ["Analisar com IA", true] : i.analise_status === "CONCLUIDA" ? ["Nova análise com IA", false] : i.analise_status === null ? ["Na fila para análise", true] : ["Analisar com IA", false];
+  const cie = (APP.dados.conf || []).filter(c => c.instrumento_id === i.id && ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(c.status));
+  return `<div class="menu-wrap"><button class="b sm" onclick="event.stopPropagation();abrirMenu(this)">Ações ▾</button><div class="menu">
+    <button onclick="abrirInst('${i.id}')">Abrir · parecer e análise</button>
+    <button onclick="abrirInst('${i.id}','cl')">Cláusulas</button>
+    ${interno() ? `<button onclick="abrirInst('${i.id}','imp')">Impacto por empresa</button>` : ""}
+    <div class="sep"></div>
+    <button onclick="pdfCct('${i.id}')">Gerar PDF</button>
+    ${i.arquivo_path ? `<button onclick="baixar('${esc(i.arquivo_path)}')">Baixar extrato (.doc)</button>` : `<button disabled>Extrato indisponível</button>`}
+    ${interno() ? `<div class="sep"></div><button ${ia[1] ? "disabled" : ""} onclick="analisarIA('${i.id}')">${ia[0]}</button>` : ""}
+    ${cie.length ? `<button onclick="registrarCiencia('${cie[0].id}')">Registrar ciência${cie.length > 1 ? ` (${cie.length})` : ""}</button>` : `<button disabled>Ciência registrada</button>`}
+  </div></div>`;
+}
+async function analisarIA(id) { APP.instAtual = APP.dados.inst.find(x => x.id === id); await reprocessar(); await carregarTudo(); }
 APP.ord = { col: "detectado_em", asc: false };
 function ordenar(col) { APP.ord = { col, asc: APP.ord.col === col ? !APP.ord.asc : true }; renderInst(); }
+// ---- consulta genérica (busca + filtros + ordenação) para as demais abas ----
+APP.ords = {};
+function ordenarTab(tab, col, fn) { const o = APP.ords[tab] || {}; APP.ords[tab] = { col, asc: o.col === col ? !o.asc : true }; fn(); }
+function thOrd(tab, t, col, fn, cls) { const o = APP.ords[tab] || {}; return `<th class="${cls || ""}" style="cursor:pointer;user-select:none" onclick="ordenarTab('${tab}','${col}',${fn})">${t}${o.col === col ? (o.asc ? " ▲" : " ▼") : ""}</th>`; }
+function aplicarOrd(tab, lista) { const o = APP.ords[tab]; if (!o || !o.col) return lista; return [...lista].sort((a, b) => { const x = a[o.col] ?? "", y = b[o.col] ?? ""; const r = (typeof x === "number" || typeof x === "boolean") ? (+x) - (+y) : String(x).localeCompare(String(y), "pt-BR"); return o.asc ? r : -r; }); }
+function barraConsulta(tab, filtros, fn) {
+  // filtros: [{id, label, opts:[valores]}] — mantém a seleção atual
+  const atual = id => (document.getElementById(id) || {}).value || "";
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><input id="q_${tab}" placeholder="buscar…" value="${esc(atual("q_" + tab))}" style="width:200px" oninput="${fn}()">` +
+    filtros.map(f => `<select id="${f.id}" onchange="${fn}()" style="width:${f.w || 170}px"><option value="">${f.label}: todos</option>${f.opts.map(v => `<option value="${esc(v[0] ?? v)}" ${atual(f.id) === String(v[0] ?? v) ? "selected" : ""}>${esc(v[1] ?? v)}</option>`).join("")}</select>`).join("") + `</div>`;
+}
+const uniq = a => [...new Set(a.filter(Boolean))].sort();
+const contador = (n, m) => `<div style="font-size:12px;color:var(--text-3);margin-bottom:6px">${n} de ${m} · clique no título da coluna para ordenar</div>`;
 function tabInst(lista, sortable) {
   if (!lista.length) return `<div class="aviso">Nenhuma convenção com esses filtros.</div>`;
   const th = (t, col, cls) => sortable ? `<th class="${cls || ""}" style="cursor:pointer;user-select:none" onclick="ordenar('${col}')">${t}${APP.ord.col === col ? (APP.ord.asc ? " ▲" : " ▼") : ""}</th>` : `<th class="${cls || ""}">${t}</th>`;
   return `<table><tr>${th("Registro","numero_registro")}${th("Tipo","tipo")}${th("Sindicato","sindicato_nome")}${th("Categoria","categoria")}${th("Vigência","vigencia_inicio")}${th("Registro MTE","data_registro")}${th("Detectada","detectado_em")}${th("Importação","status_importacao")}${th("Análise","analise_status")}${th("Ciência","status_ciencia")}${th("Cláus.","total_clausulas","r")}<th></th></tr>` +
     lista.map(i => `<tr><td><b>${esc(i.numero_registro)}</b>${i.origem === "historico" ? '<br><span class="tag cinza">histórico</span>' : ""}</td><td>${esc(i.tipo||"")}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.categoria||"")}</td>
       <td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${fmtD(i.data_registro)}</td><td>${fmtDT(i.detectado_em)}</td><td>${tagStatus(i.status_importacao)}</td><td>${i.analise_status ? tagStatus(i.analise_status === "CONCLUIDA" ? "IMPORTADO" : "ATENCAO").replace(/>[^<]+</, ">" + (i.analise_status === "CONCLUIDA" ? "concluída" : "IA pendente") + "<") : "—"}</td>
-      <td>${tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td style="white-space:nowrap"><button class="b sec sm" onclick="abrirInst('${i.id}')">Abrir</button> <button class="b sec sm" onclick="pdfCct('${i.id}')">PDF</button></td></tr>`).join("") + `</table>`;
+      <td>${tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td style="white-space:nowrap;text-align:right">${menuInst(i)}</td></tr>`).join("") + `</table>`;
 }
 function renderInst() {
   const f = ($("fInst").value || "").toLowerCase(), hoje = new Date().toISOString().slice(0, 10);
@@ -517,7 +570,7 @@ function renderInst() {
   const { col, asc } = APP.ord; l.sort((a, b) => { const x = a[col] ?? "", y = b[col] ?? ""; const r = typeof x === "number" ? x - y : String(x).localeCompare(String(y), "pt-BR"); return asc ? r : -r; });
   $("tabInst").innerHTML = `<div style="font-size:12px;color:var(--text-3);margin-bottom:6px">${l.length} de ${APP.dados.inst.length} · clique no título da coluna para ordenar</div>` + tabInst(l, true);
 }
-async function abrirInst(id) {
+async function abrirInst(id, aba) {
   const i = APP.dados.inst.find(x => x.id === id); APP.instAtual = i;
   $("mInstTit").textContent = `${i.tipo || "Instrumento"} ${i.numero_registro}`;
   $("mInstCab").innerHTML = `<b>Partes:</b> ${(i.partes||[]).map(p => esc(p.nome || p)).join(" × ")}<br><b>Categoria:</b> ${esc(i.categoria||"—")} · <b>Abrangência:</b> ${esc(i.abrangencia||"—")}<br>
@@ -528,11 +581,11 @@ async function abrirInst(id) {
   $("btnBaixar").style.display = i.arquivo_path ? "inline-block" : "none";
   $("btnIA").style.display = interno() ? "inline-flex" : "none"; $("btnIA").disabled = false; $("btnIA").textContent = i.analise_status === "CONCLUIDA" ? "Nova análise com IA" : i.analise_status === null && i.status_importacao === "IMPORTADO" ? "Na fila para análise" : "Analisar com IA"; if (i.analise_status === null && i.status_importacao === "IMPORTADO") $("btnIA").disabled = true;
   $("btnBaixar").onclick = () => baixar(i.arquivo_path);
-  $("fCl").value = ""; $("mInstCl").innerHTML = "carregando…"; $("mInstAn").innerHTML = "carregando…"; abaInst("an"); $("mInst").classList.add("on");
+  $("fCl").value = ""; $("mInstCl").innerHTML = "carregando…"; $("mInstAn").innerHTML = "carregando…"; $("mInst").classList.add("on");
   try {
     const [cl, an, val] = await Promise.all([get(`cct_clausulas?instrumento_id=eq.${id}&select=ordem,numero_extenso,titulo,grupo,subgrupo,texto&order=ordem`),
       get(`cct_analises?instrumento_id=eq.${id}&order=versao.desc&limit=1`), get(`cct_valores?instrumento_id=eq.${id}&order=clausula_ordem`)]);
-    APP.clAtual = cl; APP.anAtual = an[0]; renderCl(); renderAn(an[0], val);
+    APP.clAtual = cl; APP.anAtual = an[0]; renderCl(); renderAn(an[0], val); abaInst(aba || "an");
   } catch (e) { $("mInstCl").innerHTML = $("mInstAn").innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
 }
 function renderCl() {
@@ -581,8 +634,15 @@ async function salvarInc() {
   try { await patch("cct_incidentes", "id=eq." + $("iId").value, d); fechar("mInc"); msg("Incidente atualizado."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
 function renderDest() {
-  $("tabDest").innerHTML = `<table><tr><th>Nome</th><th>E-mail</th><th>Grupo</th><th>Tipos</th><th>Ativo</th><th></th></tr>` +
-    APP.dados.dest.map(d => `<tr><td>${esc(d.nome)}</td><td>${esc(d.email)}</td><td>${esc(d.grupo||"")}</td><td>${(d.tipos||[]).map(esc).join(", ")}</td><td>${d.ativo ? "sim" : "não"}</td>
+  const all = APP.dados.dest, tab = "dest", fn = "renderDest";
+  const g = id => (document.getElementById(id) || {}).value || "";
+  const barra = barraConsulta(tab, [{ id: "fd_grupo", label: "Grupo", opts: uniq(all.map(d => d.grupo)), w: 190 }, { id: "fd_tipo", label: "Tipo de alerta", opts: uniq(all.flatMap(d => d.tipos || [])), w: 170 }, { id: "fd_at", label: "Ativo", opts: [["sim","sim"],["nao","não"]], w: 110 }], fn);
+  const q = g("q_" + tab).toLowerCase(), fg = g("fd_grupo"), ft = g("fd_tipo"), fa = g("fd_at");
+  let l = all.map(d => ({ ...d, tipos_txt: (d.tipos || []).join(", ") })).filter(d => (!q || [d.nome, d.email, d.grupo, d.tipos_txt].join(" ").toLowerCase().includes(q)) && (!fg || d.grupo === fg) && (!ft || (d.tipos || []).includes(ft)) && (!fa || !!d.ativo === (fa === "sim")));
+  l = aplicarOrd(tab, l);
+  const th = (t, c) => thOrd(tab, t, c, fn);
+  $("tabDest").innerHTML = barra + contador(l.length, all.length) + `<table><tr>${th("Nome","nome")}${th("E-mail","email")}${th("Grupo","grupo")}${th("Tipos","tipos_txt")}${th("Ativo","ativo")}<th></th></tr>` +
+    l.map(d => `<tr><td>${esc(d.nome)}</td><td>${esc(d.email)}</td><td>${esc(d.grupo||"")}</td><td>${(d.tipos||[]).map(esc).join(", ")}</td><td>${d.ativo ? "sim" : "não"}</td>
       <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirDest('${d.id}')">Editar</button> <button class="b sec sm" onclick="excluirDest('${d.id}')">Excluir</button></td></tr>`).join("") + `</table>`;
 }
 function abrirDest(id) {
@@ -872,14 +932,24 @@ async function renderImpacto(inst) {
 
 // ---------- empresas ----------
 function renderEmp() {
-  const nomeS = id => (APP.dados.sind.find(s => s.id === id) || {}).nome || "?";
-  $("tabEmp").innerHTML = `<table><tr><th>CNPJ</th><th>Razão social</th><th>Sindicatos</th><th>Responsável</th><th>Gerente</th><th>ACT</th><th>Ativa</th><th></th></tr>` +
-    (APP.dados.emp||[]).map(e => `<tr><td>${fmtCnpj(e.cnpj)}</td><td>${esc(e.razao_social)}<br><small style="color:var(--cinza)">${esc([e.municipio,e.uf].filter(Boolean).join("/"))} ${esc(e.cnae||"")}</small></td>
+  const all = APP.dados.emp || [], tab = "emp", fn = "renderEmp", nomeS = id => (APP.dados.sind.find(s => s.id === id) || {}).nome || "?";
+  const g = id => (document.getElementById(id) || {}).value || "";
+  const barra = barraConsulta(tab, [{ id: "fe_uf", label: "UF", opts: uniq(all.map(x => x.uf)), w: 110 }, { id: "fe_sind", label: "Sindicato", opts: APP.dados.sind.map(x => [x.id, x.nome]), w: 220 },
+    { id: "fe_vinc", label: "Vínculo", opts: [["com","com vínculo"],["sem","sem vínculo"]], w: 140 }, { id: "fe_resp", label: "Responsável", opts: [["com","informado"],["sem","não informado"]], w: 150 },
+    { id: "fe_act", label: "ACT", opts: [["sim","monitora"],["nao","não"]], w: 120 }, { id: "fe_at", label: "Ativa", opts: [["sim","sim"],["nao","não"]], w: 110 }], fn);
+  const q = g("q_" + tab).toLowerCase(), fu = g("fe_uf"), fs = g("fe_sind"), fv = g("fe_vinc"), fr = g("fe_resp"), fa = g("fe_act"), fat = g("fe_at");
+  let l = all.map(e => ({ ...e, sindicatos_txt: (e.vinculos || []).map(v => nomeS(v.sindicato_id)).join(", "), tem_vinc: !!(e.vinculos || []).length }))
+    .filter(e => (!q || [e.razao_social, e.cnpj, fmtCnpj(e.cnpj), e.municipio, e.cnae, e.cnae_descricao, e.responsavel_nome, e.responsavel_email, e.gerente_email, e.sindicatos_txt].join(" ").toLowerCase().includes(q))
+      && (!fu || e.uf === fu) && (!fs || (e.vinculos || []).some(v => v.sindicato_id === fs)) && (!fv || e.tem_vinc === (fv === "com")) && (!fr || !!e.responsavel_email === (fr === "com")) && (!fa || !!e.monitorar_act === (fa === "sim")) && (!fat || !!e.ativo === (fat === "sim")));
+  l = aplicarOrd(tab, l);
+  const th = (t, c) => thOrd(tab, t, c, fn);
+  $("tabEmp").innerHTML = barra + contador(l.length, all.length) + `<table><tr>${th("CNPJ","cnpj")}${th("Razão social","razao_social")}${th("Sindicatos","sindicatos_txt")}${th("Responsável","responsavel_email")}${th("Gerente","gerente_email")}${th("ACT","monitorar_act")}${th("Ativa","ativo")}<th></th></tr>` +
+    l.map(e => `<tr><td class="cnpj">${fmtCnpj(e.cnpj)}</td><td class="nome">${esc(e.razao_social)}<br><small style="color:var(--cinza)">${esc([e.municipio,e.uf].filter(Boolean).join("/"))} ${esc(e.cnae||"")}</small></td>
       <td>${(e.vinculos||[]).map(v => esc(nomeS(v.sindicato_id))).join("<br>") || '<span class="tag alerta">sem vínculo</span>'}</td>
       <td>${esc(e.responsavel_nome||"")}<br><small>${esc(e.responsavel_email||"")}</small></td><td>${esc(e.gerente_nome||"")}<br><small>${esc(e.gerente_email||"")}</small></td>
       <td>${e.monitorar_act ? '<span class="tag ok">sim</span>' : ""}</td><td>${e.ativo ? "sim" : "não"}</td>
       <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirEmp('${e.id}')">Editar</button> <button class="b sec sm" onclick="excluirEmp('${e.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
-    ((APP.dados.emp||[]).length ? "" : `<div class="aviso">Nenhuma empresa cadastrada. Cadastre as empresas dos clientes e vincule ao sindicato laboral (e patronal) de cada uma.</div>`);
+    (all.length ? "" : `<div class="aviso">Nenhuma empresa cadastrada. Cadastre as empresas dos clientes e vincule ao sindicato laboral (e patronal) de cada uma.</div>`);
 }
 function abrirEmp(id) {
   const e = (APP.dados.emp||[]).find(x => x.id === id) || {};
@@ -914,27 +984,35 @@ async function excluirEmp(id) { if (!confirm("Excluir a empresa e seus vínculos
 
 // ---------- confirmações de ciência ----------
 function renderConf() {
-  const all = APP.dados.conf || [], f = $("fConf").value;
+  const all = APP.dados.conf || [], f = $("fConf").value, tab = "conf", fn = "renderConf";
   const ab = c => ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(c.status);
-  const l = all.filter(c => f === "todas" || (f === "pendentes" ? ab(c) : c.situacao === "ATRASADA"));
+  const g = id => (document.getElementById(id) || {}).value || "";
+  const barra = barraConsulta(tab, [{ id: "fc_emp", label: "Empresa", opts: uniq(all.map(c => c.empresa)), w: 200 }, { id: "fc_sind", label: "Sindicato", opts: uniq(all.map(c => c.sindicato)), w: 220 },
+    { id: "fc_sit", label: "Situação", opts: [["NO_PRAZO","no prazo"],["VENCE_HOJE","vence hoje"],["ATRASADA","atrasada"]], w: 140 }, { id: "fc_st", label: "Status", opts: [["PENDENTE","pendente"],["NOTIFICADO","notificado"],["ESCALONADO","escalonado"],["CIENTE","ciente"],["CANCELADO","cancelado"]], w: 140 }], fn);
+  const q = g("q_" + tab).toLowerCase(), fe = g("fc_emp"), fs = g("fc_sind"), fsit = g("fc_sit"), fst = g("fc_st");
+  let l = all.filter(c => (f === "todas" || (f === "pendentes" ? ab(c) : c.situacao === "ATRASADA"))
+    && (!q || [c.numero_registro, c.empresa, c.sindicato, c.responsavel_email, c.tipo_instrumento].join(" ").toLowerCase().includes(q)) && (!fe || c.empresa === fe) && (!fs || c.sindicato === fs) && (!fsit || c.situacao === fsit) && (!fst || c.status === fst));
+  l = aplicarOrd(tab, l);
   $("kpisConf").innerHTML = [["Pendentes", all.filter(ab).length, "alerta"], ["Vencem hoje", all.filter(c => c.situacao === "VENCE_HOJE").length, "alerta"], ["Atrasadas", all.filter(c => c.situacao === "ATRASADA").length, "erro"], ["Escalonadas", all.filter(c => c.status === "ESCALONADO").length, "erro"], ["Cientes", all.filter(c => c.status === "CIENTE").length, ""]]
     .map(([t, v, c]) => `<div class="kpi ${v && c ? c : ""}"><b>${v}</b><span>${t}</span></div>`).join("");
-  $("tabConf").innerHTML = `<table><tr><th>Convenção</th><th>Empresa</th><th>Sindicato</th><th>Responsável</th><th>Prazo</th><th>Situação</th><th>Status</th><th class="r">Lembr.</th><th></th></tr>` +
+  const th = (t, c, cls) => thOrd(tab, t, c, fn, cls);
+  $("tabConf").innerHTML = barra + contador(l.length, all.length) + `<table><tr>${th("Convenção","numero_registro")}${th("Empresa","empresa")}${th("Sindicato","sindicato")}${th("Responsável","responsavel_email")}${th("Prazo","prazo")}${th("Situação","situacao")}${th("Status","status")}${th("Lembr.","lembretes","r")}<th></th></tr>` +
     l.map(c => `<tr><td><b>${esc(c.numero_registro)}</b><br><small>${esc(c.tipo_instrumento||"")}</small></td><td>${esc(c.empresa||"(sindicato)")}</td><td>${esc(c.sindicato||"")}</td><td><small>${esc(c.responsavel_email||"—")}</small></td>
       <td>${fmtD(c.prazo)}</td><td>${c.situacao ? tagStatus(c.situacao === "ATRASADA" ? "CRITICO" : c.situacao === "VENCE_HOJE" ? "ATENCAO" : "INFORMATIVO").replace(/>[^<]+</, ">" + c.situacao.replace(/_/g," ") + "<") : ""}</td>
       <td>${tagStatus(c.status)}${c.ciente_em ? `<br><small>${fmtDT(c.ciente_em)} · ${esc(c.ciente_por||"")}</small>` : ""}</td><td class="r">${c.lembretes}</td>
       <td style="white-space:nowrap">${ab(c) ? `<button class="b sm" onclick="registrarCiencia('${c.id}')">Registrar ciência</button>` : ""} <button class="b sec sm" onclick="abrirInst('${c.instrumento_id}')">Ver CCT</button></td></tr>`).join("") + `</table>` +
     (l.length ? "" : `<div class="aviso">Nada aqui.</div>`);
-  $("cfgDestTeste").value = APP.dados.cfg.email_destino_teste || "";
-  const cf = APP.dados.cfg; $("cfgPrazo").value = cf.prazo_ciencia_dias_uteis; $("cfgHistAnos").value = cf.historico_anos || 5; $("cfgHistMax").value = cf.historico_max_por_execucao || 8;
+  const cf = APP.dados.cfg;
+  if ($("cfgPrazo")) { $("cfgPrazo").value = cf.prazo_ciencia_dias_uteis; $("cfgHistAnos").value = cf.historico_anos || 5; $("cfgHistMax").value = cf.historico_max_por_execucao || 8;
   $("cfgHorarios").value = cf.horarios_consulta || "06:00"; $("cfgIntervalo").value = cf.intervalo_consultas_s || 20; $("cfgMaxSind").value = cf.max_sindicatos_por_execucao || 0;
-  $("cfgHistAuto").value = String(cf.historico_automatico ?? false); $("cfgQuem").textContent = APP.admin ? "Você é gerente do escritório: alterações aqui valem para toda a equipe." : "Somente o gerente do escritório altera estes parâmetros.";
+  $("cfgHistAuto").value = String(cf.historico_automatico ?? false);
   $("cfgIa").value = String(cf.ia_ativa ?? true); $("cfgIaLim").value = cf.ia_limite_mes ?? 60; $("cfgIaHist").value = String(cf.ia_historico ?? false);
   $("cfgIaUso").innerHTML = `Uso no mês: <b>${APP.dados.iaUso ?? "?"}</b> de ${cf.ia_limite_mes ?? 60} pareceres.` + (superadm() ? "" : " IA, horários/fila e limpeza são configurações críticas: somente o superadministrador altera.");
   const criticos = ["cfgIa","cfgIaLim","cfgIaHist","cfgHorarios","cfgIntervalo","cfgMaxSind"];
   document.querySelectorAll("[id^=cfg]").forEach(el => { if (el.tagName === "INPUT" || el.tagName === "SELECT") el.disabled = criticos.includes(el.id) ? !superadm() : !podeAdm(); });
   document.querySelectorAll("button[onclick^='salvarConfig'],button[onclick^='salvarDestTeste']").forEach(b => b.disabled = !podeAdm());
-  $("cfgQuem").textContent = superadm() ? "Você é superadministrador: acesso total às configurações." : podeAdm() ? "Você é administrador: altera as configurações operacionais; as críticas (IA, horários/fila) são do superadministrador." : "Somente administradores alteram estes parâmetros."; $("cfgLemb").value = String(APP.dados.cfg.lembrete_diario); $("cfgEsc").value = String(APP.dados.cfg.escalonar_apos_prazo);
+  $("cfgQuem").textContent = superadm() ? "Você é superadministrador: acesso total às configurações." : podeAdm() ? "Você é administrador: altera as configurações operacionais; as críticas (IA, horários/fila) são do superadministrador." : "Somente administradores alteram estes parâmetros.";
+  $("cfgDestTeste").value = cf.email_destino_teste || ""; $("cfgLemb").value = String(cf.lembrete_diario); $("cfgEsc").value = String(cf.escalonar_apos_prazo); }
 }
 async function registrarCiencia(id) {
   const obs = prompt("Observação (opcional) para o registro de ciência:") ;
