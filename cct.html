@@ -23,7 +23,7 @@
   header small{display:block;font-family:var(--font);font-size:9px;color:var(--text-3);letter-spacing:.12em;text-transform:uppercase;font-weight:600;margin-top:3px}
   .badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:20px;font-size:10.5px;font-weight:600;background:var(--gold-lt);color:var(--gold);white-space:nowrap}
   #usuario{font-size:12.5px;color:var(--text-2)}
-  nav{background:var(--surface);border-bottom:1px solid var(--border);padding:6px 34px;display:flex;gap:2px;overflow-x:auto;position:sticky;top:63px;z-index:99}
+  nav{background:var(--surface);border-bottom:1px solid var(--border);padding:6px 34px;display:flex;gap:2px;flex-wrap:wrap;position:sticky;top:63px;z-index:99}
   nav button{display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:9px;color:var(--text-3);font-size:13px;font-weight:500;cursor:pointer;transition:var(--tr);border:none;background:none;white-space:nowrap;font-family:inherit}
   nav button:hover{background:var(--bg);color:var(--text-2)} nav button.on{background:var(--gold-lt);color:var(--gold);font-weight:600}
   main{max-width:1240px;margin:0 auto;padding:26px 34px}
@@ -55,6 +55,14 @@
   .kpi:hover{box-shadow:var(--gold-glow);transform:translateY(-1px)}
   .kpi b{font-family:var(--mono);font-size:26px;font-weight:500;line-height:1;display:block;color:var(--text)} .kpi span{font-weight:600;margin-top:6px;font-size:12.5px;color:var(--text-2);display:block}
   .kpi.erro{border-left-color:var(--red)} .kpi.erro b{color:var(--red)} .kpi.alerta{border-left-color:var(--amber)} .kpi.alerta b{color:var(--amber)} .kpi.info{border-left-color:var(--gold)} .kpi.info b{color:var(--gold)}
+  .kpi.ok{border-left-color:var(--green)} .kpi.ok b{color:var(--green)}
+  .bloco{margin-bottom:18px} .bloco-t{display:flex;align-items:center;gap:10px;margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+  .bloco-t svg{width:16px;height:16px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .hero{background:linear-gradient(135deg,#1a3a5c,#1a5276 55%,#2e86c1);color:#fff;border-radius:16px;padding:22px 26px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow-lg)}
+  .hero h2{font-family:var(--display);font-size:26px;margin:0;color:#fff} .hero .sub{opacity:.85;font-size:13px;margin-top:4px}
+  .hero .estado{display:flex;gap:10px;flex-wrap:wrap} .hero .est{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:10px 14px;min-width:150px}
+  .hero .est b{display:block;font-family:var(--mono);font-size:15px;font-weight:500} .hero .est span{font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.06em}
+  .hero .est.ok{border-color:#7dcea0} .hero .est.erro{border-color:#f1948a;background:rgba(192,57,43,.25)}
   .aviso{font-size:12.5px;color:var(--text-2);border-left:3px solid var(--gold);padding:10px 13px;background:var(--gold-lt);border-radius:0 9px 9px 0;margin:10px 0;line-height:1.6}
   .aviso code,.cfg code{background:var(--surface);padding:1px 6px;border-radius:5px;font-family:var(--mono);font-size:11.5px}
   /* ===== MODAL ===== */
@@ -93,7 +101,7 @@
   <button data-aba="painel" class="on">Painel</button><button data-aba="sindicatos">Sindicatos</button><button data-aba="empresas">Empresas</button><button data-aba="instrumentos">Convenções</button><button data-aba="confirmacoes">Confirmações</button>
   <button data-aba="destinatarios">Destinatários</button><button data-aba="usuarios" id="navUsuarios" style="display:none">Usuários</button>
   <div style="position:relative"><button id="navSis" onclick="toggleSis(event)">Sistema ▾</button>
-    <div id="menuSis" style="display:none;position:absolute;top:100%;left:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px;min-width:180px;z-index:120">
+    <div id="menuSis" style="display:none;position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px;min-width:180px;z-index:120">
       <button data-aba="consultas" style="width:100%;justify-content:flex-start">Consultas</button><button data-aba="erros" style="width:100%;justify-content:flex-start">Central de Erros</button><button data-aba="versoes" style="width:100%;justify-content:flex-start">Versões</button></div></div>
 </nav>
 <main>
@@ -110,8 +118,8 @@
     <div class="msg" id="msg"></div>
 
     <section data-sec="painel">
-      <div class="topo" style="align-items:flex-end;margin-bottom:18px"><div><h2 style="font-family:var(--display);font-size:28px;margin:0">Painel</h2><div style="color:var(--text-3);font-size:13px;margin-top:4px">Monitoramento de Convenções Coletivas — Artecon Artes Contábeis</div></div></div>
-      <div class="kpis" id="kpis"></div>
+      <div class="hero" id="hero"></div>
+      <div id="kpis"></div>
       <div id="painelExtra"></div>
       <div class="card" style="margin-top:16px"><h2>Últimas convenções detectadas</h2><div id="painelNovos"></div></div>
       <div class="card"><h2>Como funciona</h2>
@@ -169,6 +177,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.9.0</td><td>03/09/2026</td><td>Níveis de acesso: <b>Usuário</b> (equipe), <b>Gerente do escritório</b> (tudo + usuários + alertas de erro) e <b>Empresa</b> (cliente: vê só as convenções, o impacto e as ciências da própria empresa, e registra a ciência) — aplicado no banco por RLS. Aba Usuários cria os três tipos. Erros do aplicativo (ALTO/CRÍTICO) passam a notificar sempre os gerentes/administradores, além dos destinatários configurados. IA: "Comentários do analista" separados dos fatos conferidos, rotulados e com aviso de que podem conter erro. Menu Sistema corrigido (abria atrás da barra). Painel redesenhado por blocos. Banco <code>setup_cct_v0.9.0.sql</code>.</td></tr>
           <tr><td>v0.8.0</td><td>03/09/2026</td><td>IA com ancoragem obrigatória: cada destaque, providência e alerta precisa citar a cláusula e trazer um trecho literal dela; o robô confere trecho e números contra o texto importado e <b>descarta</b> o que não bate (a aba Análise mostra os descartados e o motivo). Menu "Sistema" agrupa Consultas, Central de Erros e Versões. Painel reformulado: vencimentos de vigência e data-base, ciências, robô, cadastro. Cadastro em lote de empresas e sindicatos por lista de CNPJs com consulta à Receita (BrasilAPI/Minha Receita) e vínculo opcional.</td></tr>
           <tr><td>v0.7.1</td><td>03/09/2026</td><td>Parecer por IA sem custo via GitHub Models (GPT-4o com o token do próprio Actions, permissão <code>models: read</code>); material compactado para o limite do nível gratuito. Anthropic continua como opção se a chave existir.</td></tr>
           <tr><td>v0.7.0</td><td>03/09/2026</td><td>Aba Usuários (só para diretoria/admin): lista os usuários do escritório, cria novo usuário (mesmo modelo do Rescisões Pro — login + colaborador + papel), envia e-mail de redefinição de senha. Convenções: botão "PDF" que gera a convenção completa (capa com registro, partes, vigência, categoria, abrangência, todas as cláusulas por grupo/subgrupo, anexos) pela impressão do navegador → "Salvar como PDF".</td></tr>
@@ -218,7 +227,9 @@
 <div class="modal" id="mUsu"><div class="card" style="max-width:560px"><h2>Novo usuário</h2>
   <div class="grid g2"><div><label>Nome</label><input id="uNome"></div><div><label>E-mail (login)</label><input id="uEmail" type="email"></div>
     <div><label>Senha inicial</label><input id="uSenha" type="password" autocomplete="new-password" placeholder="mínimo 8 caracteres"></div>
-    <div><label>Papel</label><select id="uPapel"><option value="usuario">Usuário</option><option value="diretoria">Diretoria (admin)</option></select></div></div>
+    <div><label>Nível de acesso</label><select id="uPapel" onchange="$('uEmpWrap').style.display=this.value==='empresa'?'block':'none'"><option value="usuario">Usuário (equipe do escritório)</option><option value="diretoria">Gerente do escritório</option><option value="empresa">Empresa (cliente)</option></select></div>
+    <div id="uEmpWrap" style="display:none;grid-column:span 2"><label>Empresa(s) que este usuário pode ver</label><div id="uEmps" style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;font-size:13px;max-height:180px;overflow:auto"></div></div></div>
+  <div class="aviso"><b>Usuário</b> e <b>Gerente</b> usam o login único da Artecon (também entram no Rescisões Pro). <b>Empresa</b> é o acesso do cliente: enxerga só as convenções, o impacto e as ciências da(s) empresa(s) marcada(s), e pode registrar a ciência.</div>
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mUsu')">Cancelar</button><button class="b" onclick="salvarUsu()">Criar usuário</button></div>
 </div></div>
 
@@ -256,7 +267,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.8.0" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.9.0" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const $ = id => document.getElementById(id);
@@ -299,10 +310,18 @@ async function entrar() {
   } catch (e) { $("lMsg").textContent = e.message; }
 }
 async function iniciar() {
-  const u = await get(`resc_usuarios?select=tenant_id,papel&auth_id=eq.${APP.uid}&limit=1`);
-  if (!u.length) { $("lMsg").textContent = "Usuário sem vínculo de tenant (resc_usuarios)."; return; }
-  APP.tenantId = u[0].tenant_id; APP.papel = u[0].papel; APP.admin = ["diretoria","superadmin","admin"].includes(APP.papel);
+  let tenant = null;
+  try { const a = await get(`cct_acessos?select=tenant_id,nivel,empresa_id&auth_id=eq.${APP.uid}&ativo=eq.true`); if (a.length) tenant = a[0].tenant_id; } catch (e) {}
+  if (!tenant) { const u = await get(`resc_usuarios?select=tenant_id,papel&auth_id=eq.${APP.uid}&limit=1`); if (u.length) tenant = u[0].tenant_id; }
+  if (!tenant) { $("lMsg").textContent = "Usuário sem acesso ao CCT Monitor. Peça ao gerente do escritório para cadastrá-lo."; return; }
+  APP.tenantId = tenant;
+  try { APP.nivel = await api("rpc/cct_nivel", { method: "POST", body: "{}" }); } catch (e) { APP.nivel = "usuario"; }
+  APP.admin = APP.nivel === "gerente";
   $("navUsuarios").style.display = APP.admin ? "flex" : "none";
+  // nível empresa: só Painel, Convenções e Confirmações
+  const soEmpresa = APP.nivel === "empresa";
+  document.querySelectorAll("nav button[data-aba]").forEach(b => { if (!["painel","instrumentos","confirmacoes"].includes(b.dataset.aba)) b.style.display = soEmpresa ? "none" : ""; });
+  $("navSis").parentElement.style.display = soEmpresa ? "none" : ""; if (!soEmpresa && !APP.admin) $("navUsuarios").style.display = "none";
   $("login").style.display = "none"; $("app").style.display = "block"; $("nav").style.display = "flex";
   $("usuario").textContent = APP.email; $("btnSair").style.display = "inline-block";
   await carregarTudo(); mostrar("painel");
@@ -312,7 +331,7 @@ $("btnEntrar").onclick = entrar; $("lSenha").addEventListener("keydown", e => e.
 
 // ---------- navegação ----------
 document.querySelectorAll("nav button[data-aba]").forEach(b => b.onclick = () => { mostrar(b.dataset.aba); $("menuSis").style.display = "none"; });
-function toggleSis(e) { e.stopPropagation(); const m = $("menuSis"); m.style.display = m.style.display === "none" ? "block" : "none"; }
+function toggleSis(e) { e.stopPropagation(); const m = $("menuSis"), r = $("navSis").getBoundingClientRect(); m.style.top = (r.bottom + 4) + "px"; m.style.left = r.left + "px"; m.style.display = m.style.display === "none" ? "block" : "none"; }
 document.addEventListener("click", () => { const m = $("menuSis"); if (m) m.style.display = "none"; });
 function mostrar(aba) {
   document.querySelectorAll("nav button[data-aba]").forEach(b => b.classList.toggle("on", b.dataset.aba === aba));
@@ -335,43 +354,43 @@ async function carregarTudo() {
     get(`cct_config?tenant_id=eq.${t}`)]);
   APP.dados = { sind, inst, cons, inc, dest, notif, emp, conf, cfg: cfg[0] || { prazo_ciencia_dias_uteis: 2, lembrete_diario: true, escalonar_apos_prazo: true } };
   renderPainel(); renderSind(); renderInst(); renderCons(); renderInc(); renderDest(); renderNotif(); renderEmp(); renderConf();
-  if (APP.admin) { try { APP.dados.usu = await get(`resc_usuarios?select=auth_id,papel,colaborador:resc_colaboradores(nome,email,status)&order=papel`); } catch (e) { APP.dados.usu = []; } renderUsu(); }
+  if (APP.admin) { try { const [ru, ac] = await Promise.all([get(`resc_usuarios?select=auth_id,papel,colaborador:resc_colaboradores(nome,email,status)&order=papel`), get(`cct_acessos?tenant_id=eq.${APP.tenantId}&select=*,empresa:cct_empresas(razao_social)&order=nivel,email`)]); APP.dados.usu = ru; APP.dados.acessos = ac; } catch (e) { APP.dados.usu = []; APP.dados.acessos = []; } renderUsu(); }
 }
 
+const ICO = { mon: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>', cct: '<svg viewBox="0 0 24 24"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M9 13h6M9 17h6"/></svg>',
+  cie: '<svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>', sis: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>' };
 function renderPainel() {
   const d = APP.dados, hoje = new Date(), dias = n => new Date(Date.now() + n * 864e5), h24 = Date.now() - 864e5;
   const abertos = d.inc.filter(i => ["NOVO","EM_NOVA_TENTATIVA","PERSISTENTE","EM_ANALISE"].includes(i.status));
   const conf = d.conf || [], ab = c => ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(c.status);
-  const ult = d.cons[0], ultRobo = d.cons.filter(c => c.origem === "github-actions")[0];
+  const ultRobo = d.cons.filter(c => c.origem === "github-actions")[0], ult = d.cons[0];
   const vig = i => i.vigencia_fim ? new Date(i.vigencia_fim + "T12:00:00") : null;
   const vencendo = d.inst.filter(i => vig(i) && vig(i) >= hoje && vig(i) <= dias(90)).sort((a, b) => a.vigencia_fim.localeCompare(b.vigencia_fim));
   const vencidas = d.inst.filter(i => vig(i) && vig(i) < hoje && !d.inst.some(j => j.id !== i.id && j.sindicato_id === i.sindicato_id && j.vigencia_inicio > i.vigencia_inicio));
   const sindSemConsulta = d.sind.filter(s => s.monitorar && s.ativo && (!s.ultima_consulta || new Date(s.ultima_consulta) < dias(-2)));
   const empSemVinc = (d.emp || []).filter(e => e.ativo && !(e.vinculos || []).length);
   const roboOk = ultRobo && new Date(ultRobo.executada_em) > dias(-1.5);
-  const k = [
-    ["Sindicatos monitorados", d.sind.filter(s => s.monitorar && s.ativo).length, "info"],
-    ["Empresas vinculadas", (d.emp || []).filter(e => e.ativo && (e.vinculos || []).length).length, "info"],
-    ["Convenções vigentes", d.inst.filter(i => vig(i) && vig(i) >= hoje).length, "info"],
-    ["Novas nos últimos 7 dias", d.inst.filter(i => new Date(i.detectado_em) > dias(-7)).length, "alerta"],
-    ["Vigência vence em 90 dias", vencendo.length, "alerta"],
-    ["Vigência vencida sem renovação", vencidas.length, "erro"],
-    ["Ciências pendentes", conf.filter(ab).length, "alerta"],
-    ["Ciências atrasadas", conf.filter(c => c.situacao === "ATRASADA").length, "erro"],
-    ["Importações não concluídas", d.inst.filter(i => i.status_importacao !== "IMPORTADO").length, "erro"],
-    ["Pareceres pendentes", d.inst.filter(i => i.status_importacao === "IMPORTADO" && i.analise_status !== "CONCLUIDA").length, "alerta"],
-    ["Incidentes abertos", abertos.length, "erro"],
-    ["Erros nas últimas 24h", d.inc.filter(i => new Date(i.ultima_ocorrencia) > h24).length, "erro"],
-    ["Notificações não enviadas", d.notif.filter(n => n.status === "NAO_ENVIADA").length, "alerta"],
-    ["Sindicatos sem consulta há 2+ dias", sindSemConsulta.length, "erro"],
-    ["Empresas sem vínculo sindical", empSemVinc.length, "alerta"]];
-  $("kpis").innerHTML = k.map(([l, v, c]) => `<div class="kpi ${v ? c : ""}"><b>${esc(v)}</b><span>${l}</span></div>`).join("") +
-    `<div class="kpi ${roboOk ? "" : "erro"}"><b style="font-size:16px;padding-top:6px">${ultRobo ? fmtDT(ultRobo.executada_em) : "nunca"}</b><span>Robô — última execução automática ${roboOk ? "✓" : "(atrasada)"}</span></div>` +
-    `<div class="kpi"><b style="font-size:16px;padding-top:6px">${ult ? ult.status.replace(/_/g, " ").replace("CONSULTA ", "") : "—"}</b><span>Última consulta ${ult ? fmtDT(ult.executada_em) : ""}</span></div>`;
+  const hoje_txt = hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+  $("hero").innerHTML = `<div><h2>${APP.nivel === "empresa" ? "Minhas convenções" : "Painel"}</h2><div class="sub">${hoje_txt.charAt(0).toUpperCase() + hoje_txt.slice(1)} · ${esc(APP.email)} · ${APP.nivel === "gerente" ? "gerente do escritório" : APP.nivel === "empresa" ? "acesso da empresa" : "equipe"}</div></div>
+    <div class="estado">${APP.nivel !== "empresa" ? `<div class="est ${roboOk ? "ok" : "erro"}"><b>${ultRobo ? fmtDT(ultRobo.executada_em) : "nunca"}</b><span>robô · última execução</span></div>
+    <div class="est ${abertos.length ? "erro" : "ok"}"><b>${abertos.length}</b><span>incidentes abertos</span></div>` : ""}
+    <div class="est ${conf.filter(c => c.situacao === "ATRASADA").length ? "erro" : "ok"}"><b>${conf.filter(ab).length}</b><span>ciências pendentes</span></div>
+    <div class="est"><b>${d.inst.filter(i => vig(i) && vig(i) >= hoje).length}</b><span>convenções vigentes</span></div></div>`;
+  const kpi = (l, v, c) => `<div class="kpi ${v ? c : ""}"><b>${esc(v)}</b><span>${l}</span></div>`;
+  const bloco = (t, ico, itens) => `<div class="bloco"><div class="bloco-t">${ico}${t}</div><div class="kpis">${itens.join("")}</div></div>`;
+  let h = "";
+  if (APP.nivel !== "empresa") h += bloco("Monitoramento", ICO.mon, [kpi("Sindicatos monitorados", d.sind.filter(s => s.monitorar && s.ativo).length, "info"), kpi("Empresas vinculadas", (d.emp || []).filter(e => e.ativo && (e.vinculos || []).length).length, "info"),
+    kpi("Empresas sem vínculo sindical", empSemVinc.length, "alerta"), kpi("Sindicatos sem consulta há 2+ dias", sindSemConsulta.length, "erro")]);
+  h += bloco("Convenções", ICO.cct, [kpi("Novas nos últimos 7 dias", d.inst.filter(i => new Date(i.detectado_em) > dias(-7)).length, "alerta"), kpi("Vigência vence em 90 dias", vencendo.length, "alerta"), kpi("Vencidas sem renovação registrada", vencidas.length, "erro"),
+    ...(APP.nivel !== "empresa" ? [kpi("Importações não concluídas", d.inst.filter(i => i.status_importacao !== "IMPORTADO").length, "erro"), kpi("Pareceres pendentes", d.inst.filter(i => i.status_importacao === "IMPORTADO" && i.analise_status !== "CONCLUIDA").length, "alerta")] : [])]);
+  h += bloco("Ciência dos responsáveis", ICO.cie, [kpi("Pendentes", conf.filter(ab).length, "alerta"), kpi("Vencem hoje", conf.filter(c => c.situacao === "VENCE_HOJE").length, "alerta"), kpi("Atrasadas", conf.filter(c => c.situacao === "ATRASADA").length, "erro"), kpi("Escalonadas ao gerente", conf.filter(c => c.status === "ESCALONADO").length, "erro"), kpi("Cientes", conf.filter(c => c.status === "CIENTE").length, "ok")]);
+  if (APP.nivel !== "empresa") h += bloco("Sistema", ICO.sis, [kpi("Incidentes abertos", abertos.length, "erro"), kpi("Erros nas últimas 24h", d.inc.filter(i => new Date(i.ultima_ocorrencia) > h24).length, "erro"), kpi("Notificações não enviadas", d.notif.filter(n => n.status === "NAO_ENVIADA").length, "alerta"),
+    `<div class="kpi ${ult && ult.status === "CONSULTA_NAO_CONCLUIDA" ? "erro" : ult && ult.status === "CONSULTA_COM_ALERTA" ? "alerta" : "ok"}"><b style="font-size:15px;padding-top:6px">${ult ? ult.status.replace("CONSULTA_", "").replace(/_/g, " ") : "—"}</b><span>última consulta ${ult ? fmtDT(ult.executada_em) : ""}</span></div>`]);
+  $("kpis").innerHTML = h;
   let extra = "";
-  if (vencendo.length || vencidas.length) extra += `<div class="card" style="margin-top:16px"><h2>Vigências a vencer / vencidas</h2><table><tr><th>Registro</th><th>Sindicato</th><th>Categoria</th><th>Vigência</th><th>Data-base</th><th>Situação</th></tr>` +
+  if (vencendo.length || vencidas.length) extra += `<div class="card"><h2>Vigências a vencer / vencidas</h2><table><tr><th>Registro</th><th>Sindicato</th><th>Categoria</th><th>Vigência</th><th>Data-base</th><th>Situação</th></tr>` +
     [...vencidas, ...vencendo].map(i => { const dd = Math.round((vig(i) - hoje) / 864e5); return `<tr><td><b>${esc(i.numero_registro)}</b></td><td>${esc(i.sindicato?.nome || "")}</td><td>${esc(i.categoria || "")}</td><td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${esc(i.data_base || "—")}</td><td>${dd < 0 ? `<span class="tag erro">vencida há ${-dd} dias — renovação ainda não registrada</span>` : `<span class="tag alerta">vence em ${dd} dias</span>`}</td></tr>`; }).join("") + `</table><div class="aviso">O robô continua consultando o sindicato diariamente; a renovação aparece aqui assim que for registrada no Mediador.</div></div>`;
-  if (conf.filter(ab).length) extra += `<div class="card"><h2>Ciências pendentes</h2><table><tr><th>Convenção</th><th>Empresa</th><th>Responsável</th><th>Prazo</th><th>Situação</th></tr>` + conf.filter(ab).slice(0, 8).map(c => `<tr><td>${esc(c.numero_registro)}</td><td>${esc(c.empresa || "(sindicato)")}</td><td>${esc(c.responsavel_email || "—")}</td><td>${fmtD(c.prazo)}</td><td>${esc((c.situacao || "").replace(/_/g, " "))}</td></tr>`).join("") + `</table></div>`;
+  if (conf.filter(ab).length) extra += `<div class="card"><h2>Ciências pendentes</h2><table><tr><th>Convenção</th><th>Empresa</th><th>Responsável</th><th>Prazo</th><th>Situação</th><th></th></tr>` + conf.filter(ab).slice(0, 8).map(c => `<tr><td>${esc(c.numero_registro)}</td><td>${esc(c.empresa || "(sindicato)")}</td><td>${esc(c.responsavel_email || "—")}</td><td>${fmtD(c.prazo)}</td><td>${esc((c.situacao || "").replace(/_/g, " "))}</td><td><button class="b sm" onclick="registrarCiencia('${c.id}')">Registrar ciência</button></td></tr>`).join("") + `</table></div>`;
   $("painelExtra").innerHTML = extra;
   $("painelNovos").innerHTML = tabInst(d.inst.slice(0, 8));
 }
@@ -516,6 +535,7 @@ function renderAn(an, val) {
     if ((an.destaques||[]).length) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Destaques <small style="font-family:var(--font);font-weight:400;color:var(--text-3)">— cada item conferido contra o trecho literal da cláusula</small></h2>` + an.destaques.map(d => `<div class="cl"><h4>${esc(d.tema)} <span class="tag ok">conferido</span></h4><p>${esc(d.texto)}</p>${d.trecho ? `<blockquote style="margin:6px 0 0;padding:6px 10px;border-left:3px solid var(--gold-lt);color:var(--text-2);font-size:12.5px">"${esc(d.trecho)}"</blockquote>` : ""}<small>${(d.clausulas||[]).map(cl).join(" · ")}</small></div>`).join("") + `</div>`;
     if ((an.providencias||[]).length) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Providências para o DP</h2><table><tr><th>Ação</th><th>Prazo</th><th>Cláusulas</th><th></th></tr>` + an.providencias.map(p => `<tr><td>${esc(p.acao)}</td><td>${esc(p.prazo||"")}</td><td>${(p.clausulas||[]).map(cl).join(" ")}</td><td>${p.confianca === "NECESSITA_VALIDACAO" ? '<span class="tag alerta">validar</span>' : ""}</td></tr>`).join("") + `</table></div>`;
     if ((an.alertas||[]).length || (an.pontos_incertos||[]).length) h += `<div class="card" style="padding:14px"><h2 style="font-size:15px">Alertas e pontos incertos</h2><ul style="margin:0;padding-left:18px">${(an.alertas||[]).map(a => `<li>${esc(typeof a === "string" ? a : a.texto)}${a.clausulas ? " " + a.clausulas.map(cl).join(" ") : ""}</li>`).join("")}${(an.pontos_incertos||[]).map(a => `<li style="color:var(--cinza)">(em aberto no texto) ${esc(a)}</li>`).join("")}</ul></div>`;
+    if ((an.comentarios||[]).length) h += `<div class="card" style="padding:14px;border-left:4px solid var(--amber)"><h2 style="font-size:15px">Comentários do analista (IA)</h2><div class="aviso" style="background:var(--amber-lt);border-color:var(--amber);color:#6e4a00">Os comentários abaixo são <b>interpretação</b> gerada por IA a partir das cláusulas citadas — não são texto da convenção e <b>podem conter erros</b>. Confira sempre a cláusula antes de agir.</div>` + an.comentarios.map(c => `<div class="cl" style="border-left:3px solid var(--amber)"><h4><span class="tag alerta">COMENTÁRIO</span></h4><p>${esc(c.texto)}</p><small>${(c.clausulas||[]).map(cl).join(" · ")}</small></div>`).join("") + `</div>`;
     const desc = an.validacao || [];
     if (desc.length) h += `<details class="card" style="padding:14px"><summary>${desc.length} item(ns) da IA descartado(s) por não constar literalmente na CCT</summary><ul style="margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--text-2)">${desc.map(x => `<li>${esc(x)}</li>`).join("")}</ul></details>`;
   }
@@ -539,12 +559,18 @@ async function reprocessar() {
 
 // ---------- usuários (mesmo modelo do Rescisões Pro) ----------
 function renderUsu() {
-  const l = APP.dados.usu || [];
-  $("tabUsu").innerHTML = `<table><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Status</th><th></th></tr>` +
-    l.map(u => `<tr><td>${esc(u.colaborador?.nome||"")}</td><td>${esc(u.colaborador?.email||"")}</td><td>${tagStatus(["diretoria","superadmin","admin"].includes(u.papel) ? "INFORMATIVO" : "IMPORTADO").replace(/>[^<]+</, ">" + esc(u.papel) + "<")}</td><td>${esc(u.colaborador?.status||"")}</td>
-      <td>${u.colaborador?.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(u.colaborador.email)}')">Redefinir senha</button>` : ""}</td></tr>`).join("") + `</table>`;
+  const l = APP.dados.usu || [], ac = APP.dados.acessos || [];
+  const nivelDe = p => ["diretoria","superadmin","admin"].includes(p) ? "gerente do escritório" : "usuário";
+  $("tabUsu").innerHTML = `<table><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>Empresa</th><th>Status</th><th></th></tr>` +
+    l.map(u => `<tr><td>${esc(u.colaborador?.nome||"")}</td><td>${esc(u.colaborador?.email||"")}</td><td>${tagStatus(nivelDe(u.papel) === "usuário" ? "IMPORTADO" : "INFORMATIVO").replace(/>[^<]+</, ">" + nivelDe(u.papel) + "<")}</td><td>—</td><td>${esc(u.colaborador?.status||"")}</td>
+      <td>${u.colaborador?.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(u.colaborador.email)}')">Redefinir senha</button>` : ""}</td></tr>`).join("") +
+    ac.map(a => `<tr><td>${esc(a.nome||"")}</td><td>${esc(a.email||"")}</td><td>${tagStatus(a.nivel === "empresa" ? "ATENCAO" : "INFORMATIVO").replace(/>[^<]+</, ">" + (a.nivel === "empresa" ? "empresa (cliente)" : a.nivel) + "<")}</td><td>${esc(a.empresa?.razao_social||"")}</td><td>${a.ativo ? "ativo" : "inativo"}</td>
+      <td style="white-space:nowrap">${a.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(a.email)}')">Redefinir senha</button>` : ""} <button class="b sec sm" onclick="toggleAcesso('${a.id}',${!a.ativo})">${a.ativo ? "Desativar" : "Ativar"}</button></td></tr>`).join("") + `</table>`;
 }
-function abrirUsu() { $("uNome").value = ""; $("uEmail").value = ""; $("uSenha").value = ""; $("uPapel").value = "usuario"; $("mUsu").classList.add("on"); }
+async function toggleAcesso(id, ativo) { try { await patch("cct_acessos", "id=eq." + id, { ativo }); await carregarTudo(); } catch (e) { msg(e.message, "erro"); } }
+function abrirUsu() { $("uNome").value = ""; $("uEmail").value = ""; $("uSenha").value = ""; $("uPapel").value = "usuario"; $("uEmpWrap").style.display = "none";
+  $("uEmps").innerHTML = (APP.dados.emp || []).filter(e => e.ativo).map(e => `<label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" style="width:auto" data-eid="${e.id}"> ${esc(e.razao_social)}</label>`).join("") || "<small>Cadastre empresas primeiro.</small>";
+  $("mUsu").classList.add("on"); }
 async function salvarUsu() {
   const nome = $("uNome").value.trim(), email = $("uEmail").value.trim().toLowerCase(), senha = $("uSenha").value, papel = $("uPapel").value;
   if (!nome || !email.includes("@") || senha.length < 8) return msg("Informe nome, e-mail válido e senha com 8+ caracteres.", "erro");
@@ -557,6 +583,12 @@ async function salvarUsu() {
       if (/already/i.test(m)) m = "Este e-mail já possui login."; throw new Error(m); }
     if (d.user && Array.isArray(d.user.identities) && d.user.identities.length === 0) throw new Error("Este e-mail já possui login.");
     const uid = (d.user && d.user.id) || d.id; if (!uid) throw new Error("Login criado, mas sem ID retornado.");
+    if (papel === "empresa") {
+      const emps = [...document.querySelectorAll("#uEmps input:checked")].map(i => i.dataset.eid);
+      if (!emps.length) throw new Error("Marque ao menos uma empresa para o acesso de cliente.");
+      for (const eid of emps) await post("cct_acessos", { tenant_id: APP.tenantId, auth_id: uid, email, nome, nivel: "empresa", empresa_id: eid }, "return=minimal");
+      fechar("mUsu"); msg("Acesso de empresa criado."); await carregarTudo(); return;
+    }
     // 2) colaborador + usuário (idempotente)
     let rows = await get(`resc_colaboradores?select=id&auth_id=eq.${uid}`); let colabId = rows[0]?.id;
     if (!colabId) { try { colabId = (await post("resc_colaboradores", { tenant_id: APP.tenantId, auth_id: uid, nome, email, status: "ativo" }))[0].id; } catch (e) { if (!/duplicate|23505/i.test(e.message)) throw e; rows = await get(`resc_colaboradores?select=id&auth_id=eq.${uid}`); colabId = rows[0]?.id; } }
