@@ -21,6 +21,8 @@ import sys
 import time
 import traceback
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+BRT = ZoneInfo("America/Sao_Paulo")
 
 import requests
 from playwright.sync_api import sync_playwright
@@ -29,7 +31,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.10.0"
+VERSAO = "0.12.0"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -343,7 +345,24 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
         dados = dados or carregar_dados_instrumento(inst_id)
         ant_id = sb_rpc("cct_anterior", {"p_instrumento": inst_id})
         anterior = carregar_dados_instrumento(ant_id) if ant_id else None
-        r = analisar_cct.analisar(dados, anterior, usar_ia=bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("GITHUB_TOKEN")))
+        cfg = config(tenant)
+        origem_inst = (sb_get("cct_instrumentos", {"id": f"eq.{inst_id}", "select": "origem"}) or [{}])[0].get("origem")
+        usar_ia = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("GITHUB_TOKEN"))
+        motivo_sem_ia = None
+        if usar_ia and not cfg.get("ia_ativa", True):
+            usar_ia, motivo_sem_ia = False, "IA desativada nos parâmetros pelo gerente"
+        elif usar_ia and origem_inst == "historico" and not cfg.get("ia_historico", False):
+            usar_ia, motivo_sem_ia = False, "convenção histórica: parecer por IA desligado para histórico (parâmetros)"
+        elif usar_ia:
+            try:
+                uso = sb_rpc("cct_ia_uso_mes", {"p_tenant": tenant})
+                if uso >= int(cfg.get("ia_limite_mes") or 0):
+                    usar_ia, motivo_sem_ia = False, f"limite mensal de pareceres por IA atingido ({uso}/{cfg.get('ia_limite_mes')})"
+            except Exception as e:
+                log(f"  !! uso IA: {e}")
+        r = analisar_cct.analisar(dados, anterior, usar_ia=usar_ia)
+        if motivo_sem_ia:
+            r["erro_ia"] = motivo_sem_ia
         versao = 1 + len(sb_get("cct_analises", {"instrumento_id": f"eq.{inst_id}", "select": "id"}))
         an = sb_insert("cct_analises", {"tenant_id": tenant, "instrumento_id": inst_id, "anterior_id": ant_id, "versao": versao, "status": r["status"],
                                         "modelo": r["modelo"], "erro_ia": r["erro_ia"], "resumo": r["resumo"], "destaques": r["destaques"],
@@ -357,7 +376,7 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
         sb_patch("cct_instrumentos", {"id": f"eq.{inst_id}"}, {"analise_status": r["status"], "analise_em": datetime.now(timezone.utc).isoformat()})
         if r["status"] == "CONCLUIDA":
             resolver(tenant, f"IA:{inst_id}")
-        elif os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("GITHUB_TOKEN"):  # sem provedor configurado não é incidente, é estado
+        elif usar_ia:  # só é incidente quando a IA deveria ter rodado e falhou
             incidente(tenant, f"IA:{inst_id}", "IA", "ATENCAO", f"ANÁLISE POR IA NÃO CONCLUÍDA – {dados['metadados']['numero_registro']}: {r['erro_ia']} (valores e comparação gravados)", sindicato_id, inst_id)
         log(f"  ANÁLISE {dados['metadados']['numero_registro']}: {r['status']} — {len(r['valores'])} valores, "
             f"{'comparada com ' + anterior['metadados']['numero_registro'] if anterior else 'sem anterior'}, {r['duracao_ms']} ms")
@@ -675,14 +694,39 @@ def main():
         log(f"tenant {TENANT_CNPJ} não encontrado — abortando");
         sys.exit(2)
     tenant = tenants[0]["id"]
+    cfg0 = config(tenant)
+    forcar = (os.environ.get("FORCAR") or "").lower() in ("1", "true", "sim")
+    if not forcar and ORIGEM == "github-actions":
+        # roda de hora em hora; só executa nas horas configuradas (BRT). Manual (FORCAR) sempre executa.
+        agora = datetime.now(BRT)
+        horas = {h.strip()[:2] for h in (cfg0.get("horarios_consulta") or "06:00").split(",") if h.strip()}
+        if f"{agora:%H}" not in horas:
+            log(f"fora dos horários configurados ({cfg0.get('horarios_consulta')}) — agora {agora:%H:%M} BRT; nada a fazer")
+            processar_testes_email(tenant)  # pedidos de teste são atendidos mesmo fora do horário
+            return
+        log(f"horário de consulta {agora:%H:%M} BRT (configurados: {cfg0.get('horarios_consulta')})")
     global MAIL_DESTINO_UNICO
     cfg_dest = (config(tenant).get("email_destino_teste") or "").strip().lower()
     if cfg_dest:
         MAIL_DESTINO_UNICO = cfg_dest
         log(f"MODO TESTE de e-mail ativo (configurado no app): tudo vai para {cfg_dest}")
     processar_testes_email(tenant)
+    if cfg0.get("historico_automatico"):
+        try:
+            n = sb_rpc("cct_enfileirar_historico", {"p_tenant": tenant})
+            if n:
+                log(f"histórico automático: {n} sindicato(s) entraram na fila dos últimos {cfg0.get('historico_anos') or 5} anos")
+        except Exception as e:
+            log(f"  !! histórico automático: {e}")
+    # FILA: os consultados há mais tempo primeiro; opcionalmente só N por execução; intervalo configurável
+    global INTERVALO
+    INTERVALO = float(cfg0.get("intervalo_consultas_s") or INTERVALO)
     sinds = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true",
-                                      "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email", "order": "nome"})
+                                      "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email,ultima_consulta", "order": "ultima_consulta.asc.nullsfirst"})
+    maximo = int(cfg0.get("max_sindicatos_por_execucao") or 0)
+    if maximo and len(sinds) > maximo:
+        log(f"fila: {len(sinds)} sindicatos, {maximo} por execução (os demais ficam para a próxima)")
+        sinds = sinds[:maximo]
     emps_act = sb_get("cct_empresas", {"tenant_id": f"eq.{tenant}", "monitorar_act": "eq.true", "ativo": "eq.true",
                                        "select": "id,cnpj,razao_social,responsavel_email,gerente_email", "order": "razao_social"})
     filtro = os.environ.get("APENAS_CNPJ", "").strip()
@@ -699,8 +743,11 @@ def main():
         browser = p.chromium.launch(headless=False)  # headed sob xvfb: melhor pontuação no reCAPTCHA
         ctx = browser.new_context(locale="pt-BR", accept_downloads=True)
         page = ctx.new_page()
+        inicio_exec = time.time()
         try:
             for i, s in enumerate(sinds):
+                if time.time() - inicio_exec > 38 * 60:  # limite do Actions: 45 min — deixa o resto para a próxima execução
+                    log(f"tempo esgotado: {len(sinds) - i} sindicato(s) ficam para a próxima execução"); break
                 try:
                     st, n = processar_sindicato(tenant, s, page, existentes)
                     resumo[st] += 1
