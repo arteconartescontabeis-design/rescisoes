@@ -192,7 +192,7 @@
         <div class="grid g3"><div><label>Horários de consulta (Brasília, separados por vírgula)</label><input id="cfgHorarios" placeholder="06:00,13:00"></div>
           <div><label>Intervalo entre sindicatos (segundos)</label><input id="cfgIntervalo" type="number" min="5" max="600"></div>
           <div><label>Máximo de sindicatos por execução (0 = todos)</label><input id="cfgMaxSind" type="number" min="0" max="500"></div></div>
-        <div class="aviso">O GitHub dispara o robô de hora em hora (aos 5 minutos). Para cada horário marcado aqui (HH:MM, Brasília), o robô executa no <b>primeiro disparo após esse horário</b>, se ainda não tiver rodado desde então — "13:00" roda às 13h05, "23:17" às 00h05; atraso máximo de 1 h. Fins de semana não consultam. As consultas formam uma fila: os sindicatos consultados há mais tempo vão primeiro, com o intervalo definido entre um e outro — mais espaço entre consultas = menos risco de bloqueio. Com muitos sindicatos, use dois ou três horários e um máximo por execução.</div>
+        <div class="aviso">O GitHub dispara o robô de hora em hora (aos 5 minutos). Para cada horário marcado aqui (HH:MM, Brasília), o robô executa no <b>primeiro disparo após esse horário</b>, se ainda não tiver rodado desde então — "13:00" roda às 13h05, "23:17" às 00h05; atraso máximo de 1 h. O que não couber em um disparo (limite de 45 min do GitHub ≈ 45 sindicatos) continua no disparo seguinte. Fins de semana não consultam. As consultas formam uma fila: os sindicatos consultados há mais tempo vão primeiro, com o intervalo definido entre um e outro — mais espaço entre consultas = menos risco de bloqueio. Com muitos sindicatos, use dois ou três horários e um máximo por execução.</div>
         <h2 style="margin-top:18px">Parecer por IA</h2>
         <div class="grid g3"><div><label>Gerar parecer por IA</label><select id="cfgIa"><option value="true">Sim</option><option value="false">Não</option></select></div>
           <div><label>Limite de pareceres por mês</label><input id="cfgIaLim" type="number" min="0" max="5000"></div>
@@ -215,7 +215,8 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
-          <tr><td>v0.13.1</td><td>03/09/2026</td><td>Horários de consulta: o robô executa no primeiro disparo (aos :05 de cada hora, 24 h) após cada horário configurado, se ainda não rodou desde então — "23:17" passa a ser atendido às 00h05; atraso máximo de 1 h. Fins de semana não consultam. Limpeza de registros: exclusiva do superadministrador (mantido).</td></tr>
+          <tr><td>v0.13.2</td><td>03/09/2026</td><td>Fila entre disparos: o robô continua nos disparos seguintes enquanto houver sindicato não consultado desde o último horário configurado (o que não coube nos 45 min do Actions segue na hora seguinte).</td></tr>
+          <tr><td>v0.13.1</td><td>03/09/2026</td><td>Horários de consulta: o robô executa no primeiro disparo (aos :05 de cada hora, 24 h) após cada horário configurado, se ainda não rodou desde então — "23:17" passa a ser atendido às 00h05; atraso máximo de 1 h. O que não couber em um disparo (limite de 45 min do GitHub ≈ 45 sindicatos) continua no disparo seguinte. Fins de semana não consultam. Limpeza de registros: exclusiva do superadministrador (mantido).</td></tr>
           <tr><td>v0.13.0</td><td>03/09/2026</td><td>Quatro níveis de acesso: <b>Superadministrador</b> (tudo, incluindo configurações críticas — IA, horários/fila — e limpeza de registros), <b>Administrador</b> (usuários, cadastros, configurações operacionais, relatórios), <b>Operador/Analista</b> (cadastros e operação do dia a dia) e <b>Cliente</b> (só a própria empresa). Regras aplicadas no banco por funções com privilégio. Cabeçalho mostra o nível de quem está logado. Botão <b>"Analisar com IA"</b> na convenção (fila para a próxima execução do robô, dentro do limite mensal). "Limpar registros de teste" só para superadministrador. Banco <code>setup_cct_v0.13.0.sql</code> (define o titular como superadministrador).</td></tr>
           <tr><td>v0.12.3</td><td>03/09/2026</td><td>Disparo do robô ampliado para 24 h (de hora em hora, aos 5 minutos); dias úteis e horas continuam definidos em Configurações. O minuto informado no horário é ignorado: "23:00" e "23:06" rodam às 23h05.</td></tr>
           <tr><td>v0.12.2</td><td>03/09/2026</td><td>Alterar nível passa a usar função do banco com privilégio (a política do Rescisões não permitia alterar a linha de outro usuário); validações de único gerente e auto-rebaixamento no banco. Banco <code>setup_cct_v0.12.2.sql</code>.</td></tr>
@@ -320,7 +321,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.13.1" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.13.2" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
