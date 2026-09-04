@@ -29,7 +29,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.9.0"
+VERSAO = "0.10.0"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -207,10 +207,10 @@ def data_br(s):
     return None
 
 
-def importar(tenant, sind, reg, page, consulta_id, empresa=None):
+def importar(tenant, sind, reg, page, consulta_id, empresa=None, origem="monitoramento"):
     """Baixa, extrai e grava um instrumento novo. Sempre grava a linha — com status explícito."""
     registro = reg["registro"]
-    base = {"tenant_id": tenant, "sindicato_id": sind.get("id"), "empresa_id": (empresa or {}).get("id"), "numero_registro": registro,
+    base = {"tenant_id": tenant, "sindicato_id": sind.get("id"), "empresa_id": (empresa or {}).get("id"), "numero_registro": registro, "origem": origem,
             "numero_solicitacao": reg.get("solicitacao"), "tipo": reg.get("tipo"),
             "partes": [{"nome": p} for p in reg.get("partes", [])], "origem_consulta_id": consulta_id}
     vig = (reg.get("vigencia") or "").split(" - ")
@@ -258,6 +258,10 @@ def importar(tenant, sind, reg, page, consulta_id, empresa=None):
                      arquivo_path=arquivo_path, sha256=sha, total_clausulas=d["total_clausulas"],
                      status_importacao="IMPORTADO" if d["total_clausulas"] > 0 else "IMPORTACAO_NAO_CONCLUIDA")
         row = sb_insert("cct_instrumentos", dados, upsert_on="tenant_id,numero_registro")[0]
+        try:
+            cadastrar_partes(tenant, sind if sind.get("id") else None, d)
+        except Exception as e:
+            log(f"  !! partes: {e}")
         if d["clausulas"]:
             sb_insert("cct_clausulas", [{"tenant_id": tenant, "instrumento_id": row["id"], "ordem": c["ordem"],
                                          "numero_extenso": c["numero_extenso"], "titulo": c["titulo"], "grupo": c["grupo"],
@@ -275,6 +279,52 @@ def importar(tenant, sind, reg, page, consulta_id, empresa=None):
         incidente(tenant, f"IMPORTACAO:{registro}", "IMPORTACAO", "ALTO", f"Importação de {registro} não concluída: {e}",
                   sind.get("id"), row["id"])
         return row, False
+
+
+# ---------------------------------------------------------------- tipo do sindicato pelas partes do extrato
+import re as _re
+_RX_LAB = _re.compile(r"\b(EMPREGAD|TRABALHADOR|PROFISSIONA|OPERARI|OPERÁRI|MOTORIST|VIGILANT|SERVIDOR|TECNIC|TÉCNIC|BANCARI|BANCÁRI|COMERCIARI|COMERCIÁRI|CONDUTOR|ENFERM|AUXILIAR|OFICIAI)", _re.I)
+_RX_PAT = _re.compile(r"\b(PATRONAL|EMPRESAS|EMPRESARI|INDUSTRIA|INDÚSTRIA|COMERCIO|COMÉRCIO|LOJIST|VAREJIST|ATACADIST|HOTEIS|HOTÉIS|HOSPITAIS|ESCOLAS|TRANSPORTADOR|CONTABILIST|AGENCIAS|AGÊNCIAS|CONCESSIONARI)", _re.I)
+
+
+def inferir_tipo(nome, posicao):
+    """laboral/patronal pelo nome; empate resolve pela posição no extrato (1ª parte = laboral, no padrão do Mediador)."""
+    n = nome or ""
+    lab, pat = bool(_RX_LAB.search(n)), bool(_RX_PAT.search(n))
+    if lab and not pat:
+        return "laboral"
+    if pat and not lab:
+        return "patronal"
+    if lab and pat:  # "SINDICATO DOS EMPREGADOS NO COMÉRCIO": palavra laboral prevalece
+        return "laboral"
+    return "laboral" if posicao == 0 else "patronal"
+
+
+def cadastrar_partes(tenant, sind, dados):
+    """Define o tipo do sindicato monitorado se estiver em branco e cadastra as demais partes (sem monitorar)."""
+    partes = dados.get("partes") or []
+    for pos, pt in enumerate(partes):
+        cnpj = _re.sub(r"\D", "", pt.get("cnpj") or "")
+        if len(cnpj) != 14:
+            continue
+        tipo = inferir_tipo(pt.get("nome"), pos)
+        if sind and sind.get("cnpj") == cnpj:
+            if not sind.get("tipo"):
+                sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"tipo": tipo, "tipo_origem": "cct"})
+                sind["tipo"] = tipo
+                log(f"  tipo do sindicato definido pela CCT: {tipo}")
+            continue
+        ex = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "cnpj": f"eq.{cnpj}", "select": "id,tipo"})
+        if ex:
+            if not ex[0].get("tipo"):
+                sb_patch("cct_sindicatos", {"id": f"eq.{ex[0]['id']}"}, {"tipo": tipo, "tipo_origem": "cct"})
+        else:
+            try:
+                sb_insert("cct_sindicatos", {"tenant_id": tenant, "cnpj": cnpj, "nome": (pt.get("nome") or "")[:200], "tipo": tipo, "tipo_origem": "cct",
+                                             "monitorar": False, "observacoes": f"cadastrado automaticamente como parte da {dados['metadados'].get('numero_registro')}"})
+                log(f"  parte cadastrada (sem monitorar): {pt.get('nome')} [{tipo}]")
+            except Exception as e:
+                log(f"  !! parte: {e}")
 
 
 # ---------------------------------------------------------------- análise (seções 44-61)
@@ -468,6 +518,71 @@ def notificar_para(tenant, tipo, assunto, html, dest, instrumento_id=None, incid
     return reg["status"]
 
 
+# ---------------------------------------------------------------- histórico (últimos N anos), aos poucos
+def ano_do_registro(reg):
+    m = _re.search(r"/(\d{4})", reg.get("registro") or "")
+    if m:
+        return int(m.group(1))
+    m = _re.search(r"(\d{4})", (reg.get("vigencia") or "")[:10][::-1])
+    return None
+
+
+def importar_historico(tenant, page, existentes, cfg):
+    """Para sindicatos com historico_status PENDENTE/EM_ANDAMENTO: consulta 'Todos' (vigentes e não vigentes),
+    importa registros dos últimos N anos ainda ausentes — no máximo `max` downloads por execução, com pausas."""
+    anos, maximo = int(cfg.get("historico_anos") or 5), int(cfg.get("historico_max_por_execucao") or 8)
+    ano_min = datetime.now().year - anos
+    pend = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "historico_status": "in.(PENDENTE,EM_ANDAMENTO)",
+                                     "select": "id,cnpj,nome,tipo,historico_status", "order": "historico_em.nullsfirst", "limit": "3"})
+    if not pend:
+        return 0
+    log(f"HISTÓRICO: {len(pend)} sindicato(s) pendente(s); limite {maximo} download(s) nesta execução; registros desde {ano_min}")
+    feitos = 0
+    for sind in pend:
+        if feitos >= maximo:
+            break
+        sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"historico_status": "EM_ANDAMENTO", "historico_em": datetime.now(timezone.utc).isoformat()})
+        faltam, erro_consulta = [], None
+        for tipo in TIPOS_MONITORADOS:
+            if feitos >= maximo:
+                break
+            pendentes_pg = []
+
+            def on_pagina(n, regs):
+                # importa os desta página AGORA (o download só funciona enquanto a página está na tela)
+                nonlocal feitos
+                for reg in regs:
+                    ano = ano_do_registro(reg)
+                    if ano is None or ano < ano_min or reg["registro"] in existentes:
+                        continue
+                    if feitos >= maximo:
+                        pendentes_pg.append(reg["registro"]); continue
+                    log(f"  HISTÓRICO {reg['registro']} ({reg['tipo']}) — {reg.get('vigencia')}")
+                    row, ok = importar(tenant, sind, reg, page, None, None, origem="historico")
+                    existentes.add(reg["registro"]); feitos += 1
+                    time.sleep(6)
+
+            r = None
+            for tent in (1, 2):  # uma nova tentativa em falha (seção 92), sem duplicar consultas boas
+                r = mediador.consultar(page, sind["cnpj"], tipo=tipo, vigencia="Todos", on_pagina=on_pagina)
+                if r["status"] != "CONSULTA_NAO_CONCLUIDA":
+                    break
+                time.sleep(20)
+            if r["status"] == "CONSULTA_NAO_CONCLUIDA":
+                erro_consulta = r["erro"]
+            else:
+                faltam += pendentes_pg
+            time.sleep(4)
+        if erro_consulta:
+            sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"historico_obs": f"consulta não concluída: {erro_consulta}"})
+        elif not faltam and feitos < maximo:
+            sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"historico_status": "CONCLUIDO", "historico_em": datetime.now(timezone.utc).isoformat(), "historico_obs": f"histórico de {anos} anos importado"})
+            log(f"  HISTÓRICO concluído: {sind['nome']}")
+        else:
+            sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"historico_obs": f"{len(set(faltam))} registro(s) ainda por importar — continua na próxima execução"})
+    return feitos
+
+
 # ---------------------------------------------------------------- ciclo por alvo (sindicato ou empresa/ACT)
 def processar_sindicato(tenant, sind, page, existentes):
     return processar_alvo(tenant, sind, None, TIPOS_MONITORADOS, page, existentes)
@@ -624,6 +739,20 @@ def main():
     except Exception as e:
         log(f"  !! rotina de ciências falhou: {e}\n{traceback.format_exc()}")
         incidente(tenant, "APLICATIVO:ciencias", "APLICATIVO", "ALTO", f"Rotina de lembretes/escalonamento falhou: {e}")
+    try:
+        cfg = config(tenant)
+        if cfg.get("historico_anos") is not None or True:
+            with sync_playwright() as p2:
+                b2 = p2.chromium.launch(headless=False)
+                pg2 = b2.new_context(locale="pt-BR", accept_downloads=True).new_page()
+                try:
+                    n_hist = importar_historico(tenant, pg2, existentes, cfg)
+                    resumo["historico"] = n_hist
+                finally:
+                    b2.close()
+    except Exception as e:
+        log(f"  !! histórico: {e}\n{traceback.format_exc()}")
+        incidente(tenant, "APLICATIVO:historico", "APLICATIVO", "ATENCAO", f"Importação do histórico falhou nesta execução: {e}")
     resolver(tenant, "APLICATIVO:execucao-diaria")  # heartbeat: execução chegou ao fim
     log(f"RESUMO: {json.dumps(resumo, ensure_ascii=False)}")
     with open("resumo_execucao.json", "w", encoding="utf-8") as f:
