@@ -29,7 +29,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.8.0"
+VERSAO = "0.9.0"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -161,9 +161,18 @@ def resolver(tenant, fingerprint):
         log(f"  !! falha ao resolver incidente: {e}")
 
 
+MODULOS_ERRO = {"MEDIADOR", "DOWNLOAD", "IMPORTACAO", "ARMAZENAMENTO", "APLICATIVO", "EMAIL", "IA", "ERRO"}
+
+
 def destinatarios(tenant, tipo):
     rows = sb_get("cct_alertas_destinatarios", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "select": "email,tipos"})
-    return [r["email"] for r in rows if "TODOS" in (r["tipos"] or []) or tipo in (r["tipos"] or [])]
+    dest = [r["email"] for r in rows if "TODOS" in (r["tipos"] or []) or tipo in (r["tipos"] or [])]
+    if tipo in MODULOS_ERRO:  # erros do aplicativo vão SEMPRE também aos gerentes/administradores do escritório
+        try:
+            dest += [g for g in sb_rpc("cct_emails_gerentes", {"p_tenant": tenant}) if g]
+        except Exception as e:
+            log(f"  !! gerentes: {e}")
+    return list(dict.fromkeys(d.lower() for d in dest if d))
 
 
 def notificar(tenant, tipo, assunto, html, instrumento_id=None, incidente_id=None, tipo_dest=None):
@@ -289,7 +298,8 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
         an = sb_insert("cct_analises", {"tenant_id": tenant, "instrumento_id": inst_id, "anterior_id": ant_id, "versao": versao, "status": r["status"],
                                         "modelo": r["modelo"], "erro_ia": r["erro_ia"], "resumo": r["resumo"], "destaques": r["destaques"],
                                         "providencias": r["providencias"], "alertas": r["alertas"], "pontos_incertos": r["pontos_incertos"],
-                                        "validacao": r["validacao"], "comparacao": r["comparacao"], "duracao_ms": r["duracao_ms"], "gerado_por": ORIGEM})[0]
+                                        "validacao": r["validacao"], "comparacao": r["comparacao"], "duracao_ms": r["duracao_ms"], "gerado_por": ORIGEM,
+                                        "comentarios": r.get("comentarios", [])})[0]
         requests.delete(f"{SB_URL}/rest/v1/cct_valores", headers=H, params={"instrumento_id": f"eq.{inst_id}"}, timeout=30)
         if r["valores"]:
             sb_insert("cct_valores", [{"tenant_id": tenant, "instrumento_id": inst_id, "analise_id": an["id"], **{k: v[k] for k in
