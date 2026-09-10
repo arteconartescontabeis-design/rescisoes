@@ -24,7 +24,6 @@ concurrency:
 
 permissions:
   contents: read
-  models: read      # GitHub Models (IA gratuita) com o GITHUB_TOKEN
 
 jobs:
   monitorar:
@@ -52,8 +51,6 @@ jobs:
           FORCAR: ${{ inputs.forcar }}
           APENAS_CNPJ: ${{ inputs.apenas_cnpj }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_MODEL: openai/gpt-4o
           ORIGEM: github-actions
         run: xvfb-run -a python monitor_cct.py
       - name: Guardar log e extratos da execucao
