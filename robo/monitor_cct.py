@@ -31,11 +31,12 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.15.2"
+VERSAO = "0.16.0"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
 ORIGEM = os.environ.get("ORIGEM", "github-actions")
+EXECUCAO_ID = (os.environ.get("EXECUCAO_ID") or "").strip()   # aberta pelo workflow (cct_execucao_iniciar); fechada aqui ou pelo passo "always"
 INTERVALO = float(os.environ.get("INTERVALO_S", "8"))
 # Hub artecon-mail — mesmo contrato da Edge Function bright-task do Rescisões Pro
 MAIL_URL = os.environ.get("MAIL_HUB_URL", "https://tjnqloycikukvvnconqn.supabase.co/functions/v1/mail-send")
@@ -224,6 +225,17 @@ def notificar(tenant, tipo, assunto, html, instrumento_id=None, incidente_id=Non
         log(f"  !! falha ao gravar notificação: {e}")
     log(f"  NOTIFICAÇÃO {tipo}: {reg['status']}" + (f" ({reg.get('erro')})" if reg.get("erro") else ""))
     return reg["status"]
+
+
+def encerrar_execucao(resultado, motivo=None, dados=None):
+    """Fecha a linha de cct_execucoes desta execução (v0.16.0). Sem EXECUCAO_ID (execução local) não faz nada."""
+    if not EXECUCAO_ID:
+        return
+    try:
+        ok = sb_rpc("cct_execucao_encerrar", {"p_id": EXECUCAO_ID, "p_resultado": resultado, "p_motivo": motivo, "p_dados": dict(dados or {}, versao=VERSAO)})
+        log(f"execução {EXECUCAO_ID[:8]} encerrada: {resultado}" + (f" — {motivo}" if motivo else "") + ("" if ok else " (já estava fechada)"))
+    except Exception as e:
+        log(f"  !! encerrar execução: {e}")
 
 
 def processar_testes_email(tenant):
@@ -767,10 +779,12 @@ def main():
         st, erro, ef = enviar_email([teste], "Artecon · CCT Monitor — TESTE de envio", html_padrao("Teste de envio",
                                     f"<p>Se você recebeu esta mensagem, o CCT Monitor está conectado ao hub artecon-mail.</p><p style='color:#7a8894;font-size:12px'>{datetime.now(BRT):%d/%m/%Y %H:%M} · pode ignorar/excluir.</p>", "CCT Monitor · Teste"))
         log(f"TESTE DE E-MAIL para {ef}: {st} {erro or ''}")
+        encerrar_execucao("SEM_CONSULTA", f"execução só de teste de e-mail: {st}")
         sys.exit(0 if st == "ENVIADA" else 1)
     tenants = sb_get("resc_tenants", {"cnpj": f"eq.{TENANT_CNPJ}", "select": "id,nome"})
     if not tenants:
         log(f"tenant {TENANT_CNPJ} não encontrado — abortando");
+        encerrar_execucao("ERRO_TOTAL", f"tenant {TENANT_CNPJ} não encontrado")
         sys.exit(2)
     tenant = tenants[0]["id"]
     cfg0 = config(tenant)
@@ -781,7 +795,7 @@ def main():
         from datetime import timedelta
         agora = datetime.now(BRT)
         if agora.weekday() >= 5:
-            log(f"fim de semana ({agora:%d/%m %H:%M} BRT) — sem consulta"); processar_testes_email(tenant); return
+            log(f"fim de semana ({agora:%d/%m %H:%M} BRT) — sem consulta"); processar_testes_email(tenant); encerrar_execucao("SEM_CONSULTA", "fim de semana"); return
         horarios = []
         for h in (cfg0.get("horarios_consulta") or "06:00").split(","):
             m = _re.match(r"\s*(\d{1,2}):(\d{2})", h)
@@ -797,14 +811,14 @@ def main():
             if devido is None or alvo > devido:
                 devido = alvo
         if devido is None:
-            log("nenhum horário válido configurado"); processar_testes_email(tenant); return
+            log("nenhum horário válido configurado"); processar_testes_email(tenant); encerrar_execucao("SEM_CONSULTA", "nenhum horário válido configurado"); return
         # devido = último horário configurado já passado. Executa enquanto houver sindicato monitorado NÃO consultado desde então
         # (assim, o que não coube em um disparo de 45 min continua no próximo, e um máximo por execução vira fila natural).
         todos = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true", "select": "id,ultima_consulta"})
         pendentes = [x for x in todos if not x.get("ultima_consulta") or datetime.fromisoformat(x["ultima_consulta"].replace("Z", "+00:00")).astimezone(BRT) < devido]
         if todos and not pendentes:
             log(f"nada devido: todos os {len(todos)} sindicatos já consultados desde {devido:%d/%m %H:%M} BRT (horários {cfg0.get('horarios_consulta')})")
-            processar_testes_email(tenant); return
+            processar_testes_email(tenant); encerrar_execucao("SEM_CONSULTA", f"fora do horário: todos consultados desde {devido:%d/%m %H:%M}"); return
         log(f"executando: horário devido {devido:%d/%m %H:%M} BRT, agora {agora:%H:%M} — {len(pendentes)} de {len(todos)} sindicato(s) ainda não consultados desde então")
     global MAIL_DESTINO_UNICO
     cfg_dest = (config(tenant).get("email_destino_teste") or "").strip().lower()
@@ -903,9 +917,34 @@ def main():
         incidente(tenant, "APLICATIVO:historico", "APLICATIVO", "ATENCAO", f"Importação do histórico falhou nesta execução: {e}")
     resolver(tenant, "APLICATIVO:execucao-diaria")  # heartbeat: execução chegou ao fim
     log(f"RESUMO: {json.dumps(resumo, ensure_ascii=False)}")
+    # classificação da execução (ponto crítico 07)
+    previstos = len(sinds) + len(emps_act)
+    processados = resumo["CONSULTA_CONFIRMADA"] + resumo["CONSULTA_COM_ALERTA"] + resumo["CONSULTA_NAO_CONCLUIDA"]
+    erros, alertas = resumo["CONSULTA_NAO_CONCLUIDA"], resumo["CONSULTA_COM_ALERTA"]
+    if previstos == 0:
+        resultado, motivo = "SEM_CONSULTA", "nenhum sindicato/empresa a monitorar"
+    elif erros and erros >= processados:
+        resultado, motivo = "ERRO_TOTAL", f"{erros} de {previstos} consulta(s) não concluída(s)"
+    elif erros:
+        resultado, motivo = "ERRO_PARCIAL", f"{erros} de {previstos} consulta(s) não concluída(s)"
+    elif processados < previstos:
+        resultado, motivo = "ERRO_PARCIAL", f"tempo esgotado: {previstos - processados} de {previstos} ficaram para a próxima execução"
+    elif alertas:
+        resultado, motivo = "COM_ALERTAS", f"{alertas} consulta(s) com alerta"
+    else:
+        resultado, motivo = "SUCESSO", None
+    encerrar_execucao(resultado, motivo, {"sindicatos_previstos": previstos, "sindicatos_processados": processados, "novos": resumo["novos"],
+                                          "alertas": alertas, "erros": erros, "historico": resumo.get("historico"), "detalhes": resumo})
     with open("resumo_execucao.json", "w", encoding="utf-8") as f:
         json.dump({"versao": VERSAO, "origem": ORIGEM, "quando": datetime.now(timezone.utc).isoformat(), **resumo}, f, ensure_ascii=False, indent=2)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except Exception as _e:
+        # qualquer falha não tratada fecha a execução como ERRO_TOTAL com a causa (o passo "always" do workflow cobre até este código não rodar)
+        encerrar_execucao("ERRO_TOTAL", f"{type(_e).__name__}: {str(_e)[:300]}")
+        raise
