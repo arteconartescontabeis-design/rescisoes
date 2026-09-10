@@ -219,6 +219,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.15.0</td><td>09/09/2026</td><td>Empresas: vínculo sindical reformulado — vários sindicatos por empresa, cada um com o papel <b>Laboral</b> ou <b>Patronal</b> escolhido no próprio vínculo (o papel sugerido vem do tipo do sindicato e pode ser alterado); campo <b>Buscar sindicato</b> (nome ou CNPJ) dentro do cadastro da empresa, com atalho "Cadastrar novo sindicato" que já deixa o novo sindicato vinculado; lista de vinculados em uma coluna, um abaixo do outro, em ordem alfabética. Na tabela de Empresas cada sindicato aparece em sua linha com o papel. "Sugerir sindicatos" passa a vincular com um clique.</td></tr>
           <tr><td>v0.14.2</td><td>04/09/2026</td><td>Convenções: um único botão <b>Ações ▾</b> por linha reúne Abrir (parecer e análise), Cláusulas, Impacto por empresa, Gerar PDF, Baixar extrato (.doc), Analisar com IA e Registrar ciência. Sindicatos e Empresas: CNPJ em coluna própria, em uma linha só (fonte mono), com o nome quebrando quando longo.</td></tr>
           <tr><td>v0.14.1</td><td>04/09/2026</td><td>Sindicatos, Empresas, Confirmações e Destinatários ganham o mesmo padrão de consulta de Convenções: busca livre, filtros por coluna (tipo, UF, monitorar, histórico, vínculo, ACT, situação, empresa, sindicato, grupo…) e ordenação clicando no título da coluna, com contador "N de M".</td></tr>
           <tr><td>v0.14.0</td><td>04/09/2026</td><td>E-mails no modelo único da Artecon (logo novo, faixa de título centralizada em índigo, bloco de dados-chave com prazo em destaque, matriz de impacto e providências numeradas, botões "Registrar ciência" e "Ver convenção", rodapé com contato). Assuntos padronizados "Artecon · CCT Monitor — …". Requer <code>logo_artecon.png</code> na raiz do repositório.</td></tr>
@@ -274,7 +275,9 @@
     <div><label>Gerente (nome)</label><input id="eGerN"></div><div><label>Gerente (e-mail)</label><input id="eGerE" type="email"></div><div><label>Ativa</label><select id="eAtivo"><option value="true">Sim</option><option value="false">Não</option></select></div></div>
   <div style="margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center"><label style="margin:0">Sindicatos vinculados (enquadramento)</label><button class="b sec sm" type="button" onclick="sugerir()">Sugerir sindicatos</button></div>
     <div id="eSug" style="font-size:12.5px;margin:6px 0"></div>
-    <div id="eSinds" style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;font-size:13px"></div></div>
+    <div id="eSinds" style="font-size:13px"></div>
+    <div style="margin-top:8px"><label>Buscar sindicato (nome ou CNPJ)</label><div style="display:flex;gap:6px"><input id="eBusca" placeholder="Digite parte do nome ou do CNPJ" oninput="renderBuscaSind()" autocomplete="off"><button class="b sec sm" type="button" onclick="novoSindDaEmpresa()" style="white-space:nowrap">Cadastrar novo sindicato</button></div>
+      <div id="eBuscaRes" style="font-size:13px;margin-top:4px"></div></div></div>
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mEmp')">Cancelar</button><button class="b" onclick="salvarEmp()">Salvar</button></div>
 </div></div>
 
@@ -328,7 +331,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.14.2" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.15.0" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
@@ -503,8 +506,10 @@ async function salvarSind() {
     categoria: $("sCat").value.trim() || null, monitorar: $("sMon").value === "true", observacoes: $("sObs").value.trim() || null,
     responsavel_email: $("sResp").value.trim().toLowerCase() || null, gerente_email: $("sGer").value.trim().toLowerCase() || null,
     municipio: $("sMun").value.trim() || null, cnae: $("sCnae").value.trim() || null, ...(APP.rfb && APP.rfb.cnpj === cnpj ? { situacao_cadastral: APP.rfb.situacao, receita_em: new Date().toISOString() } : {}) };
-  try { if ($("sId").value) await patch("cct_sindicatos", "id=eq." + $("sId").value, d); else await post("cct_sindicatos", d);
-    fechar("mSind"); msg("Sindicato salvo."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
+  try { let novoId = null; if ($("sId").value) await patch("cct_sindicatos", "id=eq." + $("sId").value, d); else novoId = (await post("cct_sindicatos", d))[0].id;
+    fechar("mSind"); msg("Sindicato salvo."); await carregarTudo();
+    if (APP.voltarEmp) { APP.voltarEmp = false; if (novoId && $("mEmp").classList.contains("on")) { vincSind(novoId); $("eBusca").value = ""; renderBuscaSind(); } }
+  } catch (e) { msg(e.message, "erro"); }
 }
 async function pedirHistorico(id) { try { await patch("cct_sindicatos", "id=eq." + id, { historico_status: "PENDENTE", historico_obs: null }); msg("Histórico na fila — o robô importa nas próximas execuções."); await carregarTudo(); } catch (e) { msg(e.message, "erro"); } }
 async function pedirHistoricoTodos() { const l = APP.dados.sind.filter(s => s.monitorar && s.ativo && !s.historico_status); if (!l.length) return msg("Nenhum sindicato monitorado sem histórico solicitado."); if (!confirm(`Colocar ${l.length} sindicato(s) na fila do histórico?`)) return; for (const s of l) await patch("cct_sindicatos", "id=eq." + s.id, { historico_status: "PENDENTE" }); msg("Fila criada."); await carregarTudo(); }
@@ -908,7 +913,7 @@ async function sugerir() {
   try {
     const r = await api("rpc/cct_sugerir_sindicatos", { method: "POST", body: JSON.stringify({ p_tenant: APP.tenantId, p_cnae: cnae || null, p_uf: uf || null, p_municipio: mun || null }) });
     if (!r.length) { $("eSug").innerHTML = `<span style="color:var(--text-3)">Sem base para sugerir ainda — a sugestão aprende com os vínculos confirmados e com as CCTs importadas.</span>`; return; }
-    $("eSug").innerHTML = `<div class="aviso" style="margin:0"><b>Sugestões</b> (confirme marcando abaixo): ` + r.map(x => `<div>${esc(x.nome)} <small>(${x.tipo})</small> — <b>${x.pontos} pts</b>: ${esc((x.motivos||[]).join("; "))} <a href="#" onclick="document.querySelector('#eSinds input[data-sid=\'${x.sindicato_id}\']').checked=true;return false">marcar</a></div>`).join("") + `</div>`;
+    $("eSug").innerHTML = `<div class="aviso" style="margin:0"><b>Sugestões</b> (confirme marcando abaixo): ` + r.map(x => `<div>${esc(x.nome)} <small>(${x.tipo})</small> — <b>${x.pontos} pts</b>: ${esc((x.motivos||[]).join("; "))} <a href="#" onclick="vincSind('${x.sindicato_id}');return false">vincular</a></div>`).join("") + `</div>`;
   } catch (e) { $("eSug").innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`; }
 }
 // ---------- matriz de impacto ----------
@@ -945,7 +950,7 @@ function renderEmp() {
   const th = (t, c) => thOrd(tab, t, c, fn);
   $("tabEmp").innerHTML = barra + contador(l.length, all.length) + `<table><tr>${th("CNPJ","cnpj")}${th("Razão social","razao_social")}${th("Sindicatos","sindicatos_txt")}${th("Responsável","responsavel_email")}${th("Gerente","gerente_email")}${th("ACT","monitorar_act")}${th("Ativa","ativo")}<th></th></tr>` +
     l.map(e => `<tr><td class="cnpj">${fmtCnpj(e.cnpj)}</td><td class="nome">${esc(e.razao_social)}<br><small style="color:var(--cinza)">${esc([e.municipio,e.uf].filter(Boolean).join("/"))} ${esc(e.cnae||"")}</small></td>
-      <td>${(e.vinculos||[]).map(v => esc(nomeS(v.sindicato_id))).join("<br>") || '<span class="tag alerta">sem vínculo</span>'}</td>
+      <td>${(e.vinculos||[]).map(v => ({ ...v, nome: nomeS(v.sindicato_id) })).sort(ordNome).map(v => `${esc(v.nome)} <small style="color:var(--cinza)">(${PAPEL_TXT[v.papel] || v.papel || "—"})</small>`).join("<br>") || '<span class="tag alerta">sem vínculo</span>'}</td>
       <td>${esc(e.responsavel_nome||"")}<br><small>${esc(e.responsavel_email||"")}</small></td><td>${esc(e.gerente_nome||"")}<br><small>${esc(e.gerente_email||"")}</small></td>
       <td>${e.monitorar_act ? '<span class="tag ok">sim</span>' : ""}</td><td>${e.ativo ? "sim" : "não"}</td>
       <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirEmp('${e.id}')">Editar</button> <button class="b sec sm" onclick="excluirEmp('${e.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
@@ -957,10 +962,37 @@ function abrirEmp(id) {
   $("eId").value = id || ""; $("eCnpj").value = e.cnpj ? fmtCnpj(e.cnpj) : ""; $("eNome").value = e.razao_social || ""; $("eUf").value = e.uf || ""; $("eMun").value = e.municipio || ""; $("eCnae").value = e.cnae || "";
   $("eRespN").value = e.responsavel_nome || ""; $("eRespE").value = e.responsavel_email || ""; $("eGerN").value = e.gerente_nome || ""; $("eGerE").value = e.gerente_email || "";
   $("eAct").value = String(e.monitorar_act ?? false); $("eAtivo").value = String(e.ativo ?? true); $("eSug").innerHTML = ""; $("eRfb").textContent = e.receita_em ? "Receita consultada em " + fmtDT(e.receita_em) + (e.situacao_cadastral ? " · " + e.situacao_cadastral : "") : "";
-  const vinc = new Set((e.vinculos||[]).map(v => v.sindicato_id));
-  $("eSinds").innerHTML = APP.dados.sind.map(s => `<label style="display:flex;gap:6px;align-items:center;font-size:13px;color:inherit"><input type="checkbox" style="width:auto" data-sid="${s.id}" ${vinc.has(s.id) ? "checked" : ""}> ${esc(s.nome)} <small style="color:var(--cinza)">(${s.tipo})</small></label>`).join("") || `<small>Cadastre sindicatos primeiro.</small>`;
+  APP.eVinc = (e.vinculos||[]).map(v => ({ id: v.id, sindicato_id: v.sindicato_id, papel: v.papel || "laboral" }));
+  $("eBusca").value = ""; $("eBuscaRes").innerHTML = ""; renderVincEmp();
   $("mEmp").classList.add("on");
 }
+const PAPEL_TXT = { laboral: "Laboral", patronal: "Patronal" };
+const ordNome = (a, b) => String(a.nome||"").localeCompare(String(b.nome||""), "pt-BR", { sensitivity: "base" });
+function renderVincEmp() {
+  const l = (APP.eVinc||[]).map(v => { const s = APP.dados.sind.find(x => x.id === v.sindicato_id) || {}; return { ...v, s, nome: s.nome }; }).sort(ordNome);
+  $("eSinds").innerHTML = l.length ? l.map(v => `<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #eef1f5">
+      <div style="flex:1;min-width:0"><b>${esc(v.nome || "(sindicato não encontrado)")}</b>${v.s.cnpj ? ` <small style="color:var(--cinza);font-family:'DM Mono',monospace">${fmtCnpj(v.s.cnpj)}</small>` : ""}${v.s.tipo ? ` <small style="color:var(--cinza)">· tipo do sindicato: ${v.s.tipo}</small>` : ""}</div>
+      <select style="width:auto" onchange="APP.eVinc.find(x => x.sindicato_id === '${v.sindicato_id}').papel = this.value"><option value="laboral" ${v.papel === "laboral" ? "selected" : ""}>Laboral</option><option value="patronal" ${v.papel === "patronal" ? "selected" : ""}>Patronal</option></select>
+      <button class="b sec sm" type="button" onclick="desvincSind('${v.sindicato_id}')">Remover</button></div>`).join("")
+    : `<small style="color:var(--text-3)">Nenhum sindicato vinculado. Use a busca abaixo ou "Sugerir sindicatos".</small>`;
+}
+function vincSind(sid) {
+  if (!APP.eVinc) APP.eVinc = [];
+  if (APP.eVinc.some(v => v.sindicato_id === sid)) return msg("Sindicato já vinculado.");
+  const s = APP.dados.sind.find(x => x.id === sid);
+  APP.eVinc.push({ sindicato_id: sid, papel: (s && s.tipo) || "laboral" });
+  renderVincEmp(); renderBuscaSind();
+}
+function desvincSind(sid) { APP.eVinc = (APP.eVinc||[]).filter(v => v.sindicato_id !== sid); renderVincEmp(); renderBuscaSind(); }
+function renderBuscaSind() {
+  const q = $("eBusca").value.trim().toLowerCase(), qd = q.replace(/\D/g, "");
+  if (!q) { $("eBuscaRes").innerHTML = ""; return; }
+  const ja = new Set((APP.eVinc||[]).map(v => v.sindicato_id));
+  const r = APP.dados.sind.filter(s => !ja.has(s.id) && ((s.nome||"").toLowerCase().includes(q) || (qd && (s.cnpj||"").includes(qd)))).sort(ordNome).slice(0, 15);
+  $("eBuscaRes").innerHTML = r.length ? r.map(s => `<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid #eef1f5"><div style="flex:1;min-width:0">${esc(s.nome)} <small style="color:var(--cinza);font-family:'DM Mono',monospace">${fmtCnpj(s.cnpj)}</small>${s.tipo ? ` <small style="color:var(--cinza)">(${s.tipo})</small>` : ""}</div><button class="b sec sm" type="button" onclick="vincSind('${s.id}')">Vincular</button></div>`).join("")
+    : `<small style="color:var(--text-3)">Nenhum sindicato cadastrado com esse nome/CNPJ — use "Cadastrar novo sindicato".</small>`;
+}
+function novoSindDaEmpresa() { const b = $("eBusca").value.trim(); APP.voltarEmp = true; abrirSind(); if (b && /^[\d.\/-]+$/.test(b)) $("sCnpj").value = b; else if (b) $("sNome").value = b; }
 async function salvarEmp() {
   const cnpj = $("eCnpj").value.replace(/\D/g, "");
   if (cnpj.length !== 14 || !$("eNome").value.trim()) return msg("Informe CNPJ (14 dígitos) e razão social.", "erro");
@@ -970,12 +1002,13 @@ async function salvarEmp() {
   try {
     let id = $("eId").value;
     if (id) await patch("cct_empresas", "id=eq." + id, d); else id = (await post("cct_empresas", d))[0].id;
-    const marcados = [...document.querySelectorAll("#eSinds input:checked")].map(i => i.dataset.sid);
+    const desejados = APP.eVinc || [];
     const atuais = ((APP.dados.emp||[]).find(x => x.id === id) || {}).vinculos || [];
-    for (const v of atuais) if (!marcados.includes(v.sindicato_id)) await del("cct_empresa_sindicato", "id=eq." + v.id);
-    for (const sid of marcados) if (!atuais.find(v => v.sindicato_id === sid)) {
-      const s = APP.dados.sind.find(x => x.id === sid);
-      await post("cct_empresa_sindicato", { tenant_id: APP.tenantId, empresa_id: id, sindicato_id: sid, papel: (s && s.tipo) || "laboral" });
+    for (const v of atuais) if (!desejados.find(d => d.sindicato_id === v.sindicato_id)) await del("cct_empresa_sindicato", "id=eq." + v.id);
+    for (const dv of desejados) {
+      const a = atuais.find(v => v.sindicato_id === dv.sindicato_id);
+      if (!a) await post("cct_empresa_sindicato", { tenant_id: APP.tenantId, empresa_id: id, sindicato_id: dv.sindicato_id, papel: dv.papel || "laboral" });
+      else if ((a.papel || "laboral") !== dv.papel) await patch("cct_empresa_sindicato", "id=eq." + a.id, { papel: dv.papel });
     }
     fechar("mEmp"); msg("Empresa salva."); await carregarTudo();
   } catch (e) { msg(e.message, "erro"); }
