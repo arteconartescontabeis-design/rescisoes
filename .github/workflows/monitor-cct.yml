@@ -39,9 +39,22 @@ jobs:
           pip install playwright requests beautifulsoup4 lxml
           playwright install --with-deps chromium
           sudo apt-get install -y xvfb
+      - name: Abrir execucao (registro independente do robo)
+        id: abrir
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          ID=$(curl -sS -X POST "$SUPABASE_URL/rest/v1/rpc/cct_execucao_iniciar" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" -H "Content-Type: application/json" \
+            -d '{"p_cnpj":"79876769000128","p_run_id":"${{ github.run_id }}","p_run_url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","p_origem":"github-actions"}' | tr -d '"')
+          echo "execucao_id=$ID" >> "$GITHUB_OUTPUT"
+          echo "execucao aberta: $ID"
       - name: Executar robo
+        id: robo
         working-directory: robo
         env:
+          EXECUCAO_ID: ${{ steps.abrir.outputs.execucao_id }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           TENANT_CNPJ: "79876769000128"
@@ -53,6 +66,16 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ORIGEM: github-actions
         run: xvfb-run -a python monitor_cct.py
+      - name: Encerrar execucao se o robo nao encerrou (sempre roda)
+        if: always() && steps.abrir.outputs.execucao_id != ''
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          # so tem efeito se a execucao ainda estiver EM_EXECUCAO (o robo caiu antes de registrar o fim)
+          curl -sS -X POST "$SUPABASE_URL/rest/v1/rpc/cct_execucao_encerrar" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" -H "Content-Type: application/json" \
+            -d '{"p_id":"${{ steps.abrir.outputs.execucao_id }}","p_resultado":"INTERROMPIDA","p_motivo":"o processo do robo terminou (${{ steps.robo.outcome }}) sem registrar o fim — ver log desta execucao"}'
       - name: Guardar log e extratos da execucao
         if: always()
         uses: actions/upload-artifact@v4
