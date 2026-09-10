@@ -31,7 +31,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.14.0"
+VERSAO = "0.15.2"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -224,6 +224,25 @@ def notificar(tenant, tipo, assunto, html, instrumento_id=None, incidente_id=Non
         log(f"  !! falha ao gravar notificação: {e}")
     log(f"  NOTIFICAÇÃO {tipo}: {reg['status']}" + (f" ({reg.get('erro')})" if reg.get("erro") else ""))
     return reg["status"]
+
+
+def processar_testes_email(tenant):
+    """Atende os pedidos de e-mail de teste feitos no app (Configurações → 'Solicitar e-mail de teste'):
+    cct_notificacoes tipo TESTE status PENDENTE → envia e grava ENVIADA / NAO_ENVIADA com o motivo."""
+    try:
+        pend = sb_get("cct_notificacoes", {"tenant_id": f"eq.{tenant}", "tipo": "eq.TESTE", "status": "eq.PENDENTE", "select": "id,destinatarios"})
+    except Exception as e:
+        log(f"  !! testes de e-mail: {e}"); return
+    for n in pend:
+        dest = n.get("destinatarios") or []
+        st, erro, efetivos = enviar_email(dest, "Artecon · CCT Monitor — TESTE de envio", html_padrao("Teste de envio",
+                                          f"<p>Se você recebeu esta mensagem, o CCT Monitor está conectado ao hub artecon-mail.</p><p style='color:#7a8894;font-size:12px'>{datetime.now(BRT):%d/%m/%Y %H:%M} · pode ignorar/excluir.</p>", "CCT Monitor · Teste"))
+        try:
+            sb_patch("cct_notificacoes", {"id": f"eq.{n['id']}"}, {"status": st, "erro": erro, "tentativas": 1, "destinatarios": efetivos or dest,
+                                                                  "enviada_em": datetime.now(timezone.utc).isoformat() if st == "ENVIADA" else None})
+        except Exception as e:
+            log(f"  !! gravar teste de e-mail: {e}")
+        log(f"  TESTE DE E-MAIL para {', '.join(efetivos or dest)}: {st} {erro or ''}")
 
 
 # ---------------------------------------------------------------- importação
@@ -693,9 +712,21 @@ def processar_alvo(tenant, sind, empresa, tipos, page, existentes):
             log(f"  NOVO registro {reg['registro']} ({reg['tipo']}) — {reg.get('vigencia')}")
             row, ok = importar(tenant, sind, reg, page, consulta["id"], empresa)
             existentes.add(reg["registro"])
-            novos.append((reg, row, ok))
-            criar_ciencias(tenant, sind if sind.get("id") else None, row, empresa)
-            etapas.append(f"[{tipo}] {reg['registro']}: {'importado' if ok else 'IMPORTAÇÃO NÃO CONCLUÍDA'}")
+            # v0.15.2: "Cobrar ciência a partir de" (cct_config.ciencia_inicio) — registro no MTE anterior à data = sem ciência e sem aviso
+            ini = (config(tenant).get("ciencia_inicio") or "")[:10]
+            data_reg = (row.get("data_registro") or "")[:10]
+            dispensada = bool(ini and data_reg and data_reg < ini)
+            novos.append((reg, row, ok, dispensada))
+            if dispensada:
+                try:
+                    sb_patch("cct_instrumentos", {"id": f"eq.{row['id']}"}, {"status_ciencia": "DISPENSADA"})
+                except Exception as e:
+                    log(f"  !! marcar dispensada: {e}")
+                log(f"  ciência DISPENSADA: registro no MTE em {data_reg} é anterior ao início da cobrança ({ini})")
+                etapas.append(f"[{tipo}] {reg['registro']}: {'importado' if ok else 'IMPORTAÇÃO NÃO CONCLUÍDA'} — ciência dispensada (registro {data_reg} anterior a {ini})")
+            else:
+                criar_ciencias(tenant, sind if sind.get("id") else None, row, empresa)
+                etapas.append(f"[{tipo}] {reg['registro']}: {'importado' if ok else 'IMPORTAÇÃO NÃO CONCLUÍDA'}")
             time.sleep(1)
         time.sleep(2)
 
@@ -713,7 +744,9 @@ def processar_alvo(tenant, sind, empresa, tipos, page, existentes):
         "status": status_geral, "http": http, "qtd_encontrados": total_encontrados, "qtd_novos": len(novos),
         "duracao_ms": int((time.time() - t0) * 1000), "erro": erro_geral, "etapas": etapas})
 
-    for reg, row, ok in novos:
+    for reg, row, ok, dispensada in novos:
+        if dispensada:
+            continue
         partes = "<br>".join(p["nome"] if isinstance(p, dict) else p for p in (row.get("partes") or []))
         html = (f"<p><b>{reg['tipo']}</b> registrada no Mediador para <b>{sind['nome']}</b>.</p>"
                 f"<p><b>Registro:</b> {reg['registro']}<br><b>Solicitação:</b> {reg.get('solicitacao')}<br>"
