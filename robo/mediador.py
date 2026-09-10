@@ -3,6 +3,7 @@ mediador.py — acesso ao Sistema Mediador (MTE) via navegador real (Playwright)
 Funções puras, sem banco: consultar(), parse_registros(), baixar_extrato().
 Regra fundamental: falha nunca vira "não existe CCT" — todo resultado carrega um status explícito.
 Validado em 02/09/2026 (GitHub Actions, reCAPTCHA aceito, 2 CCTs do CNPJ 84307370000166).
+v0.15.2 (09/09/2026): "Nenhum registro encontrado" (inclusive via HTTP 500 do site) = resultado normal, sem alerta.
 """
 import html as _h
 import json
@@ -102,12 +103,15 @@ def consultar(page, cnpj: str, tipo="Convenção Coletiva", vigencia="Vigentes",
             texto_erro = re.sub(r"\s+", " ", _h.unescape(texto_erro)).strip()[:300]
             r["trecho_erro"] = texto_erro
             # Defeito conhecido do Mediador (confirmado em 03/09/2026): HTTP 500 com "Nenhum registro encontrado."
-            # quando a pesquisa não tem resultados. Não é falha de acesso: é ZERO resultados (alerta, não erro).
+            # quando a pesquisa não tem resultados. O site RESPONDEU (com a própria mensagem de vazio): é resultado
+            # normal — zero instrumentos para os filtros — e não falha de acesso. Desde a v0.15.2: CONFIRMADA, sem alerta.
             if resp.status == 500 and re.search(r"nenhum registro encontrado", texto_erro, re.I):
-                r["status"] = "CONSULTA_COM_ALERTA"
-                r["erro"] = "Site respondeu 'Nenhum registro encontrado' (HTTP 500) para os filtros — não é prova de inexistência"
+                r["status"] = "CONSULTA_CONFIRMADA"
+                r["erro"] = None
                 r["total_site"] = 0
-                et.append("site: nenhum registro encontrado (via HTTP 500)")
+                r["paginas"] = 0
+                r["info"] = f"Nenhum instrumento do tipo '{tipo}' ({vigencia.lower()}) para este sindicato — o Mediador informa 'Nenhum registro encontrado' (com HTTP 500, comportamento do site)"
+                et.append(r["info"])
                 return r
             r["erro"] = f"Mediador respondeu HTTP {resp.status} na pesquisa"
             et.append(f"corpo do erro: {texto_erro[:200]}")
@@ -140,8 +144,11 @@ def consultar(page, cnpj: str, tipo="Convenção Coletiva", vigencia="Vigentes",
                         on_pagina(pg, regs_pg)
                     time.sleep(2)
         elif r["total_site"] == 0 or re.search(r"nenhum (registro|instrumento)|n[ãa]o foram encontrados", corpo, re.I):
-            r["status"] = "CONSULTA_COM_ALERTA"
-            r["erro"] = "Site respondeu zero instrumentos para os filtros — não é prova de inexistência"
+            # o site respondeu explicitamente que não há resultados: resultado normal (v0.15.2)
+            r["status"] = "CONSULTA_CONFIRMADA"
+            r["total_site"] = 0
+            r["info"] = f"Nenhum instrumento do tipo '{tipo}' ({vigencia.lower()}) para este sindicato — o Mediador informa que não há registros"
+            et.append(r["info"])
         else:
             r["erro"] = "Resposta 200 sem registros e sem mensagem de vazio (layout alterado?)"
     except Exception as e:
