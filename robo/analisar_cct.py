@@ -14,8 +14,8 @@ import time
 import unicodedata
 
 MODELO_IA = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-MODELO_GITHUB = os.environ.get("GITHUB_MODEL", "openai/gpt-4o")   # GitHub Models (grátis via GITHUB_TOKEN + permissions: models: read)
-LIMITE_CHARS_GITHUB = 22000   # nível gratuito tem janela menor: compactamos o material enviado
+# v0.15.2 (09/09/2026): GitHub Models retirado — o serviço foi desativado pelo GitHub (HTTP 410 "retirement brownout").
+# Parecer por IA exclusivamente pela API Anthropic (ANTHROPIC_API_KEY).
 
 # ----------------------------------------------------------------------------- utilidades
 def norm(s):
@@ -301,10 +301,9 @@ def _parse_json(txt):
 
 
 def parecer_ia(dados, valores, comparacao=None, api_key=None, timeout=120):
-    """Anthropic (ANTHROPIC_API_KEY) ou, na ausência, GitHub Models grátis (GITHUB_TOKEN). Retorna (parecer, erro)."""
+    """Parecer pela API Anthropic (ANTHROPIC_API_KEY). Retorna (parecer, erro)."""
     import requests
     key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-    gh = os.environ.get("GITHUB_TOKEN")
     t0 = time.time()
     if key:
         corpo = _material(dados, valores, comparacao)
@@ -316,18 +315,8 @@ def parecer_ia(dados, valores, comparacao=None, api_key=None, timeout=120):
             return None, f"Anthropic HTTP {r.status_code}: {r.text[:300]}"
         txt = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
         modelo = MODELO_IA
-    elif gh:
-        corpo = _material(dados, valores, comparacao, LIMITE_CHARS_GITHUB)
-        r = requests.post("https://models.github.ai/inference/chat/completions", timeout=timeout,
-                          headers={"Authorization": f"Bearer {gh}", "Content-Type": "application/json", "Accept": "application/vnd.github+json"},
-                          json={"model": MODELO_GITHUB, "max_tokens": 2500, "temperature": 0.2,
-                                "messages": [{"role": "system", "content": PROMPT_SISTEMA}, {"role": "user", "content": corpo}]})
-        if r.status_code != 200:
-            return None, f"GitHub Models HTTP {r.status_code}: {r.text[:300]}"
-        txt = r.json()["choices"][0]["message"]["content"]
-        modelo = "github:" + MODELO_GITHUB
     else:
-        return None, "nenhum provedor de IA configurado (ANTHROPIC_API_KEY ou GITHUB_TOKEN)"
+        return None, "ANTHROPIC_API_KEY não configurada no GitHub (Settings → Secrets) — parecer por IA não gerado"
     try:
         parecer = _parse_json(txt)
     except Exception as e:
