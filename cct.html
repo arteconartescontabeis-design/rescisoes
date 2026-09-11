@@ -106,7 +106,7 @@
 <body>
 <header>
   <div class="brand"><img src="logo.webp" alt="Artecon" onerror="this.style.display='none'"><div><h1>CCT Monitor</h1><small>Convenções Coletivas · Sistema Mediador</small></div></div>
-  <div style="display:flex;gap:12px;align-items:center"><span id="usuario"></span><button class="b sec sm" id="btnSair" style="display:none">Sair</button><span class="badge" id="versao"></span></div>
+  <div style="display:flex;gap:12px;align-items:center"><span id="usuario"></span><button class="b sec sm" id="btnSenha" style="display:none" onclick="abrirSenha()">Alterar minha senha</button><button class="b sec sm" id="btnSair" style="display:none">Sair</button><span class="badge" id="versao"></span></div>
 </header>
 <nav id="nav" style="display:none">
   <button data-aba="painel" class="on">Painel</button><button data-aba="sindicatos">Sindicatos</button><button data-aba="empresas">Empresas</button><button data-aba="instrumentos">Convenções</button><button data-aba="confirmacoes">Confirmações</button>
@@ -181,7 +181,7 @@
 
     <section data-sec="usuarios" style="display:none">
       <div class="card"><div class="topo"><h2>Usuários do escritório</h2><button class="b" onclick="abrirUsu()">+ Novo usuário</button></div><div id="tabUsu"></div>
-        <div class="aviso">Os usuários são os mesmos do Rescisões Pro (login único da Artecon). "Diretoria" administra usuários; "Usuário" acessa e opera. A senha inicial deve ser informada ao criar; o próprio usuário pode trocá-la pelo e-mail de redefinição.</div></div>
+        <div class="aviso">Os usuários dos níveis 1–3 são os mesmos do Rescisões Pro (login único da Artecon). A senha inicial é informada ao criar; cada usuário troca a própria senha em <b>"Alterar minha senha"</b> (cabeçalho) e o administrador pode enviar o e-mail de <b>Redefinir senha</b>. <b>Excluir</b> remove os acessos do CCT, o vínculo do Rescisões, inativa o colaborador e apaga o login — não é possível excluir a si mesmo nem o último administrador; um superadministrador só é excluído por outro superadministrador.</div></div>
     </section>
 
     <section data-sec="config" style="display:none">
@@ -193,6 +193,9 @@
           <div><label>Cobrar ciência a partir de (registro no MTE)</label><input id="cfgCienciaIni" type="date"></div>
           <div style="grid-column:span 2;display:flex;gap:8px;align-items:flex-end"><button class="b sec" id="btnDispensar" onclick="dispensarAnteriores()">Dispensar avisos anteriores à data</button><small style="color:var(--text-3)">Convenções registradas antes da data não geram ciência nem e-mail. O botão cancela as ciências já abertas dessas convenções (as convenções ficam DISPENSADAS). Vazio = cobra todas.</small></div>
 </div>
+        <h2 style="margin-top:18px">Erros críticos do sistema</h2>
+        <div class="grid g3"><div style="grid-column:span 2"><label>E-mail para erros críticos</label><input id="cfgEmailCrit" placeholder="ti@artecon.cnt.br, suporte@..."></div></div>
+        <div class="aviso">Todo erro <b>CRÍTICO</b> do sistema — robô não executou ou caiu (vigia do banco), exceção não tratada, indisponibilidade prolongada do Mediador — é enviado a este(s) endereço(s), além dos gerentes/administradores do escritório. Vários endereços separados por vírgula. Vazio = só os gerentes.</div>
         <h2 style="margin-top:18px">Histórico de convenções</h2>
         <div class="grid g3"><div><label>Anos a importar</label><input id="cfgHistAnos" type="number" min="1" max="15"></div>
           <div><label>Downloads por execução</label><input id="cfgHistMax" type="number" min="1" max="30"></div>
@@ -229,6 +232,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.17.0</td><td>11/09/2026</td><td><b>Usuários:</b> botão <b>Excluir</b> (administrador/superadministrador; nunca a si mesmo, o último administrador ou — sem ser superadministrador — um superadministrador): remove os acessos do CCT, o vínculo do Rescisões, inativa o colaborador e apaga o login, via função com privilégio <code>cct_excluir_usuario</code>. <b>Alterar minha senha</b> no cabeçalho (o próprio usuário define a nova senha, sem e-mail); para outro usuário continua o "Redefinir senha" por e-mail. <b>Configurações → E-mail para erros críticos</b>: endereço(s) que recebem todo erro CRÍTICO do sistema (robô, Central de Erros e vigia do banco), além dos gerentes. <b>Ciência antes da data:</b> enquanto a data de hoje for anterior a "Cobrar ciência a partir de", Painel e Confirmações não mostram Pendentes/Atrasadas/Escalonadas — aparece a faixa com a data de início — e o robô não cria ciência, nem envia aviso, lembrete ou escalonamento. Confirmações passa a explicar cada estado (Pendente · Vence hoje · Atrasada · Escalonada · Ciente). Banco <code>setup_cct_v0.17.0.sql</code>.</td></tr>
           <tr><td>v0.16.2</td><td>10/09/2026</td><td><b>Central de Erros (ponto crítico 06).</b> Ao tratar um incidente: <b>Responsável</b> pelo tratamento, <b>Solução aplicada</b> (obrigatória ao resolver) e observações/justificativa (obrigatória ao ignorar); data de encerramento gravada ao resolver ou ignorar. A tabela passa a mostrar responsável e solução. Incidentes automáticos já cobertos: robô não executou, execução interrompida ou com erro total (vigia do banco), indisponibilidade do Mediador, falha de download/importação, falha da análise por IA, falha de e-mail e exceções do robô. Banco <code>setup_cct_v0.16.0.sql</code> (colunas responsavel/solucao).</td></tr>
           <tr><td>v0.16.1</td><td>10/09/2026</td><td><b>Carregamento por módulo (pontos críticos 01 e 05).</b> As consultas iniciais (sindicatos, convenções, consultas, incidentes, destinatários, notificações, empresas, confirmações, configurações, execuções) passam a ser independentes: se uma falhar, as outras carregam normalmente e uma faixa no topo informa <i>qual</i> módulo falhou, com o motivo em linguagem clara e o botão <b>Tentar novamente</b> só daquele módulo — sem recarregar a página. Cada falha fica registrada no navegador (data, módulo, operação, erro, tentativas) para diagnóstico. <b>Testes mínimos antes de publicar (ponto 08)</b>: novo workflow <code>testes-cct.yml</code> roda a cada alteração de <code>cct.html</code> ou <code>robo/</code> — compilação e nomes indefinidos do robô (o defeito da v0.14.0 é detectado), import com ambiente falso, sintaxe do app, carregamento no DOM, renderização de todas as telas e coerência de versão; vermelho = não publicar.</td></tr>
           <tr><td>v0.16.0</td><td>10/09/2026</td><td><b>Confiabilidade operacional (pontos críticos 02, 03, 04 e 07 do relatório).</b> Nova tela <b>Sistema → Histórico do Robô</b>: uma linha por execução com previsto, início, fim, duração, sindicatos previstos/processados, CCTs novas, alertas, erros e resultado classificado (Sucesso · Com alertas · Erro parcial · Erro total · Interrompida · Sem consulta); detalhe com motivo e link para o log no GitHub. A execução é aberta pelo <b>workflow</b> antes do robô e fechada por ele num passo que roda sempre — se o robô cair, fica registrada como INTERROMPIDA. Painel: bloco "Robô" passa a mostrar última execução prevista, realizada, próxima e situação, calculadas pela agenda real (horários configurados, dias úteis e feriados do Rescisões) — sem falso alerta em fim de semana/feriado. <b>Vigia independente</b>: o heartbeat do banco roda a cada 15 min, abre incidente CRÍTICO quando a execução prevista não inicia (tolerância 80 min) ou termina interrompida/com erro total, e <b>envia o e-mail aos gerentes direto do banco</b> (pg_net + chave no Vault), sem depender do robô. Banco <code>setup_cct_v0.16.0.sql</code>.</td></tr>
@@ -315,6 +319,12 @@
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mLote')">Fechar</button><button class="b" id="btnLote" onclick="rodarLote()">Consultar Receita e cadastrar</button></div>
 </div></div>
 
+<div class="modal" id="mSenha"><div class="card" style="max-width:420px"><h2>Alterar minha senha</h2>
+  <div class="grid g2"><div><label>Nova senha</label><input id="pSenha1" type="password" autocomplete="new-password" placeholder="mínimo 8 caracteres"></div><div><label>Repita a nova senha</label><input id="pSenha2" type="password" autocomplete="new-password"></div></div>
+  <div class="aviso">A senha é a do login único da Artecon: vale também para o Rescisões Pro. Depois de alterar, use a nova senha no próximo login.</div>
+  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mSenha')">Cancelar</button><button class="b" onclick="salvarSenha()">Alterar senha</button></div>
+</div></div>
+
 <div class="modal" id="mNivel"><div class="card" style="max-width:520px"><h2>Alterar nível de acesso</h2>
   <input type="hidden" id="nTipo"><input type="hidden" id="nId"><div id="nQuem" style="font-size:13px;margin-bottom:10px"></div>
   <div id="nEquipe"><label>Novo nível</label><select id="nNivel"><option value="usuario">Usuário (equipe do escritório)</option><option value="diretoria">Gerente do escritório</option></select></div>
@@ -347,12 +357,20 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.16.2" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.17.0" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
 const podeAdm = () => ["gerente","superadmin"].includes(APP.nivel), superadm = () => APP.nivel === "superadmin", interno = () => APP.nivel !== "empresa";
 const $ = id => document.getElementById(id);
+// v0.17.0: a cobrança de ciência só existe a partir de "Cobrar ciência a partir de" (cct_config.ciencia_inicio)
+const cienciaInicio = () => ((APP.dados.cfg || {}).ciencia_inicio || "").slice(0, 10);
+const cienciaAtiva = () => { const i = cienciaInicio(); return !i || new Date().toISOString().slice(0, 10) >= i; };
+const ESTADOS_CIENCIA = [["Pendente", "a convenção foi importada e o responsável da empresa foi avisado; ainda está dentro do prazo (dias úteis configurados) para confirmar que tomou ciência"],
+  ["Vence hoje", "pendente cujo prazo termina hoje"],
+  ["Atrasada", "o prazo venceu sem confirmação; o responsável recebe lembrete diário e o gerente ainda não foi acionado"],
+  ["Escalonada", "o prazo venceu, o responsável não confirmou e o gerente do escritório já foi notificado para intervir"],
+  ["Ciente", "confirmação registrada (por quem e quando ficam gravados)"]];
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmtCnpj = c => (c||"").replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 const fmtD = d => d ? d.split("-").reverse().join("/") : "—";
@@ -407,7 +425,7 @@ async function iniciar() {
   $("navSis").parentElement.style.display = soEmpresa ? "none" : ""; if (!soEmpresa && !APP.admin) $("navUsuarios").style.display = "none";
   $("painelSub") && ($("painelSub").dataset.nivel = NIVEIS[APP.nivel] || "");
   $("login").style.display = "none"; $("app").style.display = "block"; $("nav").style.display = "flex";
-  $("usuario").innerHTML = esc(APP.email) + (APP.nivel ? ` · <span class="badge">${NIVEIS[APP.nivel] || APP.nivel}</span>` : ""); $("btnSair").style.display = "inline-block";
+  $("usuario").innerHTML = esc(APP.email) + (APP.nivel ? ` · <span class="badge">${NIVEIS[APP.nivel] || APP.nivel}</span>` : ""); $("btnSair").style.display = "inline-block"; $("btnSenha").style.display = "inline-block";
   await carregarTudo(); mostrar("painel");
 }
 function sair() { sessionStorage.removeItem("cct_sess"); location.reload(); }
@@ -491,10 +509,11 @@ function renderPainel() {
   const roboOk = ultRobo && new Date(ultRobo.executada_em) > dias(-1.5);
   const hoje_txt = hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
   $("painelTit").textContent = emp ? "Minhas convenções" : "Painel"; $("painelSub").textContent = hoje_txt.charAt(0).toUpperCase() + hoje_txt.slice(1) + " · " + APP.email + " · " + (NIVEIS[APP.nivel] || "");
-  const pend = conf.filter(ab), atras = conf.filter(c => c.situacao === "ATRASADA"), proxPrazo = pend.map(c => c.prazo).sort()[0];
+  const cieOn = cienciaAtiva(), pend = cieOn ? conf.filter(ab) : [], atras = cieOn ? conf.filter(c => c.situacao === "ATRASADA") : [], proxPrazo = pend.map(c => c.prazo).sort()[0];
   const num = (v, l, det, cls) => `<div class="a-n ${cls || ""}"><b>${esc(v)}</b><span>${l}</span><div class="d">${det}</div></div>`;
   $("kpis").innerHTML = num(vigentes.length, "convenções vigentes", novas7.length ? `+${novas7.length} nos últimos 7 dias` : "sem novas na semana", "") +
-    num(pend.length, "ciências pendentes", atras.length ? `${atras.length} atrasada(s)` : proxPrazo ? "próximo prazo " + fmtD(proxPrazo) : "todas registradas", atras.length ? "er" : pend.length ? "al" : "ok") +
+    (cieOn ? num(pend.length, "ciências pendentes", atras.length ? `${atras.length} atrasada(s)` : proxPrazo ? "próximo prazo " + fmtD(proxPrazo) : "todas registradas", atras.length ? "er" : pend.length ? "al" : "ok")
+           : num("—", "ciências pendentes", "cobrança começa em " + fmtD(cienciaInicio()), "")) +
     (emp ? num(vigentes.filter(i => i.analise_status === "CONCLUIDA").length, "pareceres disponíveis", "conferidos contra o texto", "") :
       num(abertos.length, "incidentes abertos", d.saude ? "robô " + (({NORMAL:"OK",COM_ALERTAS:"com alertas",EXECUTANDO:"executando",AGUARDANDO:"aguardando",ATRASADO:"ATRASADO",FALHA:"FALHOU",SEM_AGENDA:"sem agenda"})[d.saude.situacao] || d.saude.situacao) + " · " + fmtDT(d.saude.ultima_realizada) : roboOk ? "robô OK · " + fmtDT(ultRobo.executada_em) : "robô atrasado", abertos.length ? "er" : (d.saude ? ["NORMAL","COM_ALERTAS","EXECUTANDO","AGUARDANDO"].includes(d.saude.situacao) : roboOk) ? "ok" : "er")) +
     (emp ? num(d.sind.length, "sindicatos da empresa", "", "") : num(d.sind.filter(s => s.monitorar && s.ativo).length, "sindicatos monitorados", ult ? "última consulta " + fmtDT(ult.executada_em) : "sem consultas", ""));
@@ -808,9 +827,9 @@ function renderUsu() {
   const nivelDe = p => p === "superadmin" ? NIVEIS.superadmin : ["diretoria","admin"].includes(p) ? NIVEIS.gerente : NIVEIS.usuario;
   $("tabUsu").innerHTML = `<table><tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>Empresa</th><th>Status</th><th></th></tr>` +
     l.map(u => `<tr><td>${esc(u.colaborador?.nome||"")}</td><td>${esc(u.colaborador?.email||"")}</td><td>${tagStatus(u.papel === "superadmin" ? "CRITICO" : nivelDe(u.papel) === NIVEIS.usuario ? "IMPORTADO" : "INFORMATIVO").replace(/>[^<]+</, ">" + nivelDe(u.papel) + "<")}</td><td>—</td><td>${esc(u.colaborador?.status||"")}</td>
-      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirNivel('resc','${u.auth_id}','${esc(u.colaborador?.nome||u.colaborador?.email||"")}','${u.papel}')">Alterar nível</button> ${u.colaborador?.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(u.colaborador.email)}')">Redefinir senha</button>` : ""}</td></tr>`).join("") +
+      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirNivel('resc','${u.auth_id}','${esc(u.colaborador?.nome||u.colaborador?.email||"")}','${u.papel}')">Alterar nível</button> ${u.colaborador?.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(u.colaborador.email)}')">Redefinir senha</button>` : ""} ${podeExcluir(u.auth_id, u.papel) ? `<button class="b sec sm" style="color:var(--red,#c0392b)" onclick="excluirUsuario('${u.auth_id}','${esc(u.colaborador?.email||u.colaborador?.nome||"")}')">Excluir</button>` : ""}</td></tr>`).join("") +
     ac.map(a => `<tr><td>${esc(a.nome||"")}</td><td>${esc(a.email||"")}</td><td>${tagStatus(a.nivel === "empresa" ? "ATENCAO" : "INFORMATIVO").replace(/>[^<]+</, ">" + (NIVEIS[a.nivel] || a.nivel) + "<")}</td><td>${esc(a.empresa?.razao_social||"")}</td><td>${a.ativo ? "ativo" : "inativo"}</td>
-      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirNivel('cct','${a.id}','${esc(a.nome||a.email||"")}','${a.nivel}','${a.empresa_id||""}')">Alterar nível</button> ${a.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(a.email)}')">Redefinir senha</button>` : ""} <button class="b sec sm" onclick="toggleAcesso('${a.id}',${!a.ativo})">${a.ativo ? "Desativar" : "Ativar"}</button></td></tr>`).join("") + `</table>`;
+      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirNivel('cct','${a.id}','${esc(a.nome||a.email||"")}','${a.nivel}','${a.empresa_id||""}')">Alterar nível</button> ${a.email ? `<button class="b sec sm" onclick="redefinirSenha('${esc(a.email)}')">Redefinir senha</button>` : ""} <button class="b sec sm" onclick="toggleAcesso('${a.id}',${!a.ativo})">${a.ativo ? "Desativar" : "Ativar"}</button> ${podeExcluir(a.auth_id, a.nivel) ? `<button class="b sec sm" style="color:var(--red,#c0392b)" onclick="excluirUsuario('${a.auth_id}','${esc(a.email||a.nome||"")}')">Excluir</button>` : ""}</td></tr>`).join("") + `</table>`;
 }
 function abrirNivel(tipo, id, nome, nivel, empresaId) {
   $("nTipo").value = tipo; $("nId").value = id; $("nQuem").innerHTML = `<b>${esc(nome)}</b> · nível atual: ${esc(nivel === "diretoria" || nivel === "admin" ? NIVEIS.gerente : NIVEIS[nivel] || nivel)}`;
@@ -864,6 +883,27 @@ async function salvarUsu() {
     if (!us.length) await post("resc_usuarios", { tenant_id: APP.tenantId, auth_id: uid, colaborador_id: colabId, papel }, "return=minimal");
     fechar("mUsu"); msg("Usuário criado. Ele já pode entrar com o e-mail e a senha informados."); await carregarTudo();
   } catch (e) { msg(e.message, "erro"); }
+}
+const podeExcluir = (authId, nivel) => podeAdm() && authId && authId !== APP.uid && (superadm() || nivel !== "superadmin");
+async function excluirUsuario(authId, quem) {
+  if (!confirm(`Excluir o usuário ${quem}?\n\nSerão removidos os acessos do CCT Monitor e o vínculo do Rescisões Pro; o colaborador fica inativo e o login é apagado. Esta ação não pode ser desfeita.`)) return;
+  try {
+    const r = await api("rpc/cct_excluir_usuario", { method: "POST", body: JSON.stringify({ p_auth: authId }) });
+    msg(r.login_apagado ? `Usuário ${r.email || quem} excluído.` : `Usuário ${r.email || quem} removido do CCT/Rescisões` + (r.login_erro ? `; o login não pôde ser apagado (${r.login_erro}).` : " (login mantido: ainda tem vínculo em outro escritório)."), r.login_apagado ? "ok" : "erro");
+    await carregarTudo();
+  } catch (e) { msg(e.message, "erro"); }
+}
+function abrirSenha() { $("pSenha1").value = ""; $("pSenha2").value = ""; $("mSenha").classList.add("on"); }
+async function salvarSenha() {
+  const a = $("pSenha1").value, b = $("pSenha2").value;
+  if (a.length < 8) return msg("A nova senha precisa ter pelo menos 8 caracteres.", "erro");
+  if (a !== b) return msg("As duas senhas não conferem.", "erro");
+  try {
+    const r = await fetch(CONFIG.url + "/auth/v1/user", { method: "PUT", headers: { apikey: CONFIG.key, Authorization: "Bearer " + APP.token, "Content-Type": "application/json" }, body: JSON.stringify({ password: a }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error_description || d.msg || d.message || ("Erro " + r.status));
+    fechar("mSenha"); msg("Senha alterada. Use a nova senha no próximo login.");
+  } catch (e) { msg(/same_password|different from the old/i.test(e.message) ? "A nova senha precisa ser diferente da atual." : e.message, "erro"); }
 }
 async function redefinirSenha(email) {
   if (!confirm("Enviar e-mail de redefinição de senha para " + email + "?")) return;
@@ -1088,8 +1128,10 @@ async function excluirEmp(id) { if (!confirm("Excluir a empresa e seus vínculos
 
 // ---------- confirmações de ciência ----------
 function renderConf() {
-  const all = APP.dados.conf || [], f = $("fConf").value, tab = "conf", fn = "renderConf";
+  const cieOn = cienciaAtiva(), todas = APP.dados.conf || [], f = $("fConf").value, tab = "conf", fn = "renderConf";
   const ab = c => ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(c.status);
+  // antes da data de início da cobrança não existe pendente/atrasada/escalonada: só o que já está ciente/cancelado é listado
+  const all = cieOn ? todas : todas.filter(c => !ab(c)), abertasAntes = cieOn ? 0 : todas.filter(ab).length;
   const g = id => (document.getElementById(id) || {}).value || "";
   const barra = barraConsulta(tab, [{ id: "fc_emp", label: "Empresa", opts: uniq(all.map(c => c.empresa)), w: 200 }, { id: "fc_sind", label: "Sindicato", opts: uniq(all.map(c => c.sindicato)), w: 220 },
     { id: "fc_sit", label: "Situação", opts: [["NO_PRAZO","no prazo"],["VENCE_HOJE","vence hoje"],["ATRASADA","atrasada"]], w: 140 }, { id: "fc_st", label: "Status", opts: [["PENDENTE","pendente"],["NOTIFICADO","notificado"],["ESCALONADO","escalonado"],["CIENTE","ciente"],["CANCELADO","cancelado"]], w: 140 }], fn);
@@ -1097,10 +1139,12 @@ function renderConf() {
   let l = all.filter(c => (f === "todas" || (f === "pendentes" ? ab(c) : c.situacao === "ATRASADA"))
     && (!q || [c.numero_registro, c.empresa, c.sindicato, c.responsavel_email, c.tipo_instrumento].join(" ").toLowerCase().includes(q)) && (!fe || c.empresa === fe) && (!fs || c.sindicato === fs) && (!fsit || c.situacao === fsit) && (!fst || c.status === fst));
   l = aplicarOrd(tab, l);
-  $("kpisConf").innerHTML = [["Pendentes", all.filter(ab).length, "alerta"], ["Vencem hoje", all.filter(c => c.situacao === "VENCE_HOJE").length, "alerta"], ["Atrasadas", all.filter(c => c.situacao === "ATRASADA").length, "erro"], ["Escalonadas", all.filter(c => c.status === "ESCALONADO").length, "erro"], ["Cientes", all.filter(c => c.status === "CIENTE").length, ""]]
-    .map(([t, v, c]) => `<div class="kpi ${v && c ? c : ""}"><b>${v}</b><span>${t}</span></div>`).join("");
+  const legenda = `<details style="margin:0 0 12px;font-size:13px;color:var(--text-3)"><summary style="cursor:pointer">O que significa cada situação</summary><ul style="margin:6px 0 0 18px;padding:0">${ESTADOS_CIENCIA.map(([t, d]) => `<li><b>${t}</b> — ${d}</li>`).join("")}</ul><div style="margin-top:6px">Prazo: ${(APP.dados.cfg || {}).prazo_ciencia_dias_uteis || 2} dia(s) útil(eis) a partir do aviso ao responsável${cienciaInicio() ? " · cobrança a partir de " + fmtD(cienciaInicio()) : ""}.</div></details>`;
+  $("kpisConf").innerHTML = cieOn ? [["Pendentes", all.filter(ab).length, "alerta", ESTADOS_CIENCIA[0][1]], ["Vencem hoje", all.filter(c => c.situacao === "VENCE_HOJE").length, "alerta", ESTADOS_CIENCIA[1][1]], ["Atrasadas", all.filter(c => c.situacao === "ATRASADA").length, "erro", ESTADOS_CIENCIA[2][1]], ["Escalonadas", all.filter(c => c.status === "ESCALONADO").length, "erro", ESTADOS_CIENCIA[3][1]], ["Cientes", all.filter(c => c.status === "CIENTE").length, "", ESTADOS_CIENCIA[4][1]]]
+    .map(([t, v, c, d]) => `<div class="kpi ${v && c ? c : ""}" title="${esc(d)}"><b>${v}</b><span>${t}</span></div>`).join("")
+    : `<div class="aviso" style="grid-column:1/-1;margin:0"><b>A cobrança de ciência começa em ${fmtD(cienciaInicio())}.</b> Até lá não há ciências pendentes, atrasadas ou escalonadas: nenhum responsável é cobrado e nenhum lembrete ou escalonamento é enviado.${abertasAntes ? ` Há ${abertasAntes} ciência(s) aberta(s) de convenções anteriores à data — em Sistema → Configurações, "Dispensar avisos anteriores à data" as cancela.` : ""}</div>`;
   const th = (t, c, cls) => thOrd(tab, t, c, fn, cls);
-  $("tabConf").innerHTML = barra + contador(l.length, all.length) + `<table><tr>${th("Convenção","numero_registro")}${th("Empresa","empresa")}${th("Sindicato","sindicato")}${th("Responsável","responsavel_email")}${th("Prazo","prazo")}${th("Situação","situacao")}${th("Status","status")}${th("Lembr.","lembretes","r")}<th></th></tr>` +
+  $("tabConf").innerHTML = legenda + barra + contador(l.length, all.length) + `<table><tr>${th("Convenção","numero_registro")}${th("Empresa","empresa")}${th("Sindicato","sindicato")}${th("Responsável","responsavel_email")}${th("Prazo","prazo")}${th("Situação","situacao")}${th("Status","status")}${th("Lembr.","lembretes","r")}<th></th></tr>` +
     l.map(c => `<tr><td><b>${esc(c.numero_registro)}</b><br><small>${esc(c.tipo_instrumento||"")}</small></td><td>${esc(c.empresa||"(sindicato)")}</td><td>${esc(c.sindicato||"")}</td><td><small>${esc(c.responsavel_email||"—")}</small></td>
       <td>${fmtD(c.prazo)}</td><td>${c.situacao ? tagStatus(c.situacao === "ATRASADA" ? "CRITICO" : c.situacao === "VENCE_HOJE" ? "ATENCAO" : "INFORMATIVO").replace(/>[^<]+</, ">" + c.situacao.replace(/_/g," ") + "<") : ""}</td>
       <td>${tagStatus(c.status)}${c.ciente_em ? `<br><small>${fmtDT(c.ciente_em)} · ${esc(c.ciente_por||"")}</small>` : ""}</td><td class="r">${c.lembretes}</td>
@@ -1117,7 +1161,7 @@ function renderConf() {
   document.querySelectorAll("button[onclick^='salvarConfig'],button[onclick^='salvarDestTeste'],#btnMonTodos,#btnHistTodos").forEach(b => b.disabled = !podeAdm());
   $("loteInfo").textContent = `${APP.dados.sind.filter(s => s.ativo && !s.monitorar).length} sindicato(s) ativos sem monitoramento · ${APP.dados.sind.filter(s => s.monitorar && s.ativo && !s.historico_status).length} monitorado(s) sem histórico solicitado`;
   $("cfgQuem").textContent = superadm() ? "Você é superadministrador: acesso total às configurações." : podeAdm() ? "Você é administrador: altera as configurações operacionais; as críticas (IA, horários/fila) são do superadministrador." : "Somente administradores alteram estes parâmetros.";
-  $("cfgDestTeste").value = cf.email_destino_teste || ""; $("cfgLemb").value = String(cf.lembrete_diario); $("cfgEsc").value = String(cf.escalonar_apos_prazo); $("cfgCienciaIni").value = cf.ciencia_inicio || ""; $("btnDispensar").disabled = !podeAdm() || !cf.ciencia_inicio; }
+  $("cfgDestTeste").value = cf.email_destino_teste || ""; $("cfgLemb").value = String(cf.lembrete_diario); $("cfgEsc").value = String(cf.escalonar_apos_prazo); $("cfgCienciaIni").value = cf.ciencia_inicio || ""; $("btnDispensar").disabled = !podeAdm() || !cf.ciencia_inicio; $("cfgEmailCrit").value = cf.email_erros_criticos || ""; }
 }
 async function registrarCiencia(id) {
   const obs = prompt("Observação (opcional) para o registro de ciência:") ;
@@ -1148,7 +1192,7 @@ async function dispensarAnteriores() {
 async function salvarConfig() {
   const d = { tenant_id: APP.tenantId, prazo_ciencia_dias_uteis: +$("cfgPrazo").value || 2, lembrete_diario: $("cfgLemb").value === "true", escalonar_apos_prazo: $("cfgEsc").value === "true", email_destino_teste: APP.dados.cfg.email_destino_teste || null, historico_anos: +$("cfgHistAnos").value || 5, historico_max_por_execucao: +$("cfgHistMax").value || 8,
     horarios_consulta: ($("cfgHorarios").value.match(/\d{1,2}:\d{2}/g) || ["06:00"]).map(h => h.padStart(5, "0")).join(","), intervalo_consultas_s: Math.max(5, +$("cfgIntervalo").value || 20), max_sindicatos_por_execucao: Math.max(0, +$("cfgMaxSind").value || 0),
-    ia_ativa: $("cfgIa").value === "true", ia_limite_mes: Math.max(0, +$("cfgIaLim").value || 0), ia_historico: $("cfgIaHist").value === "true", historico_automatico: $("cfgHistAuto").value === "true", ciencia_inicio: $("cfgCienciaIni").value || "", updated_at: new Date().toISOString() };
+    ia_ativa: $("cfgIa").value === "true", ia_limite_mes: Math.max(0, +$("cfgIaLim").value || 0), ia_historico: $("cfgIaHist").value === "true", historico_automatico: $("cfgHistAuto").value === "true", ciencia_inicio: $("cfgCienciaIni").value || "", email_erros_criticos: $("cfgEmailCrit").value.trim(), updated_at: new Date().toISOString() };
   try { await api("rpc/cct_salvar_config", { method:"POST", body: JSON.stringify({ p: d }) });
     if (d.historico_automatico) { const n = await api("rpc/cct_enfileirar_historico", { method: "POST", body: JSON.stringify({ p_tenant: APP.tenantId }) }); if (n) msg(`Parâmetros salvos. ${n} sindicato(s) entraram na fila do histórico.`); else msg("Parâmetros salvos."); } else msg("Parâmetros salvos.");
     await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
