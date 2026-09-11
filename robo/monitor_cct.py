@@ -31,12 +31,13 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.17.0"
+VERSAO = "0.17.1"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
 ORIGEM = os.environ.get("ORIGEM", "github-actions")
-EXECUCAO_ID = (os.environ.get("EXECUCAO_ID") or "").strip()   # aberta pelo workflow (cct_execucao_iniciar); fechada aqui ou pelo passo "always"
+EXECUCAO_ID = (os.environ.get("EXECUCAO_ID") or "").strip()
+SO_ANALISE = (os.environ.get("SO_ANALISE") or "").lower() in ("1", "true", "sim")   # v0.17.1: disparo pelo app — só pareceres pendentes, sem Mediador   # aberta pelo workflow (cct_execucao_iniciar); fechada aqui ou pelo passo "always"
 INTERVALO = float(os.environ.get("INTERVALO_S", "8"))
 # Hub artecon-mail — mesmo contrato da Edge Function bright-task do Rescisões Pro
 MAIL_URL = os.environ.get("MAIL_HUB_URL", "https://tjnqloycikukvvnconqn.supabase.co/functions/v1/mail-send")
@@ -467,6 +468,7 @@ def analisar_pendentes(tenant):
         log(f"análises pendentes: {len(pend)}")
     for i in pend:
         analisar_instrumento(tenant, i["id"], sindicato_id=i.get("sindicato_id"))
+    return len(pend)
 
 
 # ---------------------------------------------------------------- ciência (seções 31-39)
@@ -800,6 +802,17 @@ def main():
         sys.exit(2)
     tenant = tenants[0]["id"]
     cfg0 = config(tenant)
+    if SO_ANALISE:
+        log("MODO ANÁLISE SOB DEMANDA (disparado pelo app): só pareceres pendentes — sem consulta ao Mediador, sem ciências")
+        try:
+            n = analisar_pendentes(tenant)
+        except Exception as e:
+            log(f"  !! análises pendentes falharam: {e}\n{traceback.format_exc()}")
+            incidente(tenant, "IA:sob-demanda", "IA", "ALTO", f"Análise sob demanda falhou: {e}")
+            encerrar_execucao("ERRO_TOTAL", f"análise sob demanda falhou: {e}")
+            return
+        encerrar_execucao("SEM_CONSULTA", f"análise por IA sob demanda: {n} parecer(es) processado(s)")
+        return
     forcar = (os.environ.get("FORCAR") or "").lower() in ("1", "true", "sim")
     if not forcar and ORIGEM == "github-actions":
         # Disparos de hora em hora (aos :05). Regra: executa no PRIMEIRO disparo após cada horário configurado (HH:MM, BRT),
