@@ -31,7 +31,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.16.0"
+VERSAO = "0.17.0"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -181,7 +181,7 @@ def incidente(tenant, fingerprint, modulo, gravidade, mensagem, sindicato_id=Non
             notificar(tenant, "ERRO", f"Artecon · CCT Monitor — Erro {gravidade.lower()} em {modulo}: {mensagem[:70]}",
                       bloco_chave([("Módulo", modulo), ("Gravidade", gravidade), ("Ocorrências", inc["ocorrencias"]), ("Origem", f"{ORIGEM} · {datetime.now(BRT):%d/%m/%Y %H:%M}")])
                       + f'<p style="margin:10px 0 0"><b>Mensagem:</b> {mensagem}</p><p style="font-size:12px;color:#7a8894">O incidente está registrado na Central de Erros com a trilha completa; se a etapa voltar a funcionar, ele é resolvido automaticamente e você recebe o aviso.</p>',
-                      incidente_id=inc_id, tipo_dest=modulo)
+                      incidente_id=inc_id, tipo_dest=modulo, gravidade=gravidade)
         return inc_id
     except Exception as e:
         log(f"  !! falha ao registrar incidente: {e}")
@@ -200,19 +200,26 @@ def resolver(tenant, fingerprint):
 MODULOS_ERRO = {"MEDIADOR", "DOWNLOAD", "IMPORTACAO", "ARMAZENAMENTO", "APLICATIVO", "EMAIL", "IA", "ERRO"}
 
 
-def destinatarios(tenant, tipo):
+def destinatarios(tenant, tipo, gravidade=None):
     rows = sb_get("cct_alertas_destinatarios", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "select": "email,tipos"})
     dest = [r["email"] for r in rows if "TODOS" in (r["tipos"] or []) or tipo in (r["tipos"] or [])]
     if tipo in MODULOS_ERRO:  # erros do aplicativo vão SEMPRE também aos gerentes/administradores do escritório
+        # v0.17.0: erro CRÍTICO vai também ao e-mail configurado em Sistema → Configurações (cct_config.email_erros_criticos)
+        fn = "cct_emails_erros_criticos" if gravidade == "CRITICO" else "cct_emails_gerentes"
         try:
-            dest += [g for g in sb_rpc("cct_emails_gerentes", {"p_tenant": tenant}) if g]
+            dest += [g for g in sb_rpc(fn, {"p_tenant": tenant}) if g]
         except Exception as e:
-            log(f"  !! gerentes: {e}")
+            log(f"  !! {fn}: {e}")
+            if fn != "cct_emails_gerentes":  # banco ainda sem a v0.17.0: cai para os gerentes
+                try:
+                    dest += [g for g in sb_rpc("cct_emails_gerentes", {"p_tenant": tenant}) if g]
+                except Exception as e2:
+                    log(f"  !! gerentes: {e2}")
     return list(dict.fromkeys(d.lower() for d in dest if d))
 
 
-def notificar(tenant, tipo, assunto, html, instrumento_id=None, incidente_id=None, tipo_dest=None):
-    dest = destinatarios(tenant, tipo_dest or tipo)
+def notificar(tenant, tipo, assunto, html, instrumento_id=None, incidente_id=None, tipo_dest=None, gravidade=None):
+    dest = destinatarios(tenant, tipo_dest or tipo, gravidade)
     reg = {"tenant_id": tenant, "tipo": tipo, "instrumento_id": instrumento_id, "incidente_id": incidente_id,
            "destinatarios": dest, "assunto": assunto, "status": "PENDENTE", "tentativas": 0}
     faixa = "CCT Monitor · Alerta de erro do sistema" if tipo == "ERRO" else "CCT Monitor · Aviso"
@@ -559,6 +566,11 @@ def processar_ciencias(tenant):
     """Rotina diária: lembretes dentro do prazo e escalonamento ao gerente após o prazo (seções 36-39)."""
     cfg = config(tenant)
     hoje = datetime.now().date().isoformat()
+    # v0.17.0: antes da data "Cobrar ciência a partir de" não há pendente/atrasada/escalonada — nenhum aviso, lembrete ou escalonamento
+    ini = (cfg.get("ciencia_inicio") or "")[:10]
+    if ini and hoje < ini:
+        log(f"ciências: cobrança começa em {ini} (hoje {hoje}) — nada a cobrar")
+        return
     pend = sb_get("cct_v_confirmacoes", {"tenant_id": f"eq.{tenant}", "status": "in.(PENDENTE,NOTIFICADO,ESCALONADO)", "select": "*"})
     log(f"ciências pendentes: {len(pend)}")
     for c in pend:
