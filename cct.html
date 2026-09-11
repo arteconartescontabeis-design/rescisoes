@@ -209,8 +209,11 @@
         <h2 style="margin-top:18px">Parecer por IA</h2>
         <div class="grid g3"><div><label>Gerar parecer por IA</label><select id="cfgIa"><option value="true">Sim</option><option value="false">Não</option></select></div>
           <div><label>Limite de pareceres por mês</label><input id="cfgIaLim" type="number" min="0" max="5000"></div>
-          <div><label>Parecer também para o histórico</label><select id="cfgIaHist"><option value="false">Não (só valores e comparação)</option><option value="true">Sim</option></select></div></div>
+          <div><label>Parecer também para o histórico</label><select id="cfgIaHist"><option value="false">Não (só valores e comparação)</option><option value="true">Sim</option></select></div>
+          <div><label>Repositório do robô (GitHub)</label><input id="cfgGhRepo" placeholder="organizacao/repositorio"></div>
+          <div><label>Branch</label><input id="cfgGhBranch" placeholder="main"></div></div>
         <div class="aviso" id="cfgIaUso"></div>
+        <div class="aviso">"Analisar com IA" dispara o robô no GitHub Actions na hora (só análises, sem Mediador). Requer, uma vez, o token no Vault do Supabase: <code>select vault.create_secret('&lt;token&gt;', 'GITHUB_DISPATCH_TOKEN');</code> — token fine-grained do GitHub com permissão <i>Actions: Read and write</i> no repositório acima.</div>
         <div style="margin-top:10px"><button class="b" onclick="salvarConfig()">Salvar parâmetros</button></div></div>
 
         <div class="card" style="margin-top:16px"><h2>Ações em lote</h2>
@@ -232,6 +235,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.17.1</td><td>11/09/2026</td><td><b>Parecer por IA na hora.</b> "Analisar com IA" deixa de esperar o horário agendado: o app chama <code>cct_pedir_analise_agora</code>, que coloca a convenção na fila e <b>dispara o robô no GitHub Actions</b> só para as análises (sem consultar o Mediador), pelo token guardado no Vault do Supabase. O botão fica "Gerando parecer…" e a tela atualiza sozinha quando o parecer chega (normalmente 2 a 4 minutos). Pedidos com menos de 2 min de intervalo são atendidos na mesma rodada. Sem token/pg_net, cai no comportamento anterior (fila para a próxima execução) e o app avisa. Configurações: repositório e branch do robô (superadministrador). Banco <code>setup_cct_v0.17.1.sql</code>; workflow <code>monitor-cct.yml</code> ganha a entrada <code>so_analise</code>.</td></tr>
           <tr><td>v0.17.0</td><td>11/09/2026</td><td><b>Usuários:</b> botão <b>Excluir</b> (administrador/superadministrador; nunca a si mesmo, o último administrador ou — sem ser superadministrador — um superadministrador): remove os acessos do CCT, o vínculo do Rescisões, inativa o colaborador e apaga o login, via função com privilégio <code>cct_excluir_usuario</code>. <b>Alterar minha senha</b> no cabeçalho (o próprio usuário define a nova senha, sem e-mail); para outro usuário continua o "Redefinir senha" por e-mail. <b>Configurações → E-mail para erros críticos</b>: endereço(s) que recebem todo erro CRÍTICO do sistema (robô, Central de Erros e vigia do banco), além dos gerentes. <b>Ciência antes da data:</b> enquanto a data de hoje for anterior a "Cobrar ciência a partir de", Painel e Confirmações não mostram Pendentes/Atrasadas/Escalonadas — aparece a faixa com a data de início — e o robô não cria ciência, nem envia aviso, lembrete ou escalonamento. Confirmações passa a explicar cada estado (Pendente · Vence hoje · Atrasada · Escalonada · Ciente). Banco <code>setup_cct_v0.17.0.sql</code>.</td></tr>
           <tr><td>v0.16.2</td><td>10/09/2026</td><td><b>Central de Erros (ponto crítico 06).</b> Ao tratar um incidente: <b>Responsável</b> pelo tratamento, <b>Solução aplicada</b> (obrigatória ao resolver) e observações/justificativa (obrigatória ao ignorar); data de encerramento gravada ao resolver ou ignorar. A tabela passa a mostrar responsável e solução. Incidentes automáticos já cobertos: robô não executou, execução interrompida ou com erro total (vigia do banco), indisponibilidade do Mediador, falha de download/importação, falha da análise por IA, falha de e-mail e exceções do robô. Banco <code>setup_cct_v0.16.0.sql</code> (colunas responsavel/solucao).</td></tr>
           <tr><td>v0.16.1</td><td>10/09/2026</td><td><b>Carregamento por módulo (pontos críticos 01 e 05).</b> As consultas iniciais (sindicatos, convenções, consultas, incidentes, destinatários, notificações, empresas, confirmações, configurações, execuções) passam a ser independentes: se uma falhar, as outras carregam normalmente e uma faixa no topo informa <i>qual</i> módulo falhou, com o motivo em linguagem clara e o botão <b>Tentar novamente</b> só daquele módulo — sem recarregar a página. Cada falha fica registrada no navegador (data, módulo, operação, erro, tentativas) para diagnóstico. <b>Testes mínimos antes de publicar (ponto 08)</b>: novo workflow <code>testes-cct.yml</code> roda a cada alteração de <code>cct.html</code> ou <code>robo/</code> — compilação e nomes indefinidos do robô (o defeito da v0.14.0 é detectado), import com ambiente falso, sintaxe do app, carregamento no DOM, renderização de todas as telas e coerência de versão; vermelho = não publicar.</td></tr>
@@ -357,7 +361,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.17.0" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.17.1" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
@@ -796,8 +800,29 @@ async function reprocessar() {
   if (!interno()) return msg("Somente a equipe do escritório solicita análise.", "erro");
   if (cf.ia_ativa === false) return msg("O parecer por IA está desligado em Configurações.", "erro");
   if (uso >= (cf.ia_limite_mes ?? 60)) return msg(`Limite mensal de pareceres atingido (${uso}/${cf.ia_limite_mes}).`, "erro");
-  if (!confirm(`Colocar ${APP.instAtual.numero_registro} na fila de análise com IA? Será processada na próxima execução do robô (uso do mês: ${uso}/${cf.ia_limite_mes ?? 60}).`)) return;
-  try { await patch("cct_instrumentos", "id=eq." + APP.instAtual.id, { analise_status: null }); msg("Na fila: o robô gera o parecer na próxima execução."); $("btnIA").textContent = "Na fila para análise"; $("btnIA").disabled = true; } catch (e) { msg(e.message, "erro"); }
+  if (!confirm(`Gerar o parecer por IA de ${APP.instAtual.numero_registro} agora? O robô é disparado na hora e o parecer costuma sair em 2 a 4 minutos (uso do mês: ${uso}/${cf.ia_limite_mes ?? 60}).`)) return;
+  const id = APP.instAtual.id;
+  try {
+    const r = await api("rpc/cct_pedir_analise_agora", { method: "POST", body: JSON.stringify({ p_instrumento: id }) });
+    if (r.disparado) { msg(r.agrupado ? "Na fila: o robô já foi disparado há pouco e atende esta convenção na mesma rodada." : "Robô disparado — o parecer sai em 2 a 4 minutos; a tela atualiza sozinha."); $("btnIA").textContent = "Gerando parecer…"; $("btnIA").disabled = true; acompanharAnalise(id); }
+    else { msg("Na fila para a próxima execução agendada — " + (r.motivo || "não foi possível disparar o robô agora."), "erro"); $("btnIA").textContent = "Na fila para análise"; $("btnIA").disabled = true; }
+  } catch (e) { msg(e.message, "erro"); }
+}
+// v0.17.1: acompanha o parecer pedido na hora (consulta a cada 20 s, até 12 min) e reabre a convenção quando concluir
+APP.acomp = {};
+function acompanharAnalise(id) {
+  if (APP.acomp[id]) clearInterval(APP.acomp[id]);
+  const ini = Date.now();
+  APP.acomp[id] = setInterval(async () => {
+    try {
+      const r = await get(`cct_instrumentos?id=eq.${id}&select=analise_status`);
+      const st = r[0] && r[0].analise_status;
+      if (st) { clearInterval(APP.acomp[id]); delete APP.acomp[id]; await carregarTudo();
+        msg(st === "CONCLUIDA" ? "Parecer concluído." : "Análise terminou como " + st.replace(/_/g, " ").toLowerCase() + " — veja a aba Análise.", st === "CONCLUIDA" ? "ok" : "erro");
+        if (APP.instAtual && APP.instAtual.id === id && $("mInst").classList.contains("on")) abrirInst(id, "an"); return; }
+    } catch (e) {}
+    if (Date.now() - ini > 12 * 60e3) { clearInterval(APP.acomp[id]); delete APP.acomp[id]; msg("O parecer ainda não chegou após 12 min — confira Sistema → Histórico do Robô.", "erro"); }
+  }, 20000);
 }
 
 async function limparTestes() {
@@ -1156,7 +1181,8 @@ function renderConf() {
   $("cfgHistAuto").value = String(cf.historico_automatico ?? false);
   $("cfgIa").value = String(cf.ia_ativa ?? true); $("cfgIaLim").value = cf.ia_limite_mes ?? 60; $("cfgIaHist").value = String(cf.ia_historico ?? false);
   $("cfgIaUso").innerHTML = `Uso no mês: <b>${APP.dados.iaUso ?? "?"}</b> de ${cf.ia_limite_mes ?? 60} pareceres.` + (superadm() ? "" : " IA, horários/fila e limpeza são configurações críticas: somente o superadministrador altera.");
-  const criticos = ["cfgIa","cfgIaLim","cfgIaHist","cfgHorarios","cfgIntervalo","cfgMaxSind"];
+  const criticos = ["cfgIa","cfgIaLim","cfgIaHist","cfgHorarios","cfgIntervalo","cfgMaxSind","cfgGhRepo","cfgGhBranch"];
+  $("cfgGhRepo").value = cf.github_repo || ""; $("cfgGhBranch").value = cf.github_branch || "";
   document.querySelectorAll("[id^=cfg]").forEach(el => { if (el.tagName === "INPUT" || el.tagName === "SELECT") el.disabled = criticos.includes(el.id) ? !superadm() : !podeAdm(); });
   document.querySelectorAll("button[onclick^='salvarConfig'],button[onclick^='salvarDestTeste'],#btnMonTodos,#btnHistTodos").forEach(b => b.disabled = !podeAdm());
   $("loteInfo").textContent = `${APP.dados.sind.filter(s => s.ativo && !s.monitorar).length} sindicato(s) ativos sem monitoramento · ${APP.dados.sind.filter(s => s.monitorar && s.ativo && !s.historico_status).length} monitorado(s) sem histórico solicitado`;
@@ -1192,7 +1218,7 @@ async function dispensarAnteriores() {
 async function salvarConfig() {
   const d = { tenant_id: APP.tenantId, prazo_ciencia_dias_uteis: +$("cfgPrazo").value || 2, lembrete_diario: $("cfgLemb").value === "true", escalonar_apos_prazo: $("cfgEsc").value === "true", email_destino_teste: APP.dados.cfg.email_destino_teste || null, historico_anos: +$("cfgHistAnos").value || 5, historico_max_por_execucao: +$("cfgHistMax").value || 8,
     horarios_consulta: ($("cfgHorarios").value.match(/\d{1,2}:\d{2}/g) || ["06:00"]).map(h => h.padStart(5, "0")).join(","), intervalo_consultas_s: Math.max(5, +$("cfgIntervalo").value || 20), max_sindicatos_por_execucao: Math.max(0, +$("cfgMaxSind").value || 0),
-    ia_ativa: $("cfgIa").value === "true", ia_limite_mes: Math.max(0, +$("cfgIaLim").value || 0), ia_historico: $("cfgIaHist").value === "true", historico_automatico: $("cfgHistAuto").value === "true", ciencia_inicio: $("cfgCienciaIni").value || "", email_erros_criticos: $("cfgEmailCrit").value.trim(), updated_at: new Date().toISOString() };
+    ia_ativa: $("cfgIa").value === "true", ia_limite_mes: Math.max(0, +$("cfgIaLim").value || 0), ia_historico: $("cfgIaHist").value === "true", historico_automatico: $("cfgHistAuto").value === "true", ciencia_inicio: $("cfgCienciaIni").value || "", email_erros_criticos: $("cfgEmailCrit").value.trim(), github_repo: $("cfgGhRepo").value.trim(), github_branch: $("cfgGhBranch").value.trim(), updated_at: new Date().toISOString() };
   try { await api("rpc/cct_salvar_config", { method:"POST", body: JSON.stringify({ p: d }) });
     if (d.historico_automatico) { const n = await api("rpc/cct_enfileirar_historico", { method: "POST", body: JSON.stringify({ p_tenant: APP.tenantId }) }); if (n) msg(`Parâmetros salvos. ${n} sindicato(s) entraram na fila do histórico.`); else msg("Parâmetros salvos."); } else msg("Parâmetros salvos.");
     await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
