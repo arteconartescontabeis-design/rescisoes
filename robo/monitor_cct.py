@@ -13,6 +13,13 @@ Variáveis de ambiente (secrets do GitHub Actions):
   MAIL_HUB_URL          (opcional) URL do hub; padrão: .../functions/v1/mail-send
   ORIGEM                rótulo da execução (default github-actions)
   INTERVALO_S           pausa entre sindicatos (default 8)
+
+v0.17.2: (1) cada incidente leva um bloco "contexto" (sindicato, tipo, registro, solicitação, etapa, resposta) que a Central de
+Erros mostra em linguagem corrente; (2) nos disparos de hora em hora em que não há consulta devida, o robô entra em MODO
+COMPLEMENTAR: refaz SÓ os itens com incidente aberto (consulta/download/importação/armazenamento) a cada N horas, até M
+tentativas por item por dia (cct_config.retentar_intervalo_h / retentar_max_dia) — esgotadas, o incidente vira CRÍTICO —
+e depois processa a fila de pareceres por IA dentro do tempo restante; (3) a fila de IA não é consumida sem a chave
+ANTHROPIC_API_KEY nem com o limite mensal atingido (incidente explica o motivo; a fila espera).
 """
 import hashlib
 import json
@@ -20,7 +27,7 @@ import os
 import sys
 import time
 import traceback
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 BRT = ZoneInfo("America/Sao_Paulo")
 
@@ -31,7 +38,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.17.1"
+VERSAO = "0.17.2"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -170,17 +177,24 @@ def h2_email(t, cor=COR_CCT):
 
 
 # ---------------------------------------------------------------- incidentes / notificações
-def incidente(tenant, fingerprint, modulo, gravidade, mensagem, sindicato_id=None, instrumento_id=None, detalhes=None):
+def incidente(tenant, fingerprint, modulo, gravidade, mensagem, sindicato_id=None, instrumento_id=None, detalhes=None, contexto=None):
+    """v0.17.2: `contexto` = a que o erro se refere (sindicato, cnpj, tipo, registro, solicitacao, etapa, http, resposta, ...);
+    vai em detalhes.contexto e a Central de Erros o mostra em linguagem corrente."""
     try:
+        det = dict(detalhes or {})
+        if contexto:
+            det["contexto"] = {k: (v[:600] if isinstance(v, str) else v) for k, v in contexto.items() if v not in (None, "")}
+        det["robo_versao"] = VERSAO
         inc_id = sb_rpc("cct_registrar_incidente", {
             "p_tenant": tenant, "p_fingerprint": fingerprint, "p_modulo": modulo, "p_gravidade": gravidade,
             "p_mensagem": mensagem[:1000], "p_sindicato": sindicato_id, "p_instrumento": instrumento_id,
-            "p_detalhes": detalhes or {}})
+            "p_detalhes": det})
         log(f"  INCIDENTE {gravidade} [{modulo}] {mensagem[:120]}")
         inc = sb_get("cct_incidentes", {"id": f"eq.{inc_id}", "select": "id,ocorrencias,gravidade"})[0]
         if inc["ocorrencias"] in (1, 3, 10) and gravidade in ("ALTO", "CRITICO"):
             notificar(tenant, "ERRO", f"Artecon · CCT Monitor — Erro {gravidade.lower()} em {modulo}: {mensagem[:70]}",
-                      bloco_chave([("Módulo", modulo), ("Gravidade", gravidade), ("Ocorrências", inc["ocorrencias"]), ("Origem", f"{ORIGEM} · {datetime.now(BRT):%d/%m/%Y %H:%M}")])
+                      bloco_chave([("Módulo", modulo), ("Gravidade", gravidade), ("Ocorrências", inc["ocorrencias"]), ("Origem", f"{ORIGEM} · {datetime.now(BRT):%d/%m/%Y %H:%M}")]
+                                  + [(k.capitalize(), str(v)[:120]) for k, v in (det.get("contexto") or {}).items() if k in ("sindicato", "tipo", "registro", "solicitacao", "etapa")])
                       + f'<p style="margin:10px 0 0"><b>Mensagem:</b> {mensagem}</p><p style="font-size:12px;color:#7a8894">O incidente está registrado na Central de Erros com a trilha completa; se a etapa voltar a funcionar, ele é resolvido automaticamente e você recebe o aviso.</p>',
                       incidente_id=inc_id, tipo_dest=modulo, gravidade=gravidade)
         return inc_id
@@ -302,7 +316,9 @@ def importar(tenant, sind, reg, page, consulta_id, empresa=None, origem="monitor
         row = sb_insert("cct_instrumentos", dict(base, status_importacao="IMPORTACAO_NAO_CONCLUIDA",
                                                  observacoes=f"download falhou: {e}"[:1000]), upsert_on="tenant_id,numero_registro")[0]
         incidente(tenant, f"DOWNLOAD:{registro}", "DOWNLOAD", "ALTO", f"Download do extrato {registro} falhou: {e}",
-                  sind.get("id"), row["id"], detalhes={"solicitacao": reg.get("solicitacao"), "resposta": str(e)[:1200]})
+                  sind.get("id"), row["id"], detalhes={"solicitacao": reg.get("solicitacao"), "resposta": str(e)[:1200]},
+                  contexto={"sindicato": sind.get("nome"), "cnpj": sind.get("cnpj"), "tipo": reg.get("tipo"), "registro": registro, "solicitacao": reg.get("solicitacao"),
+                            "vigencia": reg.get("vigencia"), "etapa": "download do extrato no Mediador (resumoVisualizarSalvarMsWordDoc)", "resposta": str(e)})
         return row, False
 
     sha = hashlib.sha256(corpo).hexdigest()
@@ -316,7 +332,9 @@ def importar(tenant, sind, reg, page, consulta_id, empresa=None, origem="monitor
         arquivo_path = sb_upload(f"{tenant}/{registro.replace('/', '-')}.doc", corpo)
         resolver(tenant, f"ARMAZENAMENTO:{registro}")
     except Exception as e:
-        incidente(tenant, f"ARMAZENAMENTO:{registro}", "ARMAZENAMENTO", "ALTO", f"Falha ao guardar {registro} no bucket: {e}", sind.get("id"))
+        incidente(tenant, f"ARMAZENAMENTO:{registro}", "ARMAZENAMENTO", "ALTO", f"Falha ao guardar {registro} no bucket: {e}", sind.get("id"),
+                  contexto={"sindicato": sind.get("nome"), "cnpj": sind.get("cnpj"), "tipo": reg.get("tipo"), "registro": registro, "solicitacao": reg.get("solicitacao"),
+                            "etapa": f"gravação do arquivo .doc no Storage do Supabase (bucket {BUCKET})", "resposta": str(e), "tamanho_bytes": len(corpo)})
 
     # 3) extração
     try:
@@ -352,7 +370,9 @@ def importar(tenant, sind, reg, page, consulta_id, empresa=None, origem="monitor
                                                  status_importacao="IMPORTACAO_NAO_CONCLUIDA",
                                                  observacoes=f"extração falhou: {e}"), upsert_on="tenant_id,numero_registro")[0]
         incidente(tenant, f"IMPORTACAO:{registro}", "IMPORTACAO", "ALTO", f"Importação de {registro} não concluída: {e}",
-                  sind.get("id"), row["id"])
+                  sind.get("id"), row["id"],
+                  contexto={"sindicato": sind.get("nome"), "cnpj": sind.get("cnpj"), "tipo": reg.get("tipo"), "registro": registro, "solicitacao": reg.get("solicitacao"),
+                            "etapa": "extração das cláusulas do extrato (.doc/HTML) e gravação no banco", "resposta": str(e)})
         return row, False
 
 
@@ -420,9 +440,11 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
         anterior = carregar_dados_instrumento(ant_id) if ant_id else None
         cfg = config(tenant)
         origem_inst = (sb_get("cct_instrumentos", {"id": f"eq.{inst_id}", "select": "origem"}) or [{}])[0].get("origem")
-        usar_ia = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("GITHUB_TOKEN"))
+        usar_ia = bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())
         motivo_sem_ia = None
-        if usar_ia and not cfg.get("ia_ativa", True):
+        if not usar_ia:
+            motivo_sem_ia = MOTIVO_SEM_CHAVE
+        elif usar_ia and not cfg.get("ia_ativa", True):
             usar_ia, motivo_sem_ia = False, "IA desativada nos parâmetros pelo gerente"
         elif usar_ia and origem_inst == "historico" and not cfg.get("ia_historico", False):
             usar_ia, motivo_sem_ia = False, "convenção histórica: parecer por IA desligado para histórico (parâmetros)"
@@ -450,25 +472,57 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
         if r["status"] == "CONCLUIDA":
             resolver(tenant, f"IA:{inst_id}")
         elif usar_ia:  # só é incidente quando a IA deveria ter rodado e falhou
-            incidente(tenant, f"IA:{inst_id}", "IA", "ATENCAO", f"ANÁLISE POR IA NÃO CONCLUÍDA – {dados['metadados']['numero_registro']}: {r['erro_ia']} (valores e comparação gravados)", sindicato_id, inst_id)
+            incidente(tenant, f"IA:{inst_id}", "IA", "ATENCAO", f"ANÁLISE POR IA NÃO CONCLUÍDA – {dados['metadados']['numero_registro']}: {r['erro_ia']} (valores e comparação gravados)", sindicato_id, inst_id,
+                      contexto={"registro": dados["metadados"]["numero_registro"], "etapa": "parecer por IA (API Anthropic)", "resposta": r["erro_ia"], "modelo": r.get("modelo")})
         log(f"  ANÁLISE {dados['metadados']['numero_registro']}: {r['status']} — {len(r['valores'])} valores, "
             f"{'comparada com ' + anterior['metadados']['numero_registro'] if anterior else 'sem anterior'}, {r['duracao_ms']} ms")
         return an
     except Exception as e:
         log(f"  !! análise falhou: {e}")
-        incidente(tenant, f"IA:{inst_id}", "IA", "ALTO", f"Análise não concluída (erro interno): {e}", sindicato_id, inst_id)
+        incidente(tenant, f"IA:{inst_id}", "IA", "ALTO", f"Análise não concluída (erro interno): {e}", sindicato_id, inst_id,
+                  contexto={"etapa": "análise da convenção (valores, comparação, parecer)", "resposta": f"{type(e).__name__}: {e}"})
         sb_patch("cct_instrumentos", {"id": f"eq.{inst_id}"}, {"analise_status": "ANALISE_IA_NAO_CONCLUIDA"})
         return None
 
 
-def analisar_pendentes(tenant):
-    """Instrumentos importados sem análise (ou reprocessamento pedido pelo app: analise_status nulo)."""
-    pend = sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "analise_status": "is.null", "select": "id,numero_registro,sindicato_id", "limit": "20"})
-    if pend:
-        log(f"análises pendentes: {len(pend)}")
+MOTIVO_SEM_CHAVE = "chave ANTHROPIC_API_KEY não configurada nos secrets do repositório (GitHub → Settings → Secrets and variables → Actions)"
+
+
+def analisar_pendentes(tenant, limite_s=None):
+    """Instrumentos importados sem análise (analise_status nulo: importação sem parecer, 'Analisar com IA' ou lote por ano).
+    v0.17.2: a fila NÃO é consumida sem a chave da IA nem com o limite mensal atingido — fica esperando, com incidente que explica;
+    processa dentro de `limite_s` segundos (o que sobrar continua na próxima execução). Devolve o nº de pareceres processados."""
+    pend = sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "analise_status": "is.null",
+                                       "select": "id,numero_registro,sindicato_id", "order": "detectado_em.desc", "limit": "500"})
+    if not pend:
+        resolver(tenant, "IA:chave-ausente"); resolver(tenant, "IA:limite-mensal")
+        return 0
+    log(f"análises pendentes: {len(pend)}")
+    cfg = config(tenant)
+    if not cfg.get("ia_ativa", True):
+        log("  fila de IA parada: parecer por IA desligado em Configurações"); return 0
+    if not (os.environ.get("ANTHROPIC_API_KEY") or "").strip():
+        incidente(tenant, "IA:chave-ausente", "IA", "ALTO", f"PARECER POR IA INDISPONÍVEL – {len(pend)} convenção(ões) na fila e {MOTIVO_SEM_CHAVE}",
+                  contexto={"etapa": "parecer por IA (API Anthropic)", "na_fila": len(pend), "resposta": "o robô subiu sem a variável ANTHROPIC_API_KEY; a fila fica aguardando"})
+        return 0
+    resolver(tenant, "IA:chave-ausente")
+    t0, n = time.time(), 0
     for i in pend:
+        try:
+            uso = int(sb_rpc("cct_ia_uso_mes", {"p_tenant": tenant}) or 0)
+        except Exception as e:
+            log(f"  !! uso IA: {e}"); uso = 0
+        lim = int(cfg.get("ia_limite_mes") or 0)
+        if uso >= lim:
+            incidente(tenant, "IA:limite-mensal", "IA", "ATENCAO", f"FILA DE IA PARADA – limite mensal de pareceres atingido ({uso}/{lim}); {len(pend) - n} convenção(ões) aguardam (aumente o limite em Configurações ou aguarde o próximo mês)",
+                      contexto={"etapa": "parecer por IA (API Anthropic)", "uso_mes": uso, "limite_mes": lim, "na_fila": len(pend) - n})
+            break
+        resolver(tenant, "IA:limite-mensal")
+        if limite_s and time.time() - t0 > limite_s:
+            log(f"  tempo esgotado: {len(pend) - n} parecer(es) ficam para a próxima execução"); break
         analisar_instrumento(tenant, i["id"], sindicato_id=i.get("sindicato_id"))
-    return len(pend)
+        n += 1
+    return n
 
 
 # ---------------------------------------------------------------- ciência (seções 31-39)
@@ -723,7 +777,9 @@ def processar_alvo(tenant, sind, empresa, tipos, page, existentes):
             etapas.append(f"[{tipo}] ERRO: {r['erro']}")
             incidente(tenant, f"MEDIADOR:consulta:{cnpj}:{tipo}", "MEDIADOR", "ALTO",
                       f"CONSULTA NÃO CONCLUÍDA – {tipo} – {sind['nome']}: {r['erro']}", sind["id"],
-                      detalhes={"tipo": tipo, "http": r["http"], "trecho_erro": r.get("trecho_erro"), "etapas": r["etapas"]})
+                      detalhes={"tipo": tipo, "http": r["http"], "trecho_erro": r.get("trecho_erro"), "etapas": r["etapas"]},
+                      contexto={"sindicato": sind["nome"], "cnpj": cnpj, "tipo": tipo, "etapa": "pesquisa no Mediador (ConsultarInstColetivo → getConsultaAvancada)",
+                                "http": r["http"], "resposta": r.get("trecho_erro") or r["erro"], "consulta_id": consulta["id"]})
             time.sleep(2)
             continue
         resolver(tenant, f"MEDIADOR:consulta:{cnpj}:{tipo}")
@@ -786,6 +842,136 @@ def processar_alvo(tenant, sind, empresa, tipos, page, existentes):
     return status_geral, len(novos)
 
 
+# ---------------------------------------------------------------- v0.17.2: retentativa só do que deu erro
+MODULOS_RETENTAVEIS = ("MEDIADOR", "DOWNLOAD", "IMPORTACAO", "ARMAZENAMENTO")
+
+
+def _ts(s):
+    return datetime.fromisoformat(s.replace("Z", "+00:00")).astimezone(BRT) if s else None
+
+
+def fila_retentativa(tenant, cfg):
+    """Incidentes abertos dos módulos retentáveis cuja nova tentativa está devida (intervalo e máximo diário de cct_config)."""
+    intervalo_h, maximo = int(cfg.get("retentar_intervalo_h") or 2), int(cfg.get("retentar_max_dia") or 0)
+    if maximo <= 0:
+        return [], intervalo_h, maximo
+    rows = sb_get("cct_incidentes", {"tenant_id": f"eq.{tenant}", "status": "in.(NOVO,EM_NOVA_TENTATIVA,PERSISTENTE)", "modulo": f"in.({','.join(MODULOS_RETENTAVEIS)})",
+                                     "select": "id,fingerprint,modulo,gravidade,sindicato_id,instrumento_id,mensagem,tentativas_dia,tentativas_data,ultima_tentativa,ultima_ocorrencia,escalado_em",
+                                     "order": "ultima_ocorrencia.asc"})
+    agora, hoje = datetime.now(BRT), datetime.now(BRT).date().isoformat()
+    devidos = []
+    for r in rows:
+        if not r.get("sindicato_id") or r.get("escalado_em"):
+            continue
+        td = (r.get("tentativas_dia") or 0) if (r.get("tentativas_data") or "") == hoje else 0
+        if td >= maximo:
+            continue
+        ref = _ts(r.get("ultima_tentativa") or r.get("ultima_ocorrencia"))
+        if ref and agora - ref < timedelta(hours=intervalo_h):
+            continue
+        devidos.append(dict(r, tentativas_dia=td))
+    return devidos, intervalo_h, maximo
+
+
+def retentar_armazenamento(tenant, sind, inst, page):
+    """Convenção importada cujo arquivo não foi guardado no Storage: baixa o extrato de novo (dentro da sessão do Mediador) e grava."""
+    registro = inst["numero_registro"]
+    mediador.consultar_com_retry(page, sind["cnpj"], tipo=inst.get("tipo") or "Convenção Coletiva", vigencia="Vigentes")  # abre a sessão (o extrato é negado fora dela)
+    status, corpo, trecho = mediador.baixar_extrato(page, inst["numero_solicitacao"])
+    if status != 200 or not mediador.extrato_valido(corpo):
+        raise RuntimeError(f"extrato inválido (HTTP {status}, {len(corpo) if corpo else 0} bytes) — {trecho}")
+    path = sb_upload(f"{tenant}/{registro.replace('/', '-')}.doc", corpo)
+    sb_patch("cct_instrumentos", {"id": f"eq.{inst['id']}"}, {"arquivo_path": path, "sha256": hashlib.sha256(corpo).hexdigest()})
+    resolver(tenant, f"ARMAZENAMENTO:{registro}")
+    log(f"  ARMAZENADO {registro} ({len(corpo)} bytes)")
+
+
+def processar_retentativas(tenant, cfg, page, existentes, limite_s):
+    """Refaz SÓ os sindicatos/registros com incidente aberto e tentativa devida. Devolve (tentados, resolvidos, escalados)."""
+    devidos, intervalo_h, maximo = fila_retentativa(tenant, cfg)
+    if not devidos:
+        log("retentativa: nada devido"); return 0, 0, 0
+    grupos = {}
+    for r in devidos:
+        grupos.setdefault(r["sindicato_id"], []).append(r)
+    log(f"RETENTATIVA: {len(devidos)} incidente(s) em {len(grupos)} sindicato(s) — a cada {intervalo_h} h, até {maximo}/dia")
+    t0, tentados, resolvidos, escalados = time.time(), 0, 0, 0
+    hoje, agora_iso = datetime.now(BRT).date().isoformat(), datetime.now(timezone.utc).isoformat()
+    for sid, incs in grupos.items():
+        if time.time() - t0 > limite_s:
+            log(f"  tempo esgotado: {len(grupos) - tentados} sindicato(s) ficam para o próximo disparo"); break
+        sind = (sb_get("cct_sindicatos", {"id": f"eq.{sid}", "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email"}) or [None])[0]
+        if not sind:
+            continue
+        for r in incs:
+            sb_patch("cct_incidentes", {"id": f"eq.{r['id']}"}, {"tentativas_dia": r["tentativas_dia"] + 1, "tentativas_data": hoje, "ultima_tentativa": agora_iso, "status": "EM_NOVA_TENTATIVA"})
+        tentados += 1
+        log(f"== retentativa {tentados}/{len(grupos)}: {sind['nome']} — {', '.join(sorted({r['modulo'] for r in incs}))} (tentativa {incs[0]['tentativas_dia'] + 1} de {maximo} hoje)")
+        try:
+            armaz = [r for r in incs if r["modulo"] == "ARMAZENAMENTO" and r.get("instrumento_id")]
+            for r in armaz:
+                inst = (sb_get("cct_instrumentos", {"id": f"eq.{r['instrumento_id']}", "select": "id,numero_registro,numero_solicitacao,tipo,status_importacao,arquivo_path"}) or [None])[0]
+                if inst and inst.get("status_importacao") == "IMPORTADO" and not inst.get("arquivo_path"):
+                    try:
+                        retentar_armazenamento(tenant, sind, inst, page)
+                    except Exception as e:
+                        incidente(tenant, f"ARMAZENAMENTO:{inst['numero_registro']}", "ARMAZENAMENTO", "ALTO", f"Falha ao guardar {inst['numero_registro']} no bucket: {e}", sind["id"],
+                                  contexto={"sindicato": sind["nome"], "cnpj": sind["cnpj"], "tipo": inst.get("tipo"), "registro": inst["numero_registro"], "solicitacao": inst.get("numero_solicitacao"),
+                                            "etapa": f"nova tentativa de gravação no Storage (bucket {BUCKET})", "resposta": str(e)})
+                elif inst and inst.get("arquivo_path"):
+                    resolver(tenant, f"ARMAZENAMENTO:{inst['numero_registro']}")
+            if any(r["modulo"] != "ARMAZENAMENTO" for r in incs) or any(r["modulo"] == "ARMAZENAMENTO" and not r.get("instrumento_id") for r in incs):
+                processar_sindicato(tenant, sind, page, existentes)   # consulta + importa o que ainda não está IMPORTADO
+        except Exception as e:
+            log(f"  !! retentativa: {e}\n{traceback.format_exc()}")
+        # o que continua aberto: ou espera o próximo intervalo, ou vira CRÍTICO se esgotou as tentativas do dia
+        ainda = sb_get("cct_incidentes", {"id": f"in.({','.join(r['id'] for r in incs)})", "status": "in.(NOVO,EM_NOVA_TENTATIVA,PERSISTENTE)", "select": "id,fingerprint,modulo,gravidade,mensagem,tentativas_dia,instrumento_id"})
+        resolvidos += len(incs) - len(ainda)
+        for r in ainda:
+            if (r.get("tentativas_dia") or 0) >= maximo:
+                sb_patch("cct_incidentes", {"id": f"eq.{r['id']}"}, {"gravidade": "CRITICO", "status": "PERSISTENTE", "escalado_em": datetime.now(timezone.utc).isoformat()})
+                escalados += 1
+                log(f"  ESCALADO para CRÍTICO ({r['modulo']}): {r['mensagem'][:90]}")
+                notificar(tenant, "ERRO", f"Artecon · CCT Monitor — CRÍTICO após {maximo} tentativas: {r['modulo']} · {sind['nome'][:50]}",
+                          bloco_chave([("Módulo", r["modulo"]), ("Sindicato", sind["nome"]), ("Tentativas hoje", f"{r['tentativas_dia']} (máximo {maximo})"), ("Intervalo", f"{intervalo_h} h")])
+                          + f'<p style="margin:10px 0 0"><b>Erro:</b> {r["mensagem"]}</p><p style="font-size:12px;color:#7a8894">O robô esgotou as novas tentativas automáticas de hoje. Verifique o Mediador/Supabase e, se preciso, trate o incidente na Central de Erros; a retentativa automática recomeça amanhã.</p>',
+                          incidente_id=r["id"], tipo_dest=r["modulo"], gravidade="CRITICO")
+            else:
+                log(f"  continua aberto ({r['modulo']}): tentativa {r['tentativas_dia']} de {maximo}; próxima em ~{intervalo_h} h")
+        time.sleep(INTERVALO)
+    log(f"RETENTATIVA: {tentados} sindicato(s) tentado(s), {resolvidos} incidente(s) resolvido(s), {escalados} escalado(s) para CRÍTICO")
+    return tentados, resolvidos, escalados
+
+
+def modo_complementar(tenant, cfg, motivo):
+    """Disparo sem consulta devida (fora do horário / fim de semana): retentativas + fila de IA + testes de e-mail."""
+    processar_testes_email(tenant)
+    n_ia = 0
+    devidos, _, _ = fila_retentativa(tenant, cfg)
+    ret = (0, 0, 0)
+    if devidos:
+        existentes = {r["numero_registro"] for r in sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "select": "numero_registro"})}
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=False)
+            page = browser.new_context(locale="pt-BR", accept_downloads=True).new_page()
+            try:
+                ret = processar_retentativas(tenant, cfg, page, existentes, limite_s=25 * 60)
+            finally:
+                browser.close()
+    try:
+        n_ia = analisar_pendentes(tenant, limite_s=12 * 60 if devidos else 36 * 60)
+    except Exception as e:
+        log(f"  !! análises pendentes falharam: {e}\n{traceback.format_exc()}")
+    partes = []
+    if ret[0]:
+        partes.append(f"retentativa: {ret[0]} sindicato(s), {ret[1]} resolvido(s), {ret[2]} crítico(s)")
+    if n_ia:
+        partes.append(f"IA: {n_ia} parecer(es)")
+    encerrar_execucao("SEM_CONSULTA", motivo + (" · " + "; ".join(partes) if partes else ""),
+                      {"retentativa": {"tentados": ret[0], "resolvidos": ret[1], "escalados": ret[2]}, "ia_pareceres": n_ia,
+                       "ia_chave_presente": bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())})
+
+
 def main():
     log(f"CCT Monitor robô v{VERSAO} — origem {ORIGEM}")
     teste = (os.environ.get("TESTE_EMAIL") or "").strip()
@@ -805,13 +991,15 @@ def main():
     if SO_ANALISE:
         log("MODO ANÁLISE SOB DEMANDA (disparado pelo app): só pareceres pendentes — sem consulta ao Mediador, sem ciências")
         try:
-            n = analisar_pendentes(tenant)
+            n = analisar_pendentes(tenant, limite_s=38 * 60)
         except Exception as e:
             log(f"  !! análises pendentes falharam: {e}\n{traceback.format_exc()}")
-            incidente(tenant, "IA:sob-demanda", "IA", "ALTO", f"Análise sob demanda falhou: {e}")
+            incidente(tenant, "IA:sob-demanda", "IA", "ALTO", f"Análise sob demanda falhou: {e}", contexto={"etapa": "execução só de pareceres (so_analise)", "resposta": str(e)})
             encerrar_execucao("ERRO_TOTAL", f"análise sob demanda falhou: {e}")
             return
-        encerrar_execucao("SEM_CONSULTA", f"análise por IA sob demanda: {n} parecer(es) processado(s)")
+        chave = bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())
+        encerrar_execucao("SEM_CONSULTA", f"análise por IA sob demanda: {n} parecer(es) processado(s)" + ("" if chave else " — SEM A CHAVE ANTHROPIC_API_KEY (fila aguardando)"),
+                          {"ia_pareceres": n, "ia_chave_presente": chave})
         return
     forcar = (os.environ.get("FORCAR") or "").lower() in ("1", "true", "sim")
     if not forcar and ORIGEM == "github-actions":
@@ -820,7 +1008,7 @@ def main():
         from datetime import timedelta
         agora = datetime.now(BRT)
         if agora.weekday() >= 5:
-            log(f"fim de semana ({agora:%d/%m %H:%M} BRT) — sem consulta"); processar_testes_email(tenant); encerrar_execucao("SEM_CONSULTA", "fim de semana"); return
+            log(f"fim de semana ({agora:%d/%m %H:%M} BRT) — sem consulta; modo complementar"); modo_complementar(tenant, cfg0, "fim de semana"); return
         horarios = []
         for h in (cfg0.get("horarios_consulta") or "06:00").split(","):
             m = _re.match(r"\s*(\d{1,2}):(\d{2})", h)
@@ -836,14 +1024,14 @@ def main():
             if devido is None or alvo > devido:
                 devido = alvo
         if devido is None:
-            log("nenhum horário válido configurado"); processar_testes_email(tenant); encerrar_execucao("SEM_CONSULTA", "nenhum horário válido configurado"); return
+            log("nenhum horário válido configurado; modo complementar"); modo_complementar(tenant, cfg0, "nenhum horário válido configurado"); return
         # devido = último horário configurado já passado. Executa enquanto houver sindicato monitorado NÃO consultado desde então
         # (assim, o que não coube em um disparo de 45 min continua no próximo, e um máximo por execução vira fila natural).
         todos = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true", "select": "id,ultima_consulta"})
         pendentes = [x for x in todos if not x.get("ultima_consulta") or datetime.fromisoformat(x["ultima_consulta"].replace("Z", "+00:00")).astimezone(BRT) < devido]
         if todos and not pendentes:
             log(f"nada devido: todos os {len(todos)} sindicatos já consultados desde {devido:%d/%m %H:%M} BRT (horários {cfg0.get('horarios_consulta')})")
-            processar_testes_email(tenant); encerrar_execucao("SEM_CONSULTA", f"fora do horário: todos consultados desde {devido:%d/%m %H:%M}"); return
+            modo_complementar(tenant, cfg0, f"fora do horário: todos consultados desde {devido:%d/%m %H:%M}"); return
         log(f"executando: horário devido {devido:%d/%m %H:%M} BRT, agora {agora:%H:%M} — {len(pendentes)} de {len(todos)} sindicato(s) ainda não consultados desde então")
     global MAIL_DESTINO_UNICO
     cfg_dest = (config(tenant).get("email_destino_teste") or "").strip().lower()
@@ -918,7 +1106,7 @@ def main():
     else:
         resolver(tenant, "APLICATIVO:sem-sindicatos")
     try:
-        analisar_pendentes(tenant)
+        resumo["ia_pareceres"] = analisar_pendentes(tenant, limite_s=max(60, 32 * 60 - (time.time() - inicio_exec)))  # o que sobrar continua no próximo disparo
     except Exception as e:
         log(f"  !! análises pendentes falharam: {e}")
     try:
@@ -959,7 +1147,8 @@ def main():
     else:
         resultado, motivo = "SUCESSO", None
     encerrar_execucao(resultado, motivo, {"sindicatos_previstos": previstos, "sindicatos_processados": processados, "novos": resumo["novos"],
-                                          "alertas": alertas, "erros": erros, "historico": resumo.get("historico"), "detalhes": resumo})
+                                          "alertas": alertas, "erros": erros, "historico": resumo.get("historico"), "detalhes": resumo,
+                                          "ia_pareceres": resumo.get("ia_pareceres"), "ia_chave_presente": bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())})
     with open("resumo_execucao.json", "w", encoding="utf-8") as f:
         json.dump({"versao": VERSAO, "origem": ORIGEM, "quando": datetime.now(timezone.utc).isoformat(), **resumo}, f, ensure_ascii=False, indent=2)
 
