@@ -204,7 +204,10 @@
         <h2 style="margin-top:18px">Consultas ao Mediador</h2>
         <div class="grid g3"><div><label>Horários de consulta (Brasília, separados por vírgula)</label><input id="cfgHorarios" placeholder="06:00,13:00"></div>
           <div><label>Intervalo entre sindicatos (segundos)</label><input id="cfgIntervalo" type="number" min="5" max="600"></div>
-          <div><label>Máximo de sindicatos por execução (0 = todos)</label><input id="cfgMaxSind" type="number" min="0" max="500"></div></div>
+          <div><label>Máximo de sindicatos por execução (0 = todos)</label><input id="cfgMaxSind" type="number" min="0" max="500"></div>
+          <div><label>Retentar erros a cada (horas)</label><input id="cfgRetInt" type="number" min="1" max="12"></div>
+          <div><label>Tentativas por item por dia (0 = não retentar)</label><input id="cfgRetMax" type="number" min="0" max="10"></div></div>
+        <div class="aviso"><b>Retentativa só do que deu erro:</b> nos disparos de hora em hora em que não há consulta devida, o robô refaz apenas os sindicatos e registros com incidente aberto (consulta, download, importação, armazenamento) — não os demais. Cada item é retentado no máximo a cada N horas e até M vezes por dia; esgotadas as tentativas, o incidente vira <b>CRÍTICO</b> e vai ao e-mail de erros críticos; no dia seguinte a retentativa recomeça. A Central de Erros mostra "tentativa X de M · próxima ≈ HH:MM".</div>
         <div class="aviso">O GitHub dispara o robô de hora em hora (aos 5 minutos). Para cada horário marcado aqui (HH:MM, Brasília), o robô executa no <b>primeiro disparo após esse horário</b>, se ainda não tiver rodado desde então — "13:00" roda às 13h05, "23:17" às 00h05; atraso máximo de 1 h. O que não couber em um disparo (limite de 45 min do GitHub ≈ 45 sindicatos) continua no disparo seguinte. Fins de semana não consultam. As consultas formam uma fila: os sindicatos consultados há mais tempo vão primeiro, com o intervalo definido entre um e outro — mais espaço entre consultas = menos risco de bloqueio. Com muitos sindicatos, use dois ou três horários e um máximo por execução.</div>
         <h2 style="margin-top:18px">Parecer por IA</h2>
         <div class="grid g3"><div><label>Gerar parecer por IA</label><select id="cfgIa"><option value="true">Sim</option><option value="false">Não</option></select></div>
@@ -213,12 +216,13 @@
           <div><label>Repositório do robô (GitHub)</label><input id="cfgGhRepo" placeholder="organizacao/repositorio"></div>
           <div><label>Branch</label><input id="cfgGhBranch" placeholder="main"></div></div>
         <div class="aviso" id="cfgIaUso"></div>
+        <div class="aviso" id="cfgIaDiag"></div>
         <div class="aviso">"Analisar com IA" dispara o robô no GitHub Actions na hora (só análises, sem Mediador). Requer, uma vez, o token no Vault do Supabase: <code>select vault.create_secret('&lt;token&gt;', 'GITHUB_DISPATCH_TOKEN');</code> — token fine-grained do GitHub com permissão <i>Actions: Read and write</i> no repositório acima.</div>
         <div style="margin-top:10px"><button class="b" onclick="salvarConfig()">Salvar parâmetros</button></div></div>
 
         <div class="card" style="margin-top:16px"><h2>Ações em lote</h2>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="b sec" id="btnMonTodos" onclick="monitorarTodos()">Monitorar todos os sindicatos</button><button class="b sec" id="btnHistTodos" onclick="pedirHistoricoTodos()">Importar histórico de todos</button><span id="loteInfo" style="font-size:13px;color:var(--text-3)"></span></div>
-          <div class="aviso">"Monitorar todos" liga o monitoramento de todos os sindicatos ativos que estão com "monitorar = não" (as consultas entram na fila normal, nos horários configurados). "Importar histórico de todos" coloca todos os sindicatos monitorados que ainda não têm histórico na fila dos últimos <b>N anos</b> (N = "Anos a importar", acima); a importação é gradual, no limite de downloads por execução, e não gera ciência nem e-mail.</div></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="b sec" id="btnMonTodos" onclick="monitorarTodos()">Monitorar todos os sindicatos</button><button class="b sec" id="btnHistTodos" onclick="pedirHistoricoTodos()">Importar histórico de todos</button><span style="display:inline-flex;gap:6px;align-items:center"><select id="loteAno" style="width:100px"></select><button class="b" id="btnIaAno" onclick="analisarAno()">Analisar com IA as convenções do ano</button></span><span id="loteInfo" style="font-size:13px;color:var(--text-3)"></span></div>
+          <div class="aviso">"Monitorar todos" liga o monitoramento de todos os sindicatos ativos que estão com "monitorar = não" (as consultas entram na fila normal, nos horários configurados). "Importar histórico de todos" coloca todos os sindicatos monitorados que ainda não têm histórico na fila dos últimos <b>N anos</b> (N = "Anos a importar", acima); a importação é gradual, no limite de downloads por execução, e não gera ciência nem e-mail. <b>"Analisar com IA as convenções do ano"</b> coloca na fila todas as convenções importadas do ano escolhido que ainda não têm parecer concluído (as que já têm ficam como estão) e dispara o robô; o lote é processado aos poucos — cada disparo analisa o que couber no tempo e o restante continua nos disparos seguintes, dentro do limite mensal de pareceres. Toda convenção nova já sai com parecer no momento da importação (se a chave da IA estiver configurada).</div></div>
 
         <div class="card" style="margin-top:16px"><h2>E-mail — modo teste</h2>
           <div class="grid g2"><div><label>Redirecionar todos os e-mails para (vazio = produção)</label><input id="cfgDestTeste" type="email" placeholder="seu@email.com.br"></div>
@@ -235,6 +239,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.17.2</td><td>12/09/2026</td><td><b>Central de Erros explica e retenta.</b> Cada incidente mostra <b>a que se refere</b> (sindicato, tipo, nº de registro/solicitação, etapa que falhou, resposta do servidor), <b>o que aconteceu</b> em linguagem corrente, <b>o que o robô faz sozinho</b> e <b>o que só você resolve</b>. <b>Retentativa só do que deu erro:</b> nos disparos de hora em hora sem consulta devida, o robô refaz apenas os sindicatos/registros com incidente aberto — a cada N horas, até M tentativas por item por dia (Configurações → Consultas ao Mediador; padrão 2 h / 3) — e, esgotadas, o incidente vira <b>CRÍTICO</b> e vai para o e-mail de erros críticos. O vigia do banco passa a fechar também o "ROBÔ NÃO EXECUTOU" aberto pelo vigia antigo. <b>IA:</b> botão "Analisar com IA as convenções do ano" em Ações em lote (mostra quantas são e o custo estimado antes; o lote é processado aos poucos nos disparos seguintes); a fila de IA não é consumida sem a chave <code>ANTHROPIC_API_KEY</code> nem com o limite mensal atingido — o incidente diz o motivo e a fila espera; Configurações mostra se a chave estava presente na última execução. Banco <code>setup_cct_v0.17.2.sql</code>; robô <code>monitor_cct.py</code>.</td></tr>
           <tr><td>v0.17.1</td><td>11/09/2026</td><td><b>Parecer por IA na hora.</b> "Analisar com IA" deixa de esperar o horário agendado: o app chama <code>cct_pedir_analise_agora</code>, que coloca a convenção na fila e <b>dispara o robô no GitHub Actions</b> só para as análises (sem consultar o Mediador), pelo token guardado no Vault do Supabase. O botão fica "Gerando parecer…" e a tela atualiza sozinha quando o parecer chega (normalmente 2 a 4 minutos). Pedidos com menos de 2 min de intervalo são atendidos na mesma rodada. Sem token/pg_net, cai no comportamento anterior (fila para a próxima execução) e o app avisa. Configurações: repositório e branch do robô (superadministrador). Banco <code>setup_cct_v0.17.1.sql</code>; workflow <code>monitor-cct.yml</code> ganha a entrada <code>so_analise</code>.</td></tr>
           <tr><td>v0.17.0</td><td>11/09/2026</td><td><b>Usuários:</b> botão <b>Excluir</b> (administrador/superadministrador; nunca a si mesmo, o último administrador ou — sem ser superadministrador — um superadministrador): remove os acessos do CCT, o vínculo do Rescisões, inativa o colaborador e apaga o login, via função com privilégio <code>cct_excluir_usuario</code>. <b>Alterar minha senha</b> no cabeçalho (o próprio usuário define a nova senha, sem e-mail); para outro usuário continua o "Redefinir senha" por e-mail. <b>Configurações → E-mail para erros críticos</b>: endereço(s) que recebem todo erro CRÍTICO do sistema (robô, Central de Erros e vigia do banco), além dos gerentes. <b>Ciência antes da data:</b> enquanto a data de hoje for anterior a "Cobrar ciência a partir de", Painel e Confirmações não mostram Pendentes/Atrasadas/Escalonadas — aparece a faixa com a data de início — e o robô não cria ciência, nem envia aviso, lembrete ou escalonamento. Confirmações passa a explicar cada estado (Pendente · Vence hoje · Atrasada · Escalonada · Ciente). Banco <code>setup_cct_v0.17.0.sql</code>.</td></tr>
           <tr><td>v0.16.2</td><td>10/09/2026</td><td><b>Central de Erros (ponto crítico 06).</b> Ao tratar um incidente: <b>Responsável</b> pelo tratamento, <b>Solução aplicada</b> (obrigatória ao resolver) e observações/justificativa (obrigatória ao ignorar); data de encerramento gravada ao resolver ou ignorar. A tabela passa a mostrar responsável e solução. Incidentes automáticos já cobertos: robô não executou, execução interrompida ou com erro total (vigia do banco), indisponibilidade do Mediador, falha de download/importação, falha da análise por IA, falha de e-mail e exceções do robô. Banco <code>setup_cct_v0.16.0.sql</code> (colunas responsavel/solucao).</td></tr>
@@ -361,7 +366,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.17.1" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.17.2" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
@@ -710,18 +715,86 @@ function renderCons() {
       <td>${c.erro ? `<span style="color:var(--erro)">${esc(c.erro)}</span><br>` : ""}<details><summary style="cursor:pointer;color:var(--azul);font-size:12px">etapas</summary><small>${(c.etapas||[]).map(esc).join("<br>")}</small></details></td></tr>`).join("") + `</table>` +
     (APP.dados.cons.length ? "" : `<div class="aviso">Nenhuma consulta registrada ainda.</div>`);
 }
+// v0.17.2: lote de pareceres por ano
+async function analisarAno() {
+  const ano = +$("loteAno").value, cf = APP.dados.cfg || {}, uso = APP.dados.iaUso ?? 0, lim = cf.ia_limite_mes ?? 60;
+  const doAno = (APP.dados.inst || []).filter(i => i.status_importacao === "IMPORTADO" && +(i.data_registro || i.vigencia_inicio || "").slice(0, 4) === ano);
+  const falta = doAno.filter(i => i.analise_status !== "CONCLUIDA");
+  if (cf.ia_ativa === false) return msg("O parecer por IA está desligado em Configurações.", "erro");
+  if (!doAno.length) return msg(`Nenhuma convenção importada de ${ano}.`);
+  if (!falta.length) return msg(`Todas as ${doAno.length} convenções de ${ano} já têm parecer concluído.`);
+  const cabem = Math.max(0, lim - uso);
+  const txt = `Convenções importadas de ${ano}: ${doAno.length}. Já com parecer: ${doAno.length - falta.length}. Entram na fila: ${falta.length}.\n\nEstimativa: 30 a 90 s e cerca de R$ 0,50 por convenção (varia com o tamanho da CCT) → ~R$ ${(falta.length * 0.5).toFixed(0)} no total.\nLimite mensal: ${lim} pareceres (uso ${uso}) — cabem ${cabem} neste mês${falta.length > cabem ? `; os outros ${falta.length - cabem} esperam você aumentar o limite ou o mês virar` : ""}.\n\nO robô é disparado agora e processa o que couber em cada execução; o restante continua nos disparos seguintes. Confirmar?`;
+  if (!confirm(txt)) return;
+  try {
+    const r = await api("rpc/cct_pedir_analise_lote", { method: "POST", body: JSON.stringify({ p_tenant: APP.tenantId, p_ano: ano }) });
+    msg(`${r.enfileiradas + r.ja_na_fila} convenção(ões) de ${ano} na fila` + (r.disparado ? (r.agrupado ? " — o robô já foi disparado há pouco e atende na mesma rodada." : " — robô disparado; acompanhe em Sistema → Histórico do Robô.") : ` — ${r.motivo || "não foi possível disparar o robô agora."}`), r.disparado ? "ok" : "erro");
+    await carregarTudo();
+  } catch (e) { msg(e.message, "erro"); }
+}
+// v0.17.2: explicação do incidente em linguagem corrente
+function explicarInc(i) {
+  const m = i.modulo, t = i.mensagem || "", c = Object.assign({}, (i.detalhes || {}).contexto || {}), cf = APP.dados.cfg || {}, ab = ["NOVO","EM_NOVA_TENTATIVA","PERSISTENTE","EM_ANALISE"].includes(i.status);
+  // incidentes anteriores à v0.17.2 (sem contexto): deduz registro e tipo da própria mensagem
+  if (!c.registro) { const r = t.match(/\b[A-Z]{2}\d{6}\/\d{4}\b/); if (r) c.registro = r[0]; }
+  if (!c.tipo) { const r = t.match(/(Termo Aditivo de (?:Convenção|Acordo) Coletiv[ao]|Convenção Coletiva|Acordo Coletivo)/); if (r) c.tipo = r[1]; }
+  if (!c.solicitacao && (i.detalhes || {}).solicitacao) c.solicitacao = i.detalhes.solicitacao;
+  const refere = [c.sindicato || i.sindicato?.nome ? `<b>${esc(c.sindicato || i.sindicato?.nome)}</b>${c.cnpj ? ` (${fmtCnpj(c.cnpj)})` : ""}` : "", c.tipo ? esc(c.tipo) : "", c.registro ? `registro <b>${esc(c.registro)}</b>` : "", c.solicitacao ? `solicitação ${esc(c.solicitacao)}` : "", c.vigencia ? `vigência ${esc(c.vigencia)}` : "", c.etapa ? `etapa: <i>${esc(c.etapa)}</i>` : "", c.http ? `HTTP ${esc(c.http)}` : ""].filter(Boolean).join(" · ");
+  let oque = "", voce = "";
+  if (m === "MEDIADOR") {
+    if (/Page\.goto|Timeout \d+ms/i.test(t)) oque = "O site do Mediador (mediador.trabalho.gov.br) não abriu em 60 s: o serviço do MTE estava lento ou fora do ar naquele momento. Não há CCT perdida — a consulta simplesmente não aconteceu.";
+    else if (/getConsultaAvancada/i.test(t)) oque = "A pesquisa foi enviada, mas o Mediador não devolveu resultado em 60 s. Causas típicas: o reCAPTCHA recusou o navegador do robô (acontece em rajadas quando o IP do GitHub é muito usado), o site estava instável, ou o layout da página mudou.";
+    else oque = "A consulta ao Mediador para este sindicato e tipo de instrumento não terminou; o resultado é desconhecido (o sistema nunca conclui \"não existe CCT\" a partir de uma falha).";
+    voce = "Se persistir em vários sindicatos seguidos, aumente o intervalo entre sindicatos ou reduza o máximo por execução (Configurações). Se o Mediador mudou de layout, é ajuste no robô. Confira manualmente em mediador.trabalho.gov.br → Consultar Instrumento Coletivo.";
+  } else if (m === "DOWNLOAD") {
+    if (/HTTP 500/.test(t)) oque = "A pesquisa funcionou, mas ao baixar o extrato o Mediador devolveu erro 500 com resposta vazia — defeito momentâneo do servidor do MTE ao gerar o documento. O registro ficou como IMPORTAÇÃO NÃO CONCLUÍDA e será baixado de novo.";
+    else if (/403/.test(t)) oque = "O Mediador recusou o download do extrato (403): normalmente a sessão do navegador não continha a pesquisa deste registro. O robô refaz a pesquisa antes de tentar de novo.";
+    else oque = "O extrato deste registro não foi baixado; a convenção ficou registrada como IMPORTAÇÃO NÃO CONCLUÍDA (sem cláusulas) até o download funcionar.";
+    voce = "Se continuar após as retentativas, abra o extrato manualmente no Mediador (Resumo → Visualizar/Salvar) para ver se o próprio site consegue gerá-lo; se não conseguir, o problema é do MTE.";
+  } else if (m === "ARMAZENAMENTO") {
+    oque = "O extrato foi baixado e as cláusulas foram importadas, mas o arquivo .doc original não pôde ser guardado no Storage do Supabase (bucket cct-arquivos) — timeout ou instabilidade do Supabase. Só o arquivo para download ficou faltando.";
+    voce = "Nada, salvo se persistir: verifique o status do projeto Supabase (Storage) e o tamanho do bucket.";
+  } else if (m === "IMPORTACAO") {
+    oque = "O extrato foi baixado, mas a extração das cláusulas falhou — formato inesperado do documento, extrato sem cláusulas, ou o número de registro do documento diverge do da consulta.";
+    voce = "Abra o extrato no Mediador e confira se é o documento certo; se o formato mudou, é ajuste no extrator do robô.";
+  } else if (m === "IA") {
+    if (/chave-ausente/.test(i.fingerprint || "") || /ANTHROPIC_API_KEY/.test(t)) { oque = "O robô subiu sem a chave da API da Anthropic: nenhum parecer por IA pode ser gerado. A fila de pareceres fica esperando (não é descartada)."; voce = "Crie o secret ANTHROPIC_API_KEY no GitHub (repositório → Settings → Secrets and variables → Actions) e dispare o robô (ou clique de novo em \"Analisar com IA\")."; }
+    else if (/limite-mensal/.test(i.fingerprint || "") || /limite mensal/i.test(t)) { oque = "O limite mensal de pareceres foi atingido; a fila fica esperando."; voce = "Aumente o limite em Configurações → Parecer por IA (superadministrador) ou aguarde o próximo mês."; }
+    else { oque = "A análise desta convenção não gerou parecer por IA (os valores por cláusula e a comparação foram gravados quando possível)."; voce = "Veja a aba Análise da convenção: o motivo aparece junto do status. Se for erro da API (crédito, chave inválida, modelo), corrija e clique em \"Analisar com IA\"."; }
+  } else if (m === "APLICATIVO") {
+    if (/ROBÔ NÃO EXECUTOU/i.test(t)) { oque = "O vigia do banco (independente do robô) não viu nenhuma execução no horário previsto. Ou o GitHub Actions não disparou, ou o robô caiu antes de registrar o início."; voce = "Abra GitHub → Actions → CCT Monitor e veja se há execuções e como terminaram. Se o robô voltou a rodar, este incidente fecha sozinho na próxima verificação."; }
+    else if (/EXECUÇÃO (INTERROMPIDA|ERRO_TOTAL)/i.test(t)) { oque = "Uma execução do robô terminou sem chegar ao fim (processo caiu ou foi cancelado) ou com todas as consultas falhando."; voce = "Abra o log da execução no GitHub (link no incidente) — a última linha mostra a causa."; }
+    else { oque = "Erro interno do robô (exceção não tratada) ao processar este item."; voce = "O texto do erro está nos detalhes; se repetir, é correção no robô."; }
+  } else if (m === "EMAIL") { oque = "O hub artecon-mail não aceitou o envio (chave, destinatário ou serviço fora)."; voce = "Verifique o secret MAIL_API_KEY e o hub artecon-mail."; }
+  else { oque = t; voce = ""; }
+  let robo = "";
+  const retent = ["MEDIADOR","DOWNLOAD","IMPORTACAO","ARMAZENAMENTO"].includes(m);
+  if (!ab) robo = i.status === "RESOLVIDO_AUTOMATICAMENTE" ? "Resolvido automaticamente: a etapa voltou a funcionar." : "Tratado manualmente.";
+  else if (retent) {
+    const maxd = cf.retentar_max_dia ?? 3, inth = cf.retentar_intervalo_h ?? 2, hoje = new Date().toISOString().slice(0, 10), td = (i.tentativas_data === hoje) ? (i.tentativas_dia || 0) : 0;
+    if (i.escalado_em) robo = `Esgotou as ${maxd} tentativas de hoje (escalado para CRÍTICO em ${fmtDT(i.escalado_em)}); a retentativa automática recomeça amanhã.`;
+    else if (maxd === 0) robo = "Retentativa automática desligada (Configurações): só na próxima consulta agendada.";
+    else { const base = new Date(i.ultima_tentativa || i.ultima_ocorrencia), prox = new Date(base.getTime() + inth * 3600e3); robo = `Nova tentativa automática a cada ${inth} h, só deste item — tentativa ${td} de ${maxd} hoje; próxima ≈ ${fmtDT(prox.toISOString())} (no primeiro disparo do robô após esse horário). Se der certo, o incidente fecha sozinho.`; }
+  } else if (m === "IA") robo = "Assim que a causa for corrigida, a fila de pareceres é processada no próximo disparo do robô.";
+  else if (m === "APLICATIVO" && /ROBÔ NÃO EXECUTOU/i.test(t)) robo = "Fecha sozinho quando o vigia constatar uma execução no horário.";
+  else robo = "Fecha sozinho quando a etapa voltar a funcionar na próxima execução.";
+  return { refere, oque, robo, voce, resposta: c.resposta || (i.detalhes || {}).resposta || (i.detalhes || {}).trecho_erro || "" };
+}
 function renderInc() {
   const so = $("fInc").value === "abertos", ab = ["NOVO","EM_NOVA_TENTATIVA","PERSISTENTE","EM_ANALISE"];
   const l = APP.dados.inc.filter(i => !so || ab.includes(i.status));
   $("tabInc").innerHTML = `<table><tr><th>Última ocorrência</th><th>Módulo</th><th>Sindicato</th><th>Erro</th><th>Gravidade</th><th class="r">Ocorr.</th><th>Status</th><th></th></tr>` +
-    l.map(i => `<tr><td>${fmtDT(i.ultima_ocorrencia)}<br><small style="color:var(--cinza)">1ª: ${fmtDT(i.primeira_ocorrencia)}</small></td><td>${esc(i.modulo)}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.mensagem)}</td>
+    l.map(i => { const x = explicarInc(i); return `<tr><td>${fmtDT(i.ultima_ocorrencia)}<br><small style="color:var(--cinza)">1ª: ${fmtDT(i.primeira_ocorrencia)}</small></td><td>${esc(i.modulo)}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.mensagem)}${x.refere ? `<br><small style="color:var(--text-3)">Refere-se a: ${x.refere}</small>` : ""}<details style="margin-top:4px"><summary style="cursor:pointer;color:var(--azul);font-size:12px">o que é isso / o que o robô faz</summary><small><b>O que aconteceu:</b> ${esc(x.oque)}<br><b>O robô:</b> ${esc(x.robo)}${x.voce ? `<br><b>Você:</b> ${esc(x.voce)}` : ""}${x.resposta ? `<br><b>Resposta do servidor:</b> <code>${esc(String(x.resposta).slice(0, 300))}</code>` : ""}</small></details></td>
       <td>${tagStatus(i.gravidade)}</td><td class="r">${i.ocorrencias}</td><td>${tagStatus(i.status)}${i.resolvido_em ? `<br><small>${fmtDT(i.resolvido_em)}</small>` : ""}${i.responsavel || i.resolvido_por ? `<br><small style="color:var(--cinza)">${esc(i.responsavel || i.resolvido_por)}</small>` : ""}${i.solucao ? `<br><small><b>Solução:</b> ${esc(i.solucao)}</small>` : ""}</td>
-      <td>${ab.includes(i.status) ? `<button class="b sec sm" onclick="abrirInc('${i.id}')">Tratar</button>` : ""}</td></tr>`).join("") + `</table>` +
+      <td>${ab.includes(i.status) ? `<button class="b sec sm" onclick="abrirInc('${i.id}')">Tratar</button>` : ""}</td></tr>`; }).join("") + `</table>` +
     (l.length ? "" : `<div class="aviso">Nenhum incidente ${so ? "aberto" : "registrado"}.</div>`);
 }
 function abrirInc(id) {
   const i = APP.dados.inc.find(x => x.id === id);
-  $("iId").value = id; $("iDet").innerHTML = `<b>${esc(i.modulo)}</b> · ${tagStatus(i.gravidade)} · ${i.ocorrencias} ocorrência(s)<br>${esc(i.mensagem)}<br><small>${esc(JSON.stringify(i.detalhes||{})).slice(0,600)}</small>`;
+  const x = explicarInc(i);
+  $("iId").value = id; $("iDet").innerHTML = `<b>${esc(i.modulo)}</b> · ${tagStatus(i.gravidade)} · ${i.ocorrencias} ocorrência(s) · 1ª ${fmtDT(i.primeira_ocorrencia)} · última ${fmtDT(i.ultima_ocorrencia)}<br>${esc(i.mensagem)}`
+    + `<div class="aviso" style="margin:8px 0 0">${x.refere ? `<b>Refere-se a:</b> ${x.refere}<br>` : ""}<b>O que aconteceu:</b> ${esc(x.oque)}<br><b>O que o robô faz sozinho:</b> ${esc(x.robo)}${x.voce ? `<br><b>O que só você resolve:</b> ${esc(x.voce)}` : ""}${x.resposta ? `<br><b>Resposta do servidor:</b> <code style="word-break:break-all">${esc(String(x.resposta).slice(0, 500))}</code>` : ""}</div>`
+    + `<details style="margin-top:6px"><summary style="cursor:pointer;color:var(--azul);font-size:12px">detalhes técnicos</summary><small style="word-break:break-all">${esc(JSON.stringify(i.detalhes||{})).slice(0,1200)}</small></details>`;
   $("iPor").value = i.responsavel || APP.email; $("iObs").value = i.observacoes || ""; $("iSol").value = i.solucao || ""; $("iStatus").value = i.status === "EM_ANALISE" ? "RESOLVIDO_MANUALMENTE" : "EM_ANALISE"; $("mInc").classList.add("on");
 }
 async function salvarInc() {
@@ -1183,6 +1256,16 @@ function renderConf() {
   $("cfgIaUso").innerHTML = `Uso no mês: <b>${APP.dados.iaUso ?? "?"}</b> de ${cf.ia_limite_mes ?? 60} pareceres.` + (superadm() ? "" : " IA, horários/fila e limpeza são configurações críticas: somente o superadministrador altera.");
   const criticos = ["cfgIa","cfgIaLim","cfgIaHist","cfgHorarios","cfgIntervalo","cfgMaxSind","cfgGhRepo","cfgGhBranch"];
   $("cfgGhRepo").value = cf.github_repo || ""; $("cfgGhBranch").value = cf.github_branch || "";
+  $("cfgRetInt").value = cf.retentar_intervalo_h ?? 2; $("cfgRetMax").value = cf.retentar_max_dia ?? 3;
+  // v0.17.2: diagnóstico da IA — chave presente na última execução? incidentes de IA abertos?
+  const ultExec = (APP.dados.exec || []).find(e => e.detalhes && typeof e.detalhes.ia_chave_presente === "boolean");
+  const incIa = (APP.dados.inc || []).filter(i => i.modulo === "IA" && ["NOVO","EM_NOVA_TENTATIVA","PERSISTENTE","EM_ANALISE"].includes(i.status) && /chave-ausente|limite-mensal/.test(i.fingerprint || ""));
+  const naFila = (APP.dados.inst || []).filter(i => i.status_importacao === "IMPORTADO" && i.analise_status === null).length;
+  $("cfgIaDiag").innerHTML = (ultExec ? (ultExec.detalhes.ia_chave_presente ? `<span class="tag ok">chave da IA presente</span> na execução de ${fmtDT(ultExec.inicio)}.` : `<span class="tag erro">chave da IA AUSENTE</span> na execução de ${fmtDT(ultExec.inicio)} — crie o secret <code>ANTHROPIC_API_KEY</code> em GitHub → repositório → Settings → Secrets and variables → Actions e dispare o robô de novo.`) : `Ainda não há execução do robô v0.17.2 para saber se a chave <code>ANTHROPIC_API_KEY</code> está configurada.`)
+    + (naFila ? ` <b>${naFila}</b> convenção(ões) na fila de parecer.` : "") + (incIa.length ? `<br><span style="color:var(--erro)">${incIa.map(i => esc(i.mensagem)).join("<br>")}</span>` : "");
+  const anos = uniq((APP.dados.inst || []).map(i => (i.data_registro || i.vigencia_inicio || "").slice(0, 4)).filter(Boolean)).sort().reverse();
+  $("loteAno").innerHTML = (anos.length ? anos : [String(new Date().getFullYear())]).map(a => `<option value="${a}"${a === String(new Date().getFullYear()) ? " selected" : ""}>${a}</option>`).join("");
+  $("btnIaAno").disabled = !podeAdm();
   document.querySelectorAll("[id^=cfg]").forEach(el => { if (el.tagName === "INPUT" || el.tagName === "SELECT") el.disabled = criticos.includes(el.id) ? !superadm() : !podeAdm(); });
   document.querySelectorAll("button[onclick^='salvarConfig'],button[onclick^='salvarDestTeste'],#btnMonTodos,#btnHistTodos").forEach(b => b.disabled = !podeAdm());
   $("loteInfo").textContent = `${APP.dados.sind.filter(s => s.ativo && !s.monitorar).length} sindicato(s) ativos sem monitoramento · ${APP.dados.sind.filter(s => s.monitorar && s.ativo && !s.historico_status).length} monitorado(s) sem histórico solicitado`;
@@ -1218,7 +1301,7 @@ async function dispensarAnteriores() {
 async function salvarConfig() {
   const d = { tenant_id: APP.tenantId, prazo_ciencia_dias_uteis: +$("cfgPrazo").value || 2, lembrete_diario: $("cfgLemb").value === "true", escalonar_apos_prazo: $("cfgEsc").value === "true", email_destino_teste: APP.dados.cfg.email_destino_teste || null, historico_anos: +$("cfgHistAnos").value || 5, historico_max_por_execucao: +$("cfgHistMax").value || 8,
     horarios_consulta: ($("cfgHorarios").value.match(/\d{1,2}:\d{2}/g) || ["06:00"]).map(h => h.padStart(5, "0")).join(","), intervalo_consultas_s: Math.max(5, +$("cfgIntervalo").value || 20), max_sindicatos_por_execucao: Math.max(0, +$("cfgMaxSind").value || 0),
-    ia_ativa: $("cfgIa").value === "true", ia_limite_mes: Math.max(0, +$("cfgIaLim").value || 0), ia_historico: $("cfgIaHist").value === "true", historico_automatico: $("cfgHistAuto").value === "true", ciencia_inicio: $("cfgCienciaIni").value || "", email_erros_criticos: $("cfgEmailCrit").value.trim(), github_repo: $("cfgGhRepo").value.trim(), github_branch: $("cfgGhBranch").value.trim(), updated_at: new Date().toISOString() };
+    ia_ativa: $("cfgIa").value === "true", ia_limite_mes: Math.max(0, +$("cfgIaLim").value || 0), ia_historico: $("cfgIaHist").value === "true", historico_automatico: $("cfgHistAuto").value === "true", ciencia_inicio: $("cfgCienciaIni").value || "", email_erros_criticos: $("cfgEmailCrit").value.trim(), github_repo: $("cfgGhRepo").value.trim(), github_branch: $("cfgGhBranch").value.trim(), retentar_intervalo_h: Math.min(12, Math.max(1, +$("cfgRetInt").value || 2)), retentar_max_dia: Math.min(10, Math.max(0, +$("cfgRetMax").value || 0)), updated_at: new Date().toISOString() };
   try { await api("rpc/cct_salvar_config", { method:"POST", body: JSON.stringify({ p: d }) });
     if (d.historico_automatico) { const n = await api("rpc/cct_enfileirar_historico", { method: "POST", body: JSON.stringify({ p_tenant: APP.tenantId }) }); if (n) msg(`Parâmetros salvos. ${n} sindicato(s) entraram na fila do histórico.`); else msg("Parâmetros salvos."); } else msg("Parâmetros salvos.");
     await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
