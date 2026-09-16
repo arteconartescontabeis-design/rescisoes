@@ -20,6 +20,14 @@ COMPLEMENTAR: refaz SÓ os itens com incidente aberto (consulta/download/importa
 tentativas por item por dia (cct_config.retentar_intervalo_h / retentar_max_dia) — esgotadas, o incidente vira CRÍTICO —
 e depois processa a fila de pareceres por IA dentro do tempo restante; (3) a fila de IA não é consumida sem a chave
 ANTHROPIC_API_KEY nem com o limite mensal atingido (incidente explica o motivo; a fila espera).
+
+v0.18.1: (1) o robô NÃO cadastra mais as demais partes das convenções como sindicatos (só define laboral/patronal do
+sindicato monitorado quando estiver em branco) — a relação de sindicatos é a cadastrada pelo escritório; (2) reconsulta
+automática à Receita Federal (BrasilAPI → Minha Receita) dos sindicatos/empresas com consulta mais antiga que
+cct_config.receita_reconsulta_dias (0 = só pelo botão do app), registrando cada mudança em cct_alteracoes_cadastrais;
+(3) envio dos avisos CADASTRO_ALTERADO enfileirados pelo app ou pelo robô (ao responsável; sem responsável, aos e-mails
+de erros críticos/gerentes) em toda execução, inclusive nos disparos sem consulta; (4) os e-mails de nova convenção,
+lembrete e escalonamento passam a informar o usuário responsável pela empresa (nome e e-mail).
 """
 import hashlib
 import json
@@ -38,7 +46,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.17.2"
+VERSAO = "0.18.1"
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -396,30 +404,19 @@ def inferir_tipo(nome, posicao):
 
 
 def cadastrar_partes(tenant, sind, dados):
-    """Define o tipo do sindicato monitorado se estiver em branco e cadastra as demais partes (sem monitorar)."""
-    partes = dados.get("partes") or []
-    for pos, pt in enumerate(partes):
+    """v0.18.1: define o tipo (laboral/patronal) do sindicato monitorado pelas partes do extrato, se estiver em branco.
+    As demais partes NÃO são mais cadastradas como sindicatos (até a v0.18.0 entravam sem monitorar, com o nome cortado
+    em 60 caracteres pela grade do Mediador) — a relação de sindicatos é a cadastrada pelo escritório."""
+    if not sind or not sind.get("id") or sind.get("tipo"):
+        return
+    for pos, pt in enumerate(dados.get("partes") or []):
         cnpj = _re.sub(r"\D", "", pt.get("cnpj") or "")
-        if len(cnpj) != 14:
-            continue
-        tipo = inferir_tipo(pt.get("nome"), pos)
-        if sind and sind.get("cnpj") == cnpj:
-            if not sind.get("tipo"):
-                sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"tipo": tipo, "tipo_origem": "cct"})
-                sind["tipo"] = tipo
-                log(f"  tipo do sindicato definido pela CCT: {tipo}")
-            continue
-        ex = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "cnpj": f"eq.{cnpj}", "select": "id,tipo"})
-        if ex:
-            if not ex[0].get("tipo"):
-                sb_patch("cct_sindicatos", {"id": f"eq.{ex[0]['id']}"}, {"tipo": tipo, "tipo_origem": "cct"})
-        else:
-            try:
-                sb_insert("cct_sindicatos", {"tenant_id": tenant, "cnpj": cnpj, "nome": (pt.get("nome") or "")[:200], "tipo": tipo, "tipo_origem": "cct",
-                                             "monitorar": False, "observacoes": f"cadastrado automaticamente como parte da {dados['metadados'].get('numero_registro')}"})
-                log(f"  parte cadastrada (sem monitorar): {pt.get('nome')} [{tipo}]")
-            except Exception as e:
-                log(f"  !! parte: {e}")
+        if len(cnpj) == 14 and sind.get("cnpj") == cnpj:
+            tipo = inferir_tipo(pt.get("nome"), pos)
+            sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"tipo": tipo, "tipo_origem": "cct"})
+            sind["tipo"] = tipo
+            log(f"  tipo do sindicato definido pela CCT: {tipo}")
+            return
 
 
 # ---------------------------------------------------------------- análise (seções 44-61)
@@ -618,6 +615,198 @@ def html_impacto(tenant, instrumento_id, empresa_id=None):
         return ""
 
 
+# ---------------------------------------------------------------- v0.18.1: responsável pela empresa (nome + e-mail) nos e-mails
+_NOMES = {}
+
+
+def nome_por_email(tenant, email):
+    """Nome do usuário responsável a partir do e-mail (cct_acessos → resc_colaboradores). Sem cadastro: só o e-mail."""
+    e = (email or "").strip().lower()
+    if not e:
+        return None
+    if e in _NOMES:
+        return _NOMES[e]
+    nome = None
+    for tab, campo in (("cct_acessos", "nome"), ("resc_colaboradores", "nome")):
+        try:
+            rows = sb_get(tab, {"tenant_id": f"eq.{tenant}", "email": f"ilike.{e}", "select": campo, "limit": "1"})
+            if rows and (rows[0].get(campo) or "").strip():
+                nome = rows[0][campo].strip()
+                break
+        except Exception as ex:
+            log(f"  !! nome do responsável ({tab}): {ex}")
+    _NOMES[e] = nome
+    return nome
+
+
+def responsavel_txt(tenant, email):
+    """'Nome (e-mail)' ou só o e-mail; None sem responsável."""
+    if not email:
+        return None
+    n = nome_por_email(tenant, email)
+    return f"{n} ({email})" if n else email
+
+
+# ---------------------------------------------------------------- v0.18.1: reconsulta à Receita Federal e avisos de alteração cadastral
+CAMPOS_RFB = {"sindicato": [("nome", "Nome"), ("uf", "UF"), ("municipio", "Município"), ("cnae", "CNAE"), ("situacao_cadastral", "Situação")],
+              "empresa": [("razao_social", "Razão social"), ("uf", "UF"), ("municipio", "Município"), ("cnae", "CNAE"), ("cnae_descricao", "Descrição do CNAE"), ("situacao_cadastral", "Situação")]}
+
+
+def _fmt_cnae(c):
+    d = _re.sub(r"\D", "", str(c or ""))
+    return f"{d[:4]}-{d[4]}/{d[5:]}" if len(d) == 7 else str(c or "")
+
+
+def _titulo(t):
+    return _re.sub(r"(^|\s)(\S)", lambda m: m.group(1) + m.group(2).upper(), (t or "").lower())
+
+
+def consultar_cnpj(cnpj):
+    """Mesmas fontes e o mesmo mapeamento do app (BrasilAPI, reserva Minha Receita)."""
+    fontes = [("BrasilAPI", f"https://brasilapi.com.br/api/cnpj/v1/{cnpj}"), ("Minha Receita", f"https://minhareceita.org/{cnpj}")]
+    ultimo = ""
+    for nome, url in fontes:
+        try:
+            r = requests.get(url, timeout=15, headers={"User-Agent": "Artecon-CCT-Monitor"})
+            if r.status_code != 200:
+                ultimo = f"{nome}: HTTP {r.status_code}"; continue
+            d = r.json()
+            if not d.get("razao_social"):
+                ultimo = f"{nome}: sem razão social"; continue
+            return {"razao": d.get("razao_social"), "uf": d.get("uf"), "municipio": d.get("municipio"), "cnae": d.get("cnae_fiscal"),
+                    "cnae_descricao": d.get("cnae_fiscal_descricao"), "situacao": d.get("descricao_situacao_cadastral"), "fonte": nome}
+        except Exception as e:
+            ultimo = f"{nome}: {type(e).__name__}: {e}"[:200]
+    raise RuntimeError("Consulta à Receita não concluída — " + ultimo)
+
+
+def reconsultar_receita(tenant, cfg, maximo=40, limite_s=None):
+    """cct_config.receita_reconsulta_dias > 0: reconsulta os sindicatos (cadastrados pelo escritório, receita_em não nulo)
+    e as empresas ativas cuja última consulta tem mais de N dias — os mais antigos primeiro, até `maximo` por execução.
+    Cada mudança é gravada no cadastro, em cct_alteracoes_cadastrais (origem 'robo') e enfileira o aviso CADASTRO_ALTERADO."""
+    dias = int(cfg.get("receita_reconsulta_dias") or 0)
+    if dias <= 0:
+        return 0, 0
+    corte = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat()
+    fila = []
+    try:
+        for s in sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "receita_em": f"lt.{corte}",
+                                            "select": "id,cnpj,nome,uf,municipio,cnae,situacao_cadastral,responsavel_email,receita_em", "order": "receita_em.asc", "limit": str(maximo)}):
+            fila.append(("sindicato", "cct_sindicatos", s))
+        for e in sb_get("cct_empresas", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "or": f"(receita_em.is.null,receita_em.lt.{corte})",
+                                          "select": "id,cnpj,razao_social,uf,municipio,cnae,cnae_descricao,situacao_cadastral,responsavel_email,receita_em", "order": "receita_em.asc.nullsfirst", "limit": str(maximo)}):
+            fila.append(("empresa", "cct_empresas", e))
+    except Exception as e:
+        log(f"  !! reconsulta Receita (fila): {e}"); return 0, 0
+    fila.sort(key=lambda x: x[2].get("receita_em") or "")
+    fila = fila[:maximo]
+    if not fila:
+        return 0, 0
+    log(f"Receita: reconsultando {len(fila)} cadastro(s) com consulta anterior a {dias} dia(s)")
+    ini, consultados, alterados = time.time(), 0, 0
+    for entidade, tab, x in fila:
+        if limite_s and time.time() - ini > limite_s:
+            log("  reconsulta Receita: tempo esgotado — o restante fica para a próxima execução"); break
+        cnpj = _re.sub(r"\D", "", x.get("cnpj") or "")
+        if len(cnpj) != 14:
+            continue
+        try:
+            d = consultar_cnpj(cnpj)
+        except Exception as e:
+            log(f"  !! Receita {cnpj}: {e}")
+            continue
+        consultados += 1
+        novo = {"uf": d.get("uf") or None, "municipio": _titulo(d.get("municipio")) or None, "cnae": _fmt_cnae(d.get("cnae")) or None,
+                "situacao_cadastral": d.get("situacao") or None, "receita_em": datetime.now(timezone.utc).isoformat()}
+        if entidade == "sindicato":
+            novo["nome"] = d["razao"]
+        else:
+            novo["razao_social"] = d["razao"]; novo["cnae_descricao"] = d.get("cnae_descricao") or None
+        difs = [(c, r, x.get(c), novo.get(c)) for c, r in CAMPOS_RFB[entidade] if str(x.get(c) if x.get(c) is not None else "").strip() != str(novo.get(c) if novo.get(c) is not None else "").strip()]
+        try:
+            sb_patch(tab, {"id": f"eq.{x['id']}"}, novo)
+        except Exception as e:
+            log(f"  !! gravar Receita {cnpj}: {e}"); continue
+        if difs:
+            alterados += 1
+            try:
+                sb_insert("cct_alteracoes_cadastrais", [{"tenant_id": tenant, "entidade": entidade, "entidade_id": x["id"], "cnpj": cnpj, "nome": d["razao"], "campo": c,
+                                                         "valor_antes": None if a is None else str(a), "valor_depois": None if b is None else str(b), "origem": "robo", "detectado_por": "robô"} for c, _, a, b in difs])
+            except Exception as e:
+                log(f"  !! cct_alteracoes_cadastrais: {e}")
+            try:
+                sb_insert("cct_notificacoes", {"tenant_id": tenant, "tipo": "CADASTRO_ALTERADO", "destinatarios": [x["responsavel_email"]] if x.get("responsavel_email") else [],
+                                               "assunto": f"Alteração cadastral na Receita — {d['razao']}", "status": "PENDENTE", "tentativas": 0,
+                                               "detalhes": {"entidade": entidade, "entidade_id": x["id"], "cnpj": cnpj, "nome": d["razao"], "origem": "robo",
+                                                            "alteracoes": [{"campo": r, "antes": a, "depois": b} for _, r, a, b in difs]}})
+            except Exception as e:
+                log(f"  !! enfileirar CADASTRO_ALTERADO: {e}")
+            log(f"  Receita: {d['razao']} — {len(difs)} campo(s) alterado(s): " + ", ".join(r for _, r, _, _ in difs))
+        time.sleep(0.5)
+    log(f"Receita: {consultados} consultado(s), {alterados} com alteração")
+    return consultados, alterados
+
+
+def processar_cadastro_alterado(tenant):
+    """Envia os avisos CADASTRO_ALTERADO pendentes (enfileirados pelo botão do app ou pela reconsulta do robô).
+    Destinatário: o responsável do sindicato/empresa; sem responsável, os e-mails de erros críticos e gerentes."""
+    try:
+        pend = sb_get("cct_notificacoes", {"tenant_id": f"eq.{tenant}", "tipo": "eq.CADASTRO_ALTERADO", "status": "eq.PENDENTE", "select": "id,destinatarios,assunto,detalhes", "order": "created_at.asc", "limit": "100"})
+    except Exception:
+        try:
+            pend = sb_get("cct_notificacoes", {"tenant_id": f"eq.{tenant}", "tipo": "eq.CADASTRO_ALTERADO", "status": "eq.PENDENTE", "select": "id,destinatarios,assunto,detalhes", "limit": "100"})
+        except Exception as e:
+            log(f"  !! avisos de alteração cadastral: {e}"); return 0
+    if not pend:
+        return 0
+    enviados = 0
+    for n in pend:
+        det = n.get("detalhes") or {}
+        dest = [d for d in (n.get("destinatarios") or []) if d]
+        fallback = not dest
+        if fallback:
+            try:
+                dest = [g for g in sb_rpc("cct_emails_erros_criticos", {"p_tenant": tenant}) if g]
+            except Exception:
+                try:
+                    dest = [g for g in sb_rpc("cct_emails_gerentes", {"p_tenant": tenant}) if g]
+                except Exception as e:
+                    log(f"  !! gerentes: {e}")
+        ent = "Sindicato" if det.get("entidade") == "sindicato" else "Empresa"
+        TDs = 'style="padding:8px 12px;border-top:1px solid #eef1f4"'
+        linhas = "".join(f'<tr><td {TDs}><b>{a.get("campo")}</b></td><td {TDs} style="padding:8px 12px;border-top:1px solid #eef1f4;color:#7a8894">{a.get("antes") or "—"}</td><td {TDs}><b>{a.get("depois") or "—"}</b></td></tr>' for a in det.get("alteracoes") or [])
+        corpo = bloco_chave([(ent, det.get("nome")), ("CNPJ", _fmt_cnpj(det.get("cnpj"))), ("Detectado por", "robô (reconsulta automática)" if det.get("origem") == "robo" else "atualização pelo aplicativo"),
+                             ("Responsável", responsavel_txt(tenant, (n.get("destinatarios") or [None])[0]) if not fallback else "não cadastrado — aviso enviado aos gerentes")])
+        corpo += h2_email("O que mudou na Receita Federal")
+        corpo += ('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0;font-size:13px;border:1px solid #e6ebf0;border-radius:12px;overflow:hidden">'
+                  '<tr style="background:#f4f6f8"><th align="left" style="padding:8px 12px;font-size:11px;color:#48586a;text-transform:uppercase">Campo</th><th align="left" style="padding:8px 12px;font-size:11px;color:#48586a;text-transform:uppercase">Antes</th><th align="left" style="padding:8px 12px;font-size:11px;color:#48586a;text-transform:uppercase">Depois</th></tr>'
+                  + linhas + "</table>")
+        corpo += '<p style="margin:12px 0 0;font-size:13px">O cadastro no CCT Monitor já foi atualizado com os dados novos. Confira o enquadramento sindical se a razão social, o CNAE ou o município mudaram; situação cadastral diferente de ATIVA merece atenção do DP.</p>'
+        assunto = "Artecon · CCT Monitor — " + (n.get("assunto") or f"Alteração cadastral na Receita — {det.get('nome')}")
+        st, erro, efetivos = enviar_email(dest, assunto, html_padrao("Alteração cadastral na Receita Federal", corpo, "CCT Monitor · Dados cadastrais", [("Ver alterações cadastrais", APP_URL)]))
+        if not dest:
+            st, erro = "NAO_ENVIADA", "sem responsável e sem gerente/e-mail de erros críticos configurado"
+        try:
+            sb_patch("cct_notificacoes", {"id": f"eq.{n['id']}"}, {"status": st, "erro": erro, "tentativas": 1, "destinatarios": efetivos or dest, "assunto": assunto,
+                                                                  "enviada_em": datetime.now(timezone.utc).isoformat() if st == "ENVIADA" else None})
+        except Exception as e:
+            log(f"  !! gravar aviso cadastral: {e}")
+        if st == "ENVIADA":
+            enviados += 1
+            try:
+                sb_patch("cct_alteracoes_cadastrais", {"tenant_id": f"eq.{tenant}", "entidade_id": f"eq.{det.get('entidade_id')}", "notificado_em": "is.null"},
+                         {"notificado_em": datetime.now(timezone.utc).isoformat()})
+            except Exception as e:
+                log(f"  !! marcar alteração notificada: {e}")
+        log(f"  AVISO CADASTRAL {det.get('nome')} → {', '.join(efetivos or dest) or '-'}: {st} {erro or ''}")
+    return enviados
+
+
+def _fmt_cnpj(c):
+    d = _re.sub(r"\D", "", str(c or ""))
+    return f"{d[:2]}.{d[2:5]}.{d[5:8]}/{d[8:12]}-{d[12:]}" if len(d) == 14 else str(c or "")
+
+
 def processar_ciencias(tenant):
     """Rotina diária: lembretes dentro do prazo e escalonamento ao gerente após o prazo (seções 36-39)."""
     cfg = config(tenant)
@@ -634,8 +823,12 @@ def processar_ciencias(tenant):
         ja_hoje = (c.get("ultimo_lembrete") or "")[:10] == hoje
         dest_resp = [c["responsavel_email"]] if c.get("responsavel_email") else []
         dest_ger = [c["gerente_email"]] if c.get("gerente_email") else []
+        # v0.18.1: o e-mail informa o usuário responsável pela empresa (nome e e-mail); sem empresa, o responsável pelo sindicato
+        resp_txt = responsavel_txt(tenant, c.get("responsavel_email"))
+        rotulo_resp = "Responsável pela empresa" if c.get("empresa") else "Responsável pelo sindicato"
         pares = [("Convenção", f"{c['tipo_instrumento']} {c['numero_registro']}"), ("Sindicato", c.get("sindicato")), ("Empresa", c.get("empresa")),
-                 ("Vigência", f"{fmt_br(c.get('vigencia_inicio'))} a {fmt_br(c.get('vigencia_fim'))}"), ("Responsável", c.get("responsavel_email"))]
+                 ("Vigência", f"{fmt_br(c.get('vigencia_inicio'))} a {fmt_br(c.get('vigencia_fim'))}"), (rotulo_resp, resp_txt or "não cadastrado"),
+                 ("Gerente", responsavel_txt(tenant, c.get("gerente_email")) if c.get("gerente_email") else None)]
         cab = bloco_chave(pares, ("Prazo para ciência", fmt_br(c.get("prazo")), c["situacao"].replace("_", " ").lower() if c.get("situacao") else ""))
         botoes = [("Registrar ciência", APP_URL), ("Ver convenção completa", APP_URL)]
         if c["status"] == "PENDENTE" and dest_resp:
@@ -647,7 +840,7 @@ def processar_ciencias(tenant):
             continue
         if c["situacao"] == "ATRASADA" and cfg.get("escalonar_apos_prazo", True) and c["status"] != "ESCALONADO":
             st = notificar_para(tenant, "ESCALONAMENTO", f"Artecon · CCT Monitor — Ciência pendente com prazo vencido · {alvo} · {c['numero_registro']}",
-                                html_padrao("Ciência pendente — prazo vencido", cab + f'<p style="color:#c0392b"><b>O responsável ainda não registrou ciência</b> ({c["dias_atraso"]} dia(s) de atraso). Este aviso foi escalonado ao gerente.</p>',
+                                html_padrao("Ciência pendente — prazo vencido", cab + f'<p style="color:#c0392b"><b>{("O " + rotulo_resp.lower() + ", " + resp_txt + ",") if resp_txt else "O responsável"} ainda não registrou ciência</b> ({c["dias_atraso"]} dia(s) de atraso). Este aviso foi escalonado ao gerente.</p>',
                                             "CCT Monitor · Escalonamento ao gerente", botoes), dest_ger + dest_resp, ciencia_id=c["id"], pronto=True)
             sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"status": "ESCALONADO", "escalonado_em": datetime.now(timezone.utc).isoformat(),
                                                               "lembretes": c["lembretes"] + 1, "ultimo_lembrete": datetime.now(timezone.utc).isoformat()})
@@ -944,8 +1137,15 @@ def processar_retentativas(tenant, cfg, page, existentes, limite_s):
 
 
 def modo_complementar(tenant, cfg, motivo):
-    """Disparo sem consulta devida (fora do horário / fim de semana): retentativas + fila de IA + testes de e-mail."""
+    """Disparo sem consulta devida (fora do horário / fim de semana): retentativas + fila de IA + testes de e-mail
+    + (v0.18.1) reconsulta à Receita e avisos de alteração cadastral."""
     processar_testes_email(tenant)
+    rfb = (0, 0)
+    try:
+        rfb = reconsultar_receita(tenant, cfg, maximo=40, limite_s=4 * 60)
+        processar_cadastro_alterado(tenant)
+    except Exception as e:
+        log(f"  !! dados cadastrais (Receita): {e}\n{traceback.format_exc()}")
     n_ia = 0
     devidos, _, _ = fila_retentativa(tenant, cfg)
     ret = (0, 0, 0)
@@ -967,8 +1167,10 @@ def modo_complementar(tenant, cfg, motivo):
         partes.append(f"retentativa: {ret[0]} sindicato(s), {ret[1]} resolvido(s), {ret[2]} crítico(s)")
     if n_ia:
         partes.append(f"IA: {n_ia} parecer(es)")
+    if rfb[0]:
+        partes.append(f"Receita: {rfb[0]} reconsultado(s), {rfb[1]} alterado(s)")
     encerrar_execucao("SEM_CONSULTA", motivo + (" · " + "; ".join(partes) if partes else ""),
-                      {"retentativa": {"tentados": ret[0], "resolvidos": ret[1], "escalados": ret[2]}, "ia_pareceres": n_ia,
+                      {"retentativa": {"tentados": ret[0], "resolvidos": ret[1], "escalados": ret[2]}, "ia_pareceres": n_ia, "receita": {"consultados": rfb[0], "alterados": rfb[1]},
                        "ia_chave_presente": bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())})
 
 
@@ -1039,6 +1241,14 @@ def main():
         MAIL_DESTINO_UNICO = cfg_dest
         log(f"MODO TESTE de e-mail ativo (configurado no app): tudo vai para {cfg_dest}")
     processar_testes_email(tenant)
+    # v0.18.1: reconsulta à Receita (cadastros com consulta antiga) e envio dos avisos de alteração cadastral
+    try:
+        resumo_rfb = reconsultar_receita(tenant, cfg0, maximo=40, limite_s=4 * 60)
+        processar_cadastro_alterado(tenant)
+    except Exception as e:
+        resumo_rfb = (0, 0)
+        log(f"  !! dados cadastrais (Receita): {e}\n{traceback.format_exc()}")
+        incidente(tenant, "APLICATIVO:receita", "APLICATIVO", "ATENCAO", f"Reconsulta à Receita/avisos cadastrais falharam nesta execução: {e}")
     if cfg0.get("historico_automatico"):
         try:
             n = sb_rpc("cct_enfileirar_historico", {"p_tenant": tenant})
@@ -1146,6 +1356,7 @@ def main():
         resultado, motivo = "COM_ALERTAS", f"{alertas} consulta(s) com alerta"
     else:
         resultado, motivo = "SUCESSO", None
+    resumo["receita"] = {"consultados": resumo_rfb[0], "alterados": resumo_rfb[1]}
     encerrar_execucao(resultado, motivo, {"sindicatos_previstos": previstos, "sindicatos_processados": processados, "novos": resumo["novos"],
                                           "alertas": alertas, "erros": erros, "historico": resumo.get("historico"), "detalhes": resumo,
                                           "ia_pareceres": resumo.get("ia_pareceres"), "ia_chave_presente": bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())})
