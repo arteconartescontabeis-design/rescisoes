@@ -4,14 +4,14 @@
 -- Mostra, por CNPJ, cada cadastro, quantos vínculos/ciências/acessos apontam para ele e qual será MANTIDO
 -- pelo setup_cct_v0.18.2.sql (Receita consultada > mais referências > mais antigo). Não altera nada.
 with e as (
-  select 'empresa' tipo, e.id, e.tenant_id, e.cnpj, e.razao_social nome, e.ativo, e.receita_em,
+  select 'empresa' tipo, e.id, e.tenant_id, regexp_replace(e.cnpj, '\D', '', 'g') cnpj, e.razao_social nome, e.ativo, e.receita_em,
          (select count(*) from cct_empresa_sindicato x where x.empresa_id = e.id) vinculos,
          (select count(*) from cct_ciencias x where x.empresa_id = e.id) ciencias,
          (select count(*) from cct_acessos x where x.empresa_id = e.id) acessos,
          (select count(*) from cct_instrumentos x where x.empresa_id = e.id) convencoes
     from cct_empresas e where e.cnpj is not null
   union all
-  select 'sindicato', s.id, s.tenant_id, s.cnpj, s.nome, s.ativo, s.receita_em,
+  select 'sindicato', s.id, s.tenant_id, regexp_replace(s.cnpj, '\D', '', 'g'), s.nome, s.ativo, s.receita_em,
          (select count(*) from cct_empresa_sindicato x where x.sindicato_id = s.id),
          (select count(*) from cct_ciencias x where x.sindicato_id = s.id),
          0,

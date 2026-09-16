@@ -10,6 +10,7 @@
 --    - os duplicados são então excluídos. Nada de convenção ou ciência se perde.
 -- 2) Proíbe daqui em diante dois cadastros com o mesmo CNPJ (empresas e sindicatos):
 --    índice único por (tenant_id, cnpj) + gatilho com mensagem em português ("CNPJ já cadastrado: …") que o app exibe.
+-- Compara o CNPJ só pelos dígitos (a mesma regra do app) e corrige CNPJs gravados com pontuação.
 -- Antes de executar, rode a PRÉVIA (sql/duplicados_previa.sql) para ver o que será mantido e o que será excluído.
 -- Executar no SQL Editor do Supabase DEPOIS do setup_cct_v0.18.1.sql.
 -- ============================================================================
@@ -45,7 +46,9 @@ begin
   end if;
   select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = p_tabela and column_name = 'created_at') into v_tem_ts;
 
-  for g in execute format('select tenant_id, cnpj from %I where cnpj is not null group by tenant_id, cnpj having count(*) > 1', p_tabela) loop
+  -- v0.18.2b: normaliza o CNPJ (só dígitos) antes de comparar — o app compara assim
+  execute format('update %I set cnpj = regexp_replace(cnpj, ''\D'', '''', ''g'') where cnpj is not null and cnpj <> regexp_replace(cnpj, ''\D'', '''', ''g'')', p_tabela);
+  for g in execute format('select tenant_id, cnpj from %I where cnpj is not null and cnpj <> '''' group by tenant_id, cnpj having count(*) > 1', p_tabela) loop
     -- referências a cada candidato (contadas por todas as FKs que apontam para a tabela)
     execute format($q$
       select t.id from %I t
