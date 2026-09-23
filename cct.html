@@ -248,6 +248,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.18.4</td><td>23/09/2026</td><td><b>Segurança: novo usuário criado pela função protegida.</b> O botão Criar usuário deixa de usar o cadastro público do Supabase e passa a chamar a Edge Function <code>artecon-criar-login</code>, que só aceita administrador, só deixa superadministrador criar superadministrador, exige e-mail @artecon.cnt.br para a equipe e cria o login já confirmado. Com isso o cadastro público ("Allow new users to sign up") pode ficar desligado. Mesma mudança no Rescisões Pro v13.6.0.</td></tr>
           <tr><td>v0.18.3</td><td>16/09/2026</td><td><b>Duplicidade só pelo CNPJ.</b> Empresas ou sindicatos com o mesmo nome e CNPJ diferente (matriz e filiais) deixam de ser apontados como duplicados — some a marca "duplicado (nome)", a opção "mesmo nome" do filtro e a contagem no aviso; a marca "CNPJ duplicado" e o filtro "mesmo CNPJ" continuam. Só <code>cct.html</code>.</td></tr>
           <tr><td>v0.18.2</td><td>16/09/2026</td><td><b>Um CNPJ, um cadastro.</b> O banco passa a <b>proibir</b> duas empresas ou dois sindicatos com o mesmo CNPJ no escritório (índice único + gatilho com a mensagem "CNPJ já cadastrado: …"); o app confere antes de gravar e, se o CNPJ já existe, abre o cadastro existente em vez de criar outro. <b>Empresas duplicadas excluídas</b> pelo <code>setup_cct_v0.18.2.sql</code>: de cada CNPJ repetido fica um cadastro (o que passou pela Receita, depois o com mais vínculos/ciências/acessos, depois o mais antigo) e todos os vínculos, ciências, acessos de cliente, convenções e alterações cadastrais dos duplicados são reapontados para ele — nada se perde; prévia em <code>duplicados_previa.sql</code>. Só banco e <code>cct.html</code>.</td></tr>
           <tr><td>v0.18.1</td><td>16/09/2026</td><td><b>Usuários → Redefinir senha dentro do aplicativo.</b> O administrador define a nova senha de qualquer usuário na própria tela (o e-mail de recuperação foi retirado): função com privilégio <code>cct_redefinir_senha</code> — só administrador/superadministrador, usuário do mesmo escritório, senha de superadministrador só por ele mesmo, mínimo 8 caracteres; as sessões abertas do usuário são encerradas e a ação fica no Histórico de alterações. <b>E-mails de convenção com o responsável:</b> o aviso de nova convenção, o lembrete e o escalonamento passam a informar o <b>usuário responsável pela empresa</b> (nome e e-mail, pelo cadastro de usuários) e o gerente; no escalonamento, o texto nomeia quem não registrou a ciência. <b>Robô (pendências da v0.18.0):</b> reconsulta automática à Receita a cada N dias (até 40 cadastros por disparo, inclusive nos disparos sem consulta), envio dos avisos de alteração cadastral (ao responsável; sem responsável, aos e-mails de erros críticos/gerentes) com a marcação "enviado" em Sistema → Alterações cadastrais, e o robô <b>deixa de cadastrar as demais partes</b> das convenções como sindicatos (fim dos nomes cortados em 60 caracteres) — só define laboral/patronal do sindicato monitorado. Banco <code>setup_cct_v0.18.1.sql</code>; robô <code>monitor_cct.py</code>.</td></tr>
@@ -390,7 +391,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.18.3" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.18.4" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
@@ -1018,13 +1019,14 @@ async function salvarUsu() {
   if (!nome || !email.includes("@") || senha.length < 8) return msg("Informe nome, e-mail válido e senha com 8+ caracteres.", "erro");
   try {
     // 1) conta de login (não troca a sessão do admin: o token retornado é ignorado)
-    const r = await fetch(CONFIG.url + "/auth/v1/signup", { method:"POST", headers:{ apikey: CONFIG.key, "Content-Type":"application/json" }, body: JSON.stringify({ email, password: senha, data: { nome, papel } }) });
+    // v0.18.4: login criado pela Edge Function protegida artecon-criar-login (só administrador; nasce confirmado).
+    // A rota pública de cadastro não é mais usada — o cadastro público do Supabase pode ficar DESLIGADO.
+    const r = await fetch(CONFIG.url + "/functions/v1/artecon-criar-login", { method:"POST", headers:{ apikey: CONFIG.key, Authorization: "Bearer " + APP.token, "Content-Type":"application/json" }, body: JSON.stringify({ nome, email, senha, papel }) });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) { let m = d.error_description || d.msg || d.error || d.message || ("Erro " + r.status);
-      if (/signups? not allowed/i.test(m)) m = "Cadastro de novos usuários está desativado no Supabase (Auth → Providers → Email → desmarque \"Disable signups\").";
-      if (/already/i.test(m)) m = "Este e-mail já possui login."; throw new Error(m); }
-    if (d.user && Array.isArray(d.user.identities) && d.user.identities.length === 0) throw new Error("Este e-mail já possui login.");
-    const uid = (d.user && d.user.id) || d.id; if (!uid) throw new Error("Login criado, mas sem ID retornado.");
+    if (r.status === 404) throw new Error("Função artecon-criar-login não encontrada no Supabase — publique a Edge Function antes de usar esta versão.");
+    if (r.status === 401) throw new Error("Sessão expirada. Saia e entre novamente.");
+    if (!r.ok) throw new Error(d.error || ("Erro " + r.status));
+    const uid = d.id; if (!uid) throw new Error("Login criado, mas sem ID retornado.");
     if (papel === "empresa") {
       const emps = [...document.querySelectorAll("#uEmps input:checked")].map(i => i.dataset.eid);
       if (!emps.length) throw new Error("Marque ao menos uma empresa para o acesso de cliente.");
