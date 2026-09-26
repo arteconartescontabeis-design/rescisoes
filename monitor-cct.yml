@@ -1,0 +1,97 @@
+name: CCT Monitor - consulta diaria
+
+on:
+  schedule:
+    - cron: "5 * * * *"        # de hora em hora, 24h, todos os dias; o robo so consulta nas horas (e dias uteis) configuradas no app
+  workflow_dispatch:
+    inputs:
+      apenas_cnpj:
+        description: "Rodar so para um CNPJ de sindicato (opcional)"
+        required: false
+        default: ""
+      forcar:
+        description: "Executar agora, ignorando os horarios configurados"
+        required: false
+        default: "true"
+      teste_email:
+        description: "So testar o e-mail: informe um endereco e nada mais e executado"
+        required: false
+        default: ""
+      so_analise:
+        description: "So pareceres por IA pendentes, sem consultar o Mediador (usado pelo botao Analisar com IA do app)"
+        required: false
+        default: "false"
+
+concurrency:
+  group: cct-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  monitorar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120        # v0.18.5: 45 min cancelava a rodada completa (72 sindicatos + IA + histórico) e ela ficava INTERROMPIDA
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: pip install playwright requests beautifulsoup4 lxml
+      - name: Instalar navegador (dispensado na analise sob demanda)
+        if: inputs.so_analise != 'true'
+        run: |
+          playwright install --with-deps chromium
+          sudo apt-get install -y xvfb
+      - name: Abrir execucao (registro independente do robo)
+        id: abrir
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          ID=$(curl -sS -X POST "$SUPABASE_URL/rest/v1/rpc/cct_execucao_iniciar" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" -H "Content-Type: application/json" \
+            -d '{"p_cnpj":"79876769000128","p_run_id":"${{ github.run_id }}","p_run_url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","p_origem":"github-actions"}' | tr -d '"')
+          echo "execucao_id=$ID" >> "$GITHUB_OUTPUT"
+          echo "execucao aberta: $ID"
+      - name: Executar robo
+        id: robo
+        working-directory: robo
+        env:
+          EXECUCAO_ID: ${{ steps.abrir.outputs.execucao_id }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TENANT_CNPJ: "79876769000128"
+          MAIL_API_KEY: ${{ secrets.MAIL_API_KEY }}
+          MAIL_DESTINO_UNICO: ${{ secrets.MAIL_DESTINO_UNICO }}
+          TESTE_EMAIL: ${{ inputs.teste_email }}
+          FORCAR: ${{ inputs.forcar }}
+          SO_ANALISE: ${{ inputs.so_analise }}
+          APENAS_CNPJ: ${{ inputs.apenas_cnpj }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ORIGEM: github-actions
+          ORCAMENTO_MIN: "112"      # v0.18.5: orçamento do robô = timeout-minutes menos margem para instalar/encerrar
+        run: |
+          if [ "$SO_ANALISE" = "true" ]; then python monitor_cct.py; else xvfb-run -a python monitor_cct.py; fi
+      - name: Encerrar execucao se o robo nao encerrou (sempre roda)
+        if: always() && steps.abrir.outputs.execucao_id != ''
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          # so tem efeito se a execucao ainda estiver EM_EXECUCAO (o robo caiu antes de registrar o fim)
+          curl -sS -X POST "$SUPABASE_URL/rest/v1/rpc/cct_execucao_encerrar" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" -H "Content-Type: application/json" \
+            -d '{"p_id":"${{ steps.abrir.outputs.execucao_id }}","p_resultado":"INTERROMPIDA","p_motivo":"o processo do robo terminou (${{ steps.robo.outcome }}) sem registrar o fim — ver log desta execucao"}'
+      - name: Guardar log e extratos da execucao
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cct-monitor-${{ github.run_number }}
+          path: |
+            robo/resumo_execucao.json
+            robo/extrato_*.doc
+          if-no-files-found: ignore
+          retention-days: 30

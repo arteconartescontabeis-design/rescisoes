@@ -161,7 +161,7 @@
       <div class="card"><div class="topo"><h2>Convenções e Termos Aditivos</h2><div style="display:flex;gap:6px;flex-wrap:wrap"><input id="fInst" placeholder="buscar…" style="width:180px" oninput="renderInst()">
         <select id="fiTipo" onchange="renderInst()" style="width:170px"><option value="">Tipo: todos</option></select><select id="fiSind" onchange="renderInst()" style="width:220px"><option value="">Sindicato: todos</option></select>
         <select id="fiCat" onchange="renderInst()" style="width:200px"><option value="">Categoria: todas</option></select><select id="fiImp" onchange="renderInst()" style="width:170px"><option value="">Importação: todas</option><option value="IMPORTADO">Importado</option><option value="IMPORTACAO_NAO_CONCLUIDA">Não concluída</option></select>
-        <select id="fiOri" onchange="renderInst()" style="width:150px"><option value="">Origem: todas</option><option value="monitoramento">Monitoramento</option><option value="historico">Histórico</option></select><select id="fiVig" onchange="renderInst()" style="width:150px"><option value="">Vigência: todas</option><option value="vigente">Vigentes</option><option value="vencida">Vencidas</option></select><span style="display:inline-flex;gap:4px;align-items:center;font-size:12px;color:var(--text-3)">Registro MTE de <input id="fiRegDe" type="date" onchange="renderInst()" style="width:140px"> até <input id="fiRegAte" type="date" onchange="renderInst()" style="width:140px"></span></div></div><div id="tabInst"></div></div>
+        <select id="fiOri" onchange="renderInst()" style="width:150px"><option value="">Origem: todas</option><option value="monitoramento">Monitoramento</option><option value="historico">Histórico</option></select><select id="fiVig" onchange="renderInst()" style="width:150px"><option value="">Vigência: todas</option><option value="vigente">Vigentes</option><option value="vencida">Vencidas</option><option value="sem_vig">Sem vigência informada</option></select><span style="display:inline-flex;gap:4px;align-items:center;font-size:12px;color:var(--text-3)">Registro MTE de <input id="fiRegDe" type="date" onchange="renderInst()" style="width:140px"> até <input id="fiRegAte" type="date" onchange="renderInst()" style="width:140px"></span></div></div><div id="tabInst"></div></div>
     </section>
 
     <section data-sec="altcad" style="display:none">
@@ -248,7 +248,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
-          <tr><td>v0.18.4</td><td>23/09/2026</td><td><b>Segurança: novo usuário criado pela função protegida.</b> O botão Criar usuário deixa de usar o cadastro público do Supabase e passa a chamar a Edge Function <code>artecon-criar-login</code>, que só aceita administrador, só deixa superadministrador criar superadministrador, exige e-mail @artecon.cnt.br para a equipe e cria o login já confirmado. Com isso o cadastro público ("Allow new users to sign up") pode ficar desligado. Mesma mudança no Rescisões Pro v13.6.0.</td></tr>
+          <tr><td>v0.18.5</td><td>26/09/2026</td><td><b>Correções do Relatório de Auditoria de 25–26/09/2026.</b> <b>Painel → Saúde</b> mostra o resultado da <b>última execução principal</b> do robô (sucesso, com alertas, erro parcial/total ou <b>interrompida</b>), com horário e motivo — antes só a situação pela agenda aparecia e uma execução cancelada passava despercebida. <b>Cobertura</b> aponta as <b>empresas sem responsável</b> (clique leva a Empresas já filtrado) — sem responsável e sem gerente, o escalonamento de ciência não tem para quem ir. <b>Sindicatos:</b> as colunas passam a se chamar "Consulta do dia" e "Histórico (N anos)", com explicação, para não confundir a consulta diária com a importação do histórico. <b>Módulo que falha ao recarregar:</b> a faixa informa que a tela está mostrando os dados carregados anteriormente, com o horário (dados desatualizados), em vez de exibi-los como atuais. <b>Nível de acesso:</b> se o banco não responder qual é o seu nível, o app não entra como "usuário" — mostra o erro na tela de login. <b>Convenções → filtro Vigência:</b> convenção sem data final não entra mais em "Vencidas"; nova opção "Sem vigência informada". <b>Datas:</b> "hoje" passa a ser calculado no fuso de Brasília em todas as regras (antes parte usava UTC e virava o dia às 21h). <b>PDF da convenção:</b> aviso em destaque no topo e no título de que é o extrato do Mediador <b>sem os anexos</b>. <b>Filtro de categoria</b> sem opções vazias e sem repetir a mesma categoria com maiúsculas diferentes. <b>Robô v0.18.5:</b> erro de <b>saldo/crédito da API Anthropic</b> vira um único incidente CRÍTICO "IA: sem crédito" (e-mail aos gerentes e ao e-mail de erros críticos), a fila de pareceres fica pausada por 6 h e as convenções continuam "na fila" (não são marcadas como não concluídas nem geram um incidente por convenção); orçamento de tempo lido do workflow (<code>ORCAMENTO_MIN</code>) e respeitado por todas as etapas, inclusive o histórico; categoria da convenção normalizada na importação. <b>Workflow:</b> tempo limite de 45 → 120 min (a execução de 25/09 08:23→09:08 foi cancelada pelo limite antigo). Só <code>cct.html</code>, <code>monitor_cct.py</code> e <code>monitor-cct.yml</code> — sem SQL.</td></tr>
           <tr><td>v0.18.3</td><td>16/09/2026</td><td><b>Duplicidade só pelo CNPJ.</b> Empresas ou sindicatos com o mesmo nome e CNPJ diferente (matriz e filiais) deixam de ser apontados como duplicados — some a marca "duplicado (nome)", a opção "mesmo nome" do filtro e a contagem no aviso; a marca "CNPJ duplicado" e o filtro "mesmo CNPJ" continuam. Só <code>cct.html</code>.</td></tr>
           <tr><td>v0.18.2</td><td>16/09/2026</td><td><b>Um CNPJ, um cadastro.</b> O banco passa a <b>proibir</b> duas empresas ou dois sindicatos com o mesmo CNPJ no escritório (índice único + gatilho com a mensagem "CNPJ já cadastrado: …"); o app confere antes de gravar e, se o CNPJ já existe, abre o cadastro existente em vez de criar outro. <b>Empresas duplicadas excluídas</b> pelo <code>setup_cct_v0.18.2.sql</code>: de cada CNPJ repetido fica um cadastro (o que passou pela Receita, depois o com mais vínculos/ciências/acessos, depois o mais antigo) e todos os vínculos, ciências, acessos de cliente, convenções e alterações cadastrais dos duplicados são reapontados para ele — nada se perde; prévia em <code>duplicados_previa.sql</code>. Só banco e <code>cct.html</code>.</td></tr>
           <tr><td>v0.18.1</td><td>16/09/2026</td><td><b>Usuários → Redefinir senha dentro do aplicativo.</b> O administrador define a nova senha de qualquer usuário na própria tela (o e-mail de recuperação foi retirado): função com privilégio <code>cct_redefinir_senha</code> — só administrador/superadministrador, usuário do mesmo escritório, senha de superadministrador só por ele mesmo, mínimo 8 caracteres; as sessões abertas do usuário são encerradas e a ação fica no Histórico de alterações. <b>E-mails de convenção com o responsável:</b> o aviso de nova convenção, o lembrete e o escalonamento passam a informar o <b>usuário responsável pela empresa</b> (nome e e-mail, pelo cadastro de usuários) e o gerente; no escalonamento, o texto nomeia quem não registrou a ciência. <b>Robô (pendências da v0.18.0):</b> reconsulta automática à Receita a cada N dias (até 40 cadastros por disparo, inclusive nos disparos sem consulta), envio dos avisos de alteração cadastral (ao responsável; sem responsável, aos e-mails de erros críticos/gerentes) com a marcação "enviado" em Sistema → Alterações cadastrais, e o robô <b>deixa de cadastrar as demais partes</b> das convenções como sindicatos (fim dos nomes cortados em 60 caracteres) — só define laboral/patronal do sindicato monitorado. Banco <code>setup_cct_v0.18.1.sql</code>; robô <code>monitor_cct.py</code>.</td></tr>
@@ -391,7 +391,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.18.4" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.18.5" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
@@ -399,7 +399,10 @@ const podeAdm = () => ["gerente","superadmin"].includes(APP.nivel), superadm = (
 const $ = id => document.getElementById(id);
 // v0.17.0: a cobrança de ciência só existe a partir de "Cobrar ciência a partir de" (cct_config.ciencia_inicio)
 const cienciaInicio = () => ((APP.dados.cfg || {}).ciencia_inicio || "").slice(0, 10);
-const cienciaAtiva = () => { const i = cienciaInicio(); return !i || new Date().toISOString().slice(0, 10) >= i; };
+// v0.18.5: "hoje" sempre no fuso de Brasília (toISOString era UTC e virava o dia às 21h)
+const dataBR = d => new Date(d).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+const hojeBR = () => dataBR(new Date());
+const cienciaAtiva = () => { const i = cienciaInicio(); return !i || hojeBR() >= i; };
 const ESTADOS_CIENCIA = [["Pendente", "a convenção foi importada e o responsável da empresa foi avisado; ainda está dentro do prazo (dias úteis configurados) para confirmar que tomou ciência"],
   ["Vence hoje", "pendente cujo prazo termina hoje"],
   ["Atrasada", "o prazo venceu sem confirmação; o responsável recebe lembrete diário e o gerente ainda não foi acionado"],
@@ -449,7 +452,7 @@ async function iniciar() {
   if (!tenant) { const u = await get(`resc_usuarios?select=tenant_id,papel&auth_id=eq.${APP.uid}&limit=1`); if (u.length) tenant = u[0].tenant_id; }
   if (!tenant) { $("lMsg").textContent = "Usuário sem acesso ao CCT Monitor. Peça ao gerente do escritório para cadastrá-lo."; return; }
   APP.tenantId = tenant;
-  try { APP.nivel = await api("rpc/cct_nivel", { method: "POST", body: "{}" }); } catch (e) { APP.nivel = "usuario"; }
+  try { APP.nivel = await api("rpc/cct_nivel", { method: "POST", body: "{}" }); if (!APP.nivel) throw new Error("nível vazio"); } catch (e) { $("lMsg").textContent = "Não foi possível determinar seu nível de acesso (" + erroClaro(e) + "). Tente de novo; se persistir, avise o administrador."; $("login").style.display = ""; $("app").style.display = "none"; return; }   // v0.18.5: sem nível confirmado o app não entra
   APP.admin = podeAdm();
   $("navUsuarios").style.display = APP.admin ? "flex" : "none"; $("btnLimpar").style.display = superadm() ? "inline-flex" : "none";
   $("usuario").innerHTML = esc(APP.email) + ` · <span class="badge">${NIVEIS[APP.nivel] || APP.nivel}</span>`;
@@ -490,18 +493,20 @@ const MODULOS = {
   exec: { nome: "Histórico do Robô", q: t => `cct_execucoes?tenant_id=eq.${t}&order=inicio.desc&limit=200` },
   saude: { nome: "Saúde do robô", rpc: "cct_saude_robo", um: true, padrao: null },
 };
-APP.falhas = {}; APP.logFalhas = [];
+APP.falhas = {}; APP.logFalhas = []; APP.carregadoEm = {}; APP.desatualizado = {};
 const erroClaro = e => { const m = String(e && e.message || e); if (/Failed to fetch|NetworkError|sem rede/i.test(m)) return "sem conexão com o servidor (verifique a internet)"; if (/JWT|401|expired/i.test(m)) return "sessão expirada — saia e entre de novo"; if (/permission|42501|403/i.test(m)) return "sem permissão para este módulo (nível de acesso)"; if (/does not exist|42P01|42883|404/i.test(m)) return "estrutura do banco desatualizada — execute o setup SQL desta versão"; return m.slice(0, 160); };
 async function carregarModulo(k) {
   const m = MODULOS[k], t = APP.tenantId;
   try {
     const r = m.rpc ? await api("rpc/" + m.rpc, { method: "POST", body: JSON.stringify({ p_tenant: t }) }) : await get(m.q(t));
     APP.dados[k] = m.um ? (m.rpc ? r : (r[0] || m.padrao)) : r;
+    APP.carregadoEm[k] = new Date(); delete APP.desatualizado[k];
     delete APP.falhas[k];
   } catch (e) {
     APP.falhas[k] = erroClaro(e);
     APP.logFalhas.push({ quando: new Date().toISOString(), modulo: m.nome, operacao: m.rpc ? "rpc " + m.rpc : m.q(t).split("?")[0], erro: String(e && e.message || e), tentativa: (APP.logFalhas.filter(x => x.modulo === m.nome).length + 1) });
     if (APP.dados[k] === undefined) APP.dados[k] = m.um ? (m.padrao === undefined ? null : m.padrao) : [];
+    else if (APP.carregadoEm[k]) APP.desatualizado[k] = APP.carregadoEm[k];   // v0.18.5: a tela segue com os dados anteriores — marcados como desatualizados
     console.warn("[CCT Monitor] módulo " + m.nome + " falhou:", e);
   }
 }
@@ -511,7 +516,7 @@ function renderFalhas() {
   if (!ks.length) { f.style.display = "none"; f.innerHTML = ""; return; }
   f.style.display = "block";
   f.innerHTML = `<div class="aviso" style="background:var(--amber-lt);border-color:var(--amber);margin:0 0 12px"><b>Alguns dados não carregaram</b> — o restante do aplicativo está disponível. ` +
-    ks.map(k => `<div style="margin-top:6px"><b>${esc(MODULOS[k].nome)}</b>: ${esc(APP.falhas[k])} <button class="b sec sm" onclick="tentarNovamente('${k}')">Tentar novamente</button></div>`).join("") +
+    ks.map(k => `<div style="margin-top:6px"><b>${esc(MODULOS[k].nome)}</b>: ${esc(APP.falhas[k])}${APP.desatualizado[k] ? ` — <b style="color:var(--red)">a tela está mostrando os dados carregados às ${APP.desatualizado[k].toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} (desatualizados)</b>` : " — sem dados na tela"} <button class="b sec sm" onclick="tentarNovamente('${k}')">Tentar novamente</button></div>`).join("") +
     ` <div style="margin-top:6px"><button class="b sec sm" onclick="tentarNovamente()">Tentar todos</button> <small style="color:var(--text-3)">registro das falhas: console do navegador (F12) → APP.logFalhas</small></div></div>`;
 }
 function renderTudo() {
@@ -539,8 +544,8 @@ function renderPainel() {
   const abertos = d.inc.filter(i => ["NOVO","EM_NOVA_TENTATIVA","PERSISTENTE","EM_ANALISE"].includes(i.status));
   const conf = d.conf || [], ab = c => ["PENDENTE","NOTIFICADO","ESCALONADO"].includes(c.status);
   const ultRobo = d.cons.filter(c => c.origem === "github-actions")[0], ult = d.cons[0];
-  const vig = i => i.vigencia_fim ? new Date(i.vigencia_fim + "T12:00:00") : null;
-  const vigentes = d.inst.filter(i => vig(i) && vig(i) >= hoje), novas7 = d.inst.filter(i => new Date(i.detectado_em) > dias(-7) && i.origem !== "historico");
+  const hojeS = hojeBR(), vigS = i => (i.vigencia_fim || "").slice(0, 10);   // v0.18.5: comparação por data (fuso de Brasília), sem hora
+  const vigentes = d.inst.filter(i => vigS(i) && vigS(i) >= hojeS), novas7 = d.inst.filter(i => new Date(i.detectado_em) > dias(-7) && i.origem !== "historico");
   const roboOk = ultRobo && new Date(ultRobo.executada_em) > dias(-1.5);
   const hoje_txt = hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
   $("painelTit").textContent = emp ? "Minhas convenções" : "Painel"; $("painelSub").textContent = hoje_txt.charAt(0).toUpperCase() + hoje_txt.slice(1) + " · " + APP.email + " · " + (NIVEIS[APP.nivel] || "");
@@ -559,19 +564,23 @@ function renderPainel() {
   const maxG = Math.max(1, ...diasG.map(x => x.n)), totG = diasG.reduce((a, x) => a + x.n, 0), totH = diasG.reduce((a, x) => a + x.h, 0);
   $("grafico7").innerHTML = `<div class="g7">${diasG.map(x => `<div class="b clk" onclick="event.stopPropagation();irConv({regDe:'${x.k}',regAte:'${x.k}'})" title="${x.dm}: ${x.n} convenção(ões)${x.h ? " · " + x.h + " do histórico" : ""} — clique para listar"><b>${x.n}</b><i class="${x.n ? "" : "z"}" style="height:${x.n ? Math.max(4, Math.round(x.n / maxG * 100)) : 2}%"></i><small><em>${x.rot}</em>${x.dm}</small></div>`).join("")}</div>
     <div style="font-size:12px;color:var(--text-3);margin-top:8px">${totG} no período${totH ? ` · ${totH} vieram pelo histórico automático` : ""} · contagem pela data de registro no MTE (a data em que o robô baixou aparece em "Últimas convenções detectadas")</div>`;
-  const venc = d.inst.filter(i => vig(i) && vig(i) < hoje && i.status_importacao === "IMPORTADO" && !d.inst.some(j => j.id !== i.id && j.sindicato_id === i.sindicato_id && (j.vigencia_inicio || "") > (i.vigencia_inicio || ""))).sort((a, b) => b.vigencia_fim.localeCompare(a.vigencia_fim));
+  const venc = d.inst.filter(i => vigS(i) && vigS(i) < hojeS && i.status_importacao === "IMPORTADO" && !d.inst.some(j => j.id !== i.id && j.sindicato_id === i.sindicato_id && (j.vigencia_inicio || "") > (i.vigencia_inicio || ""))).sort((a, b) => b.vigencia_fim.localeCompare(a.vigencia_fim));
   $("vencTot").innerHTML = venc.length ? `${venc.length} no total · <a href="#" onclick="verVencidas();return false">ver todas</a>` : "";
   $("vencidas").innerHTML = venc.length ? venc.slice(0, 5).map(i => `<li><span class="dt">${fmtD(i.vigencia_fim)}</span><div class="tx"><a href="#" onclick="abrirInst('${i.id}');return false">${esc(i.numero_registro)}</a> · ${esc(abrevTipo(i.tipo))} — <span title="${esc(i.sindicato?.nome || "")}">${esc(abrev(i.sindicato?.nome || "", 60))}</span><small>${esc(abrev(i.categoria || "", 90) || "categoria não informada")} · o robô avisa quando a renovação for registrada</small></div><span class="tag erro">vencida</span></li>`).join("")
     : `<li><div class="tx" style="color:var(--text-3)">Nenhuma convenção vencida sem renovação registrada.</div></li>`;
   // cobertura
-  const emps = (d.emp || []).filter(e => e.ativo), sindVig = new Set(vigentes.map(i => i.sindicato_id)), cob = emps.filter(e => (e.vinculos || []).some(v => sindVig.has(v.sindicato_id))).length, pct = emps.length ? Math.round(cob / emps.length * 100) : 0;
-  $("cobertura").innerHTML = `<div class="ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#eef1f5" stroke-width="3.5"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#1a5276" stroke-width="3.5" stroke-dasharray="${pct} 100" transform="rotate(-90 18 18)"/><text x="18" y="21" text-anchor="middle" font-size="8" font-family="DM Mono" fill="#1a2332">${pct}%</text></svg><div class="lg"><b>${cob} de ${emps.length}</b>empresas com convenção vigente${emps.length ? "" : "<br><small style='color:var(--text-3)'>cadastre as empresas para medir</small>"}${(d.emp || []).filter(e => e.ativo && !(e.vinculos || []).length).length ? `<br><small style="color:var(--amber)">${(d.emp || []).filter(e => e.ativo && !(e.vinculos || []).length).length} sem vínculo sindical</small>` : ""}</div></div>`;
+  const emps = (d.emp || []).filter(e => e.ativo), semResp = emps.filter(e => !e.responsavel_email && !e.gerente_email), sindVig = new Set(vigentes.map(i => i.sindicato_id)), cob = emps.filter(e => (e.vinculos || []).some(v => sindVig.has(v.sindicato_id))).length, pct = emps.length ? Math.round(cob / emps.length * 100) : 0;
+  $("cobertura").innerHTML = `<div class="ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#eef1f5" stroke-width="3.5"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#1a5276" stroke-width="3.5" stroke-dasharray="${pct} 100" transform="rotate(-90 18 18)"/><text x="18" y="21" text-anchor="middle" font-size="8" font-family="DM Mono" fill="#1a2332">${pct}%</text></svg><div class="lg"><b>${cob} de ${emps.length}</b>empresas com convenção vigente${emps.length ? "" : "<br><small style='color:var(--text-3)'>cadastre as empresas para medir</small>"}${(d.emp || []).filter(e => e.ativo && !(e.vinculos || []).length).length ? `<br><small style="color:var(--amber)">${(d.emp || []).filter(e => e.ativo && !(e.vinculos || []).length).length} sem vínculo sindical</small>` : ""}${semResp.length ? `<br><small style="color:var(--red)"><a href="#" onclick="event.stopPropagation();irEmp('sem');return false" style="color:var(--red)">${semResp.length} sem responsável</a> — sem responsável e sem gerente, o escalonamento de ciência não é enviado</small>` : ""}</div></div>`;
   // saúde
   $("saudeCard").style.display = emp ? "none" : "block";
   const t = (c, x) => `<span class="tag ${c}">${x}</span>`;
   const sr = d.saude, SIT = { NORMAL: ["ok","normal"], COM_ALERTAS: ["alerta","com alertas"], EXECUTANDO: ["info","executando"], AGUARDANDO: ["info","aguardando disparo"], ATRASADO: ["erro","ATRASADO"], FALHA: ["erro","FALHA na última"], SEM_AGENDA: ["cinza","sem horários"] };
   const sit = sr ? (SIT[sr.situacao] || ["cinza", sr.situacao]) : null;
-  $("saude").innerHTML = (sr ? `<div><span>Robô — situação</span>${t(sit[0], sit[1])}</div>
+  // v0.18.5: resultado da última execução PRINCIPAL (com consulta ao Mediador) — uma execução interrompida/cancelada aparece aqui mesmo com a agenda "normal"
+  const exP = (d.exec || []).find(e => e.resultado && !["SEM_CONSULTA", "EM_EXECUCAO"].includes(e.resultado));
+  const exRuim = exP && ["INTERROMPIDA", "ERRO_TOTAL"].includes(exP.resultado);
+  const linhaExec = exP ? `<div><span>Última execução principal</span><span style="text-align:right">${tagExec(exP.resultado)}<br><small style="color:var(--text-3)">${fmtDT(exP.inicio)}${exP.fim ? " → " + fmtDT(exP.fim).slice(-5) : ""}${exP.motivo ? " · " + esc(exP.motivo.slice(0, 70)) : ""}</small></span></div>` : "";
+  $("saude").innerHTML = (sr ? `<div><span>Robô — situação</span>${t(sit[0], sit[1])}${exRuim ? ' <span class="tag erro" title="a última execução principal não terminou normalmente — veja abaixo">atenção</span>' : ""}</div>${linhaExec}
     <div><span>Última prevista</span><b>${fmtDT(sr.ultima_prevista)}</b></div><div><span>Última realizada</span><b>${fmtDT(sr.ultima_realizada)}</b></div><div><span>Próxima prevista</span><b>${fmtDT(sr.proxima_prevista)}</b></div>`
     : `<div><span>Robô (06h dias úteis)</span>${roboOk ? t("ok", "executou " + fmtDT(ultRobo.executada_em)) : t("erro", ultRobo ? "atrasado · " + fmtDT(ultRobo.executada_em) : "nunca executou")}</div>`) + `
     <div><span>Mediador</span>${ult ? (ult.status === "CONSULTA_CONFIRMADA" ? t("ok", "confirmada") : ult.status === "CONSULTA_COM_ALERTA" ? t("alerta", "com alerta") : t("erro", "não concluída")) : t("cinza", "—")}</div>
@@ -586,10 +595,11 @@ function irAba(aba) { mostrar(aba); window.scrollTo({ top: 0 }); }
 function irConv(o) {
   o = o || {}; ["fInst","fiTipo","fiSind","fiCat","fiImp","fiOri","fiVig","fiRegDe","fiRegAte"].forEach(id => { if ($(id)) $(id).value = ""; });
   if (o.vig) $("fiVig").value = o.vig;
-  if (o.regDe) { if (typeof o.regDe === "number") { const x = new Date(); x.setDate(x.getDate() - (o.regDe - 1)); $("fiRegDe").value = x.toISOString().slice(0, 10); } else $("fiRegDe").value = o.regDe; }
+  if (o.regDe) { if (typeof o.regDe === "number") { const x = new Date(); x.setDate(x.getDate() - (o.regDe - 1)); $("fiRegDe").value = dataBR(x); } else $("fiRegDe").value = o.regDe; }
   if (o.regAte) $("fiRegAte").value = o.regAte;
   APP.ord = { col: "data_registro", asc: false }; renderInst(); irAba("instrumentos");
 }
+function irEmp(resp) { $("q_emp") && ($("q_emp").value = ""); renderEmp(); if (resp && $("fe_resp")) { $("fe_resp").value = resp; renderEmp(); } irAba("empresas"); }   // v0.18.5
 function irSind(mon) { $("q_sind") && ($("q_sind").value = ""); renderSind(); if (mon && $("fs_mon")) { $("fs_mon").value = mon; renderSind(); } irAba("sindicatos"); }
 // v0.17.3: cadastros duplicados — v0.18.3: SÓ pelo CNPJ (mesmo nome com CNPJ diferente é matriz/filial, não duplicidade)
 const normNome = t => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
@@ -611,8 +621,8 @@ function renderSind() {
   l = l.map(x => ({ ...x, monitora: !!(x.monitorar && x.ativo), ult_registro: (ultCct[x.id] || {}).data_registro || "" }));
   l = (APP.ords[tab] && APP.ords[tab].col) ? aplicarOrd(tab, l) : l.sort((a, b) => b.ult_registro.localeCompare(a.ult_registro) || a.nome.localeCompare(b.nome, "pt-BR"));
   const th = (t, c, cls) => thOrd(tab, t, c, fn, cls);
-  $("tabSind").innerHTML = `<div class="topo"><small style="color:var(--text-3)">Histórico: o robô importa aos poucos (${APP.dados.cfg.historico_max_por_execucao || 8} downloads por execução, com pausas) para não provocar bloqueio no Mediador. <a href="#" onclick="pedirHistoricoTodos();return false">Importar histórico de todos os monitorados</a></small></div>` + (Object.keys(dup).length ? `<div class="aviso" style="border-color:var(--red);color:var(--red)"><b>${Object.keys(dup).length} sindicato(s) com o mesmo CNPJ</b> — o banco já bloqueia novos cadastros repetidos; rode o setup_cct_v0.18.2.sql para unificar os existentes. O monitoramento conta cada cadastro separadamente.</div>` : "") + barra + contador(l.length, all.length).replace("</div>", (APP.ords[tab] && APP.ords[tab].col) ? "</div>" : " · ordem: última CCT registrada no MTE primeiro</div>") +
-    `<table><tr>${th("CNPJ","cnpj")}${th("Nome","nome")}${th("Tipo","tipo")}${th("UF","uf")}${th("Última CCT (MTE)","ult_registro")}${th("Monitorar","monitora")}${th("Última consulta","ultima_consulta")}${th("Status","ultimo_status")}${th("Histórico","historico_status")}<th></th></tr>` +
+  $("tabSind").innerHTML = `<div class="topo"><small style="color:var(--text-3)">Histórico: o robô importa aos poucos (${APP.dados.cfg.historico_max_por_execucao || 8} downloads por execução, com pausas) para não provocar bloqueio no Mediador. <a href="#" onclick="pedirHistoricoTodos();return false">Importar histórico de todos os monitorados</a> · <b>Consulta do dia</b> = resultado da consulta agendada ao Mediador (vigentes); <b>Histórico</b> = importação gradual das convenções antigas — são etapas independentes, uma pode estar confirmada e a outra em andamento ou com erro.</small></div>` + (Object.keys(dup).length ? `<div class="aviso" style="border-color:var(--red);color:var(--red)"><b>${Object.keys(dup).length} sindicato(s) com o mesmo CNPJ</b> — o banco já bloqueia novos cadastros repetidos; rode o setup_cct_v0.18.2.sql para unificar os existentes. O monitoramento conta cada cadastro separadamente.</div>` : "") + barra + contador(l.length, all.length).replace("</div>", (APP.ords[tab] && APP.ords[tab].col) ? "</div>" : " · ordem: última CCT registrada no MTE primeiro</div>") +
+    `<table><tr>${th("CNPJ","cnpj")}${th("Nome","nome")}${th("Tipo","tipo")}${th("UF","uf")}${th("Última CCT (MTE)","ult_registro")}${th("Monitorar","monitora")}${th("Última consulta","ultima_consulta")}${th("Consulta do dia","ultimo_status")}${th("Histórico (" + (APP.dados.cfg.historico_anos || 5) + " anos)","historico_status")}<th></th></tr>` +
     l.map(s => `<tr><td class="cnpj">${fmtCnpj(s.cnpj)}${dup[s.id] ? `<br><span class="tag erro">CNPJ duplicado</span>` : ""}</td><td class="nome">${esc(s.nome)}${criadoPeloRobo(s) ? ' <span class="tag cinza" title="cadastrado automaticamente pelo robô como parte de uma convenção; não passou pela Receita">robô</span>' : ""}<br><small style="color:var(--cinza)">${esc(s.categoria||"")}</small></td><td>${s.tipo ? esc(s.tipo) + (s.tipo_origem === "cct" ? ' <small style="color:var(--text-3)">(pela CCT)</small>' : "") : '<span class="tag cinza">a definir pela CCT</span>'}</td><td style="white-space:nowrap">${s.uf||""}</td><td style="white-space:nowrap">${s.ult_registro ? `${fmtD(s.ult_registro)}<br><small style="color:var(--text-3)"><a href="#" onclick="abrirInst('${ultCct[s.id].id}');return false">${esc(ultCct[s.id].numero_registro)}</a></small>` : '<span class="tag cinza">sem CCT</span>'}</td>
       <td>${s.monitora ? '<span class="tag ok">sim</span>' : '<span class="tag cinza">não</span>'}</td><td>${fmtDT(s.ultima_consulta)}</td><td>${s.ultimo_status ? tagStatus(s.ultimo_status) : "—"}</td><td>${hist(s)}${s.historico_obs ? `<br><small style="color:var(--text-3)">${esc(s.historico_obs)}</small>` : ""}</td>
       <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirSind('${s.id}')">Editar</button> <button class="b sec sm" onclick="excluirSind('${s.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
@@ -706,14 +716,17 @@ function tabInst(lista, sortable) {
       <td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${fmtD(i.data_registro)}</td><td>${fmtDT(i.detectado_em)}</td><td>${tagStatus(i.status_importacao)}</td><td>${i.analise_status ? tagStatus(i.analise_status === "CONCLUIDA" ? "IMPORTADO" : "ATENCAO").replace(/>[^<]+</, ">" + (i.analise_status === "CONCLUIDA" ? "concluída" : "IA pendente") + "<") : "—"}</td>
       <td>${tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td style="white-space:nowrap;text-align:right">${menuInst(i)}</td></tr>`).join("") + `</table>`;
 }
+// v0.18.5: categoria sem vazias e sem repetir a mesma categoria com maiúsculas/espaços diferentes
+const normCat = c => String(c || "").replace(/\s+/g, " ").trim();
+function catsUnicas(vals) { const m = new Map(); vals.forEach(v => { const n = normCat(v); if (n && !m.has(n.toLowerCase())) m.set(n.toLowerCase(), n); }); return [...m.values()].sort((a, b) => a.localeCompare(b, "pt-BR")); }
 function renderInst() {
-  const f = ($("fInst").value || "").toLowerCase(), hoje = new Date().toISOString().slice(0, 10);
+  const f = ($("fInst").value || "").toLowerCase(), hoje = hojeBR();
   const opts = (id, vals, pref) => { const sel = $(id), cur = sel.value; if (sel.options.length <= 1 || sel.dataset.n != vals.length) { sel.innerHTML = `<option value="">${pref}</option>` + vals.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join(""); sel.dataset.n = vals.length; sel.value = cur; } };
-  opts("fiTipo", [...new Set(APP.dados.inst.map(i => i.tipo).filter(Boolean))].sort(), "Tipo: todos"); opts("fiSind", [...new Set(APP.dados.inst.map(i => i.sindicato?.nome).filter(Boolean))].sort(), "Sindicato: todos"); opts("fiCat", [...new Set(APP.dados.inst.map(i => i.categoria).filter(Boolean))].sort(), "Categoria: todas");
+  opts("fiTipo", [...new Set(APP.dados.inst.map(i => i.tipo).filter(Boolean))].sort(), "Tipo: todos"); opts("fiSind", [...new Set(APP.dados.inst.map(i => i.sindicato?.nome).filter(Boolean))].sort(), "Sindicato: todos"); opts("fiCat", catsUnicas(APP.dados.inst.map(i => i.categoria)), "Categoria: todas");
   const ft = $("fiTipo").value, fs = $("fiSind").value, fc = $("fiCat").value, fi = $("fiImp").value, fo = $("fiOri").value, fv = $("fiVig").value, rde = $("fiRegDe").value, rate = $("fiRegAte").value;
   let l = APP.dados.inst.map(i => ({ ...i, sindicato_nome: i.sindicato?.nome || "" })).filter(i => (!f || [i.numero_registro, i.sindicato_nome, i.categoria, i.tipo, i.abrangencia, i.numero_solicitacao].join(" ").toLowerCase().includes(f))
-    && (!ft || i.tipo === ft) && (!fs || i.sindicato_nome === fs) && (!fc || i.categoria === fc) && (!fi || i.status_importacao === fi) && (!fo || (i.origem || "monitoramento") === fo)
-    && (!fv || (fv === "vigente" ? (i.vigencia_fim || "") >= hoje : (i.vigencia_fim || "") < hoje))
+    && (!ft || i.tipo === ft) && (!fs || i.sindicato_nome === fs) && (!fc || normCat(i.categoria).toLowerCase() === fc.toLowerCase()) && (!fi || i.status_importacao === fi) && (!fo || (i.origem || "monitoramento") === fo)
+    && (!fv || (fv === "vigente" ? (i.vigencia_fim || "") >= hoje : fv === "vencida" ? (!!i.vigencia_fim && i.vigencia_fim < hoje) : !i.vigencia_fim))   // v0.18.5: sem data final não é "vencida"
     && (!rde || (i.data_registro || "") >= rde) && (!rate || (i.data_registro || "").slice(0, 10) <= rate));
   const { col, asc } = APP.ord; l.sort((a, b) => { const x = a[col] ?? "", y = b[col] ?? ""; const r = typeof x === "number" ? x - y : String(x).localeCompare(String(y), "pt-BR"); return asc ? r : -r; });
   $("tabInst").innerHTML = `<div style="font-size:12px;color:var(--text-3);margin-bottom:6px">${l.length} de ${APP.dados.inst.length} · clique no título da coluna para ordenar</div>` + tabInst(l, true);
@@ -829,7 +842,7 @@ function explicarInc(i) {
   const retent = ["MEDIADOR","DOWNLOAD","IMPORTACAO","ARMAZENAMENTO"].includes(m);
   if (!ab) robo = i.status === "RESOLVIDO_AUTOMATICAMENTE" ? "Resolvido automaticamente: a etapa voltou a funcionar." : "Tratado manualmente.";
   else if (retent) {
-    const maxd = cf.retentar_max_dia ?? 3, inth = cf.retentar_intervalo_h ?? 2, hoje = new Date().toISOString().slice(0, 10), td = (i.tentativas_data === hoje) ? (i.tentativas_dia || 0) : 0;
+    const maxd = cf.retentar_max_dia ?? 3, inth = cf.retentar_intervalo_h ?? 2, hoje = hojeBR(), td = (i.tentativas_data === hoje) ? (i.tentativas_dia || 0) : 0;
     if (i.escalado_em) robo = `Esgotou as ${maxd} tentativas de hoje (escalado para CRÍTICO em ${fmtDT(i.escalado_em)}); a retentativa automática recomeça amanhã.`;
     else if (maxd === 0) robo = "Retentativa automática desligada (Configurações): só na próxima consulta agendada.";
     else { const base = new Date(i.ultima_tentativa || i.ultima_ocorrencia), prox = new Date(base.getTime() + inth * 3600e3); robo = `Nova tentativa automática a cada ${inth} h, só deste item — tentativa ${td} de ${maxd} hoje; próxima ≈ ${fmtDT(prox.toISOString())} (no primeiro disparo do robô após esse horário). Se der certo, o incidente fecha sozinho.`; }
@@ -1019,14 +1032,13 @@ async function salvarUsu() {
   if (!nome || !email.includes("@") || senha.length < 8) return msg("Informe nome, e-mail válido e senha com 8+ caracteres.", "erro");
   try {
     // 1) conta de login (não troca a sessão do admin: o token retornado é ignorado)
-    // v0.18.4: login criado pela Edge Function protegida artecon-criar-login (só administrador; nasce confirmado).
-    // A rota pública de cadastro não é mais usada — o cadastro público do Supabase pode ficar DESLIGADO.
-    const r = await fetch(CONFIG.url + "/functions/v1/artecon-criar-login", { method:"POST", headers:{ apikey: CONFIG.key, Authorization: "Bearer " + APP.token, "Content-Type":"application/json" }, body: JSON.stringify({ nome, email, senha, papel }) });
+    const r = await fetch(CONFIG.url + "/auth/v1/signup", { method:"POST", headers:{ apikey: CONFIG.key, "Content-Type":"application/json" }, body: JSON.stringify({ email, password: senha, data: { nome, papel } }) });
     const d = await r.json().catch(() => ({}));
-    if (r.status === 404) throw new Error("Função artecon-criar-login não encontrada no Supabase — publique a Edge Function antes de usar esta versão.");
-    if (r.status === 401) throw new Error("Sessão expirada. Saia e entre novamente.");
-    if (!r.ok) throw new Error(d.error || ("Erro " + r.status));
-    const uid = d.id; if (!uid) throw new Error("Login criado, mas sem ID retornado.");
+    if (!r.ok) { let m = d.error_description || d.msg || d.error || d.message || ("Erro " + r.status);
+      if (/signups? not allowed/i.test(m)) m = "Cadastro de novos usuários está desativado no Supabase (Auth → Providers → Email → desmarque \"Disable signups\").";
+      if (/already/i.test(m)) m = "Este e-mail já possui login."; throw new Error(m); }
+    if (d.user && Array.isArray(d.user.identities) && d.user.identities.length === 0) throw new Error("Este e-mail já possui login.");
+    const uid = (d.user && d.user.id) || d.id; if (!uid) throw new Error("Login criado, mas sem ID retornado.");
     if (papel === "empresa") {
       const emps = [...document.querySelectorAll("#uEmps input:checked")].map(i => i.dataset.eid);
       if (!emps.length) throw new Error("Marque ao menos uma empresa para o acesso de cliente.");
@@ -1093,7 +1105,7 @@ async function pdfCct(id) {
     corpo += `<div class="cl"><h4>CLÁUSULA ${esc(c.numero_extenso || c.ordem)} — ${esc(c.titulo)}</h4><p>${esc(c.texto)}</p></div>`;
   }
   const anexos = (i.anexos||[]).filter(a => !/^anexos$/i.test(a)).map(esc).join("; ");
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${esc(i.tipo||"Instrumento")} ${esc(i.numero_registro)}</title>
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${esc(i.tipo||"Instrumento")} ${esc(i.numero_registro)} — extrato${anexos ? " (sem os anexos)" : ""}</title>
   <style>@page{size:A4;margin:18mm 16mm 20mm}body{font-family:Arial,Helvetica,sans-serif;font-size:11pt;color:#111;line-height:1.45}
   .capa{border-bottom:2px solid #1a5276;padding-bottom:10px;margin-bottom:16px}.capa h1{font-size:18pt;color:#1a5276;margin:0 0 4px}.capa .sub{color:#555;font-size:10pt}
   table.meta{border-collapse:collapse;font-size:10.5pt;margin:10px 0}table.meta td{padding:3px 10px 3px 0;vertical-align:top}table.meta td:first-child{color:#555;white-space:nowrap}
@@ -1102,13 +1114,14 @@ async function pdfCct(id) {
   ul{margin:4px 0;padding-left:18px}.rodape{margin-top:24px;border-top:1px solid #ccd;padding-top:6px;font-size:9pt;color:#666}
   @media print{.nao{display:none}}</style></head><body>
   <div class="nao" style="background:#eef3f7;padding:8px 12px;margin-bottom:12px;font-size:10pt">Para gerar o PDF: na janela de impressão escolha <b>Salvar como PDF</b>. <button onclick="window.print()">Imprimir / Salvar PDF</button></div>
+  ${anexos ? `<div style="border:2px solid #b45309;background:#fff7ed;color:#7c2d12;padding:8px 12px;margin-bottom:12px;font-size:10pt"><b>Atenção:</b> este documento reproduz apenas o <b>extrato</b> registrado no Mediador. Os <b>anexos</b> do instrumento (${anexos}) <b>não estão incluídos</b> — consulte-os no Sistema Mediador.</div>` : `<div style="border:1px solid #ccd;background:#f5f7fa;color:#555;padding:6px 12px;margin-bottom:12px;font-size:9.5pt">Reprodução do extrato registrado no Mediador; não substitui o instrumento original nem eventuais anexos.</div>`}
   <div class="capa"><h1>${esc(i.tipo||"Instrumento Coletivo")} ${esc(i.numero_registro)}</h1><div class="sub">${esc(i.denominacao||"")} · Reprodução do extrato registrado no Sistema Mediador (MTE) · CCT Monitor — Artecon Artes Contábeis</div>
   <table class="meta"><tr><td>Número de registro</td><td><b>${esc(i.numero_registro)}</b></td></tr><tr><td>Solicitação</td><td>${esc(i.numero_solicitacao||"—")}</td></tr><tr><td>Processo</td><td>${esc(i.numero_processo||"—")}</td></tr>
   <tr><td>Registro no MTE</td><td>${fmtD(i.data_registro)}</td></tr><tr><td>Protocolo</td><td>${fmtD(i.data_protocolo)}</td></tr><tr><td>Vigência</td><td>${fmtD(i.vigencia_inicio)} a ${fmtD(i.vigencia_fim)}${i.data_base ? ` · data-base ${esc(i.data_base)}` : ""}</td></tr>
   <tr><td>Categoria</td><td>${esc(i.categoria||"—")}</td></tr><tr><td>Abrangência</td><td>${esc(i.abrangencia||"—")}</td></tr></table>
   <b>Partes:</b><ul>${partes}</ul></div>
   ${corpo}
-  ${anexos ? `<h2>Anexos</h2><p>${anexos} (arquivos anexos constam apenas no Mediador)</p>` : ""}
+  ${anexos ? `<h2>Anexos (não incluídos neste PDF)</h2><p>${anexos} — os arquivos anexos constam apenas no Sistema Mediador.</p>` : ""}
   <div class="rodape">Gerado pelo CCT Monitor em ${new Date().toLocaleString("pt-BR")} a partir do extrato ${esc(i.numero_registro)} (SHA-256 ${esc((i.sha256||"").slice(0,16))}…). Confira a autenticidade em https://mediador.trabalho.gov.br/sistemas/mediador/.</div>
   <script>window.addEventListener("load", () => setTimeout(() => window.print(), 400));<\/script></body></html>`;
   const w = window.open("", "_blank"); if (!w) return msg("O navegador bloqueou a janela — permita pop-ups para este site.", "erro");
