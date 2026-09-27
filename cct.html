@@ -249,6 +249,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.19.1</td><td>27/09/2026</td><td><b>Empresa sem funcionários.</b> Em Empresas, cada linha ganha o botão <b>Sem funcionários</b> (e <b>Reativar</b> para desfazer). A ação pede a <b>sua senha</b> para confirmar. Empresa marcada: não exige sindicato nem responsável, sai da cobertura e da sugestão de sindicato, <b>não recebe ciência</b> das convenções, não entra na consulta de ACT nem na reconsulta da Receita; as ciências pendentes dela são canceladas com o motivo. Marcar e desmarcar ficam registrados em <b>Sistema → Histórico de alterações</b> (quem e quando), e a linha mostra a tag "sem funcionários" com data e autor. Filtro "Situação: sem funcionários" em Empresas e contagem no Painel. Requer <b>setup_cct_v0.19.1.sql</b>. Arquivos: cct.html, robo/monitor_cct.py.</td></tr>
           <tr><td>v0.19.0</td><td>26/09/2026</td><td><b>Consultar agora.</b> Em Sindicatos, cada linha ganha o botão <b>Consultar agora</b>: dispara o robô só para aquele CNPJ, fora da agenda; o resultado aparece em "Consulta do dia" em 2 a 4 minutos (se houver execução em andamento, entra logo depois dela). Responde na hora à pergunta "a convenção já foi registrada?". <b>Paginação real:</b> app e robô passam a ler listas grandes em páginas de 1.000 linhas — antes, ao passar do limite, o robô deixaria de reconhecer convenções antigas e reimportaria com aviso duplicado. <b>Responsável obrigatório:</b> empresa não é salva sem e-mail do responsável; no cadastro em lote o e-mail passa a valer para todas as empresas do lote (obrigatório). <b>Sugerir sindicato para as sem vínculo</b> (Empresas): o app propõe o sindicato mais provável para cada empresa ativa sem vínculo, com os motivos (CNAE, município, abrangência da CCT, UF); você marca as que aceita e só essas são vinculadas — nada é vinculado sozinho. <b>Configurações:</b> mostra a resposta do GitHub ao último disparo do robô (aceito, token inválido, sem permissão, repositório não encontrado) e passa a gravar "Retentativas" e "Reconsultar a Receita a cada N dias" (eram enviados mas não salvos). Requer <b>setup_cct_v0.19.0.sql</b>. Arquivos: cct.html, robo/monitor_cct.py.</td></tr>
           <tr><td>v0.18.5</td><td>26/09/2026</td><td><b>Correções do Relatório de Auditoria de 25–26/09/2026.</b> <b>Painel → Saúde</b> mostra o resultado da <b>última execução principal</b> do robô (sucesso, com alertas, erro parcial/total ou <b>interrompida</b>), com horário e motivo — antes só a situação pela agenda aparecia e uma execução cancelada passava despercebida. <b>Cobertura</b> aponta as <b>empresas sem responsável</b> (clique leva a Empresas já filtrado) — sem responsável e sem gerente, o escalonamento de ciência não tem para quem ir. <b>Sindicatos:</b> as colunas passam a se chamar "Consulta do dia" e "Histórico (N anos)", com explicação, para não confundir a consulta diária com a importação do histórico. <b>Módulo que falha ao recarregar:</b> a faixa informa que a tela está mostrando os dados carregados anteriormente, com o horário (dados desatualizados), em vez de exibi-los como atuais. <b>Nível de acesso:</b> se o banco não responder qual é o seu nível, o app não entra como "usuário" — mostra o erro na tela de login. <b>Convenções → filtro Vigência:</b> convenção sem data final não entra mais em "Vencidas"; nova opção "Sem vigência informada". <b>Datas:</b> "hoje" passa a ser calculado no fuso de Brasília em todas as regras (antes parte usava UTC e virava o dia às 21h). <b>PDF da convenção:</b> aviso em destaque no topo e no título de que é o extrato do Mediador <b>sem os anexos</b>. <b>Filtro de categoria</b> sem opções vazias e sem repetir a mesma categoria com maiúsculas diferentes. <b>Robô v0.18.5:</b> erro de <b>saldo/crédito da API Anthropic</b> vira um único incidente CRÍTICO "IA: sem crédito" (e-mail aos gerentes e ao e-mail de erros críticos), a fila de pareceres fica pausada por 6 h e as convenções continuam "na fila" (não são marcadas como não concluídas nem geram um incidente por convenção); orçamento de tempo lido do workflow (<code>ORCAMENTO_MIN</code>) e respeitado por todas as etapas, inclusive o histórico; categoria da convenção normalizada na importação. <b>Workflow:</b> tempo limite de 45 → 120 min (a execução de 25/09 08:23→09:08 foi cancelada pelo limite antigo). Só <code>cct.html</code>, <code>monitor_cct.py</code> e <code>monitor-cct.yml</code> — sem SQL.</td></tr>
           <tr><td>v0.18.3</td><td>16/09/2026</td><td><b>Duplicidade só pelo CNPJ.</b> Empresas ou sindicatos com o mesmo nome e CNPJ diferente (matriz e filiais) deixam de ser apontados como duplicados — some a marca "duplicado (nome)", a opção "mesmo nome" do filtro e a contagem no aviso; a marca "CNPJ duplicado" e o filtro "mesmo CNPJ" continuam. Só <code>cct.html</code>.</td></tr>
@@ -312,6 +313,11 @@
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mSind')">Cancelar</button><button class="b" onclick="salvarSind()">Salvar</button></div>
 </div></div>
 
+<div class="modal" id="mSenha"><div class="card" style="max-width:460px"><h2>Confirme com sua senha</h2>
+  <div id="mSenhaTxt" class="aviso"></div>
+  <label>Senha de <span id="mSenhaEmail"></span></label><input id="mSenhaIn" type="password" autocomplete="current-password">
+  <div id="mSenhaMsg" style="color:var(--red);margin-top:6px;min-height:18px"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="b sec" onclick="senhaResolver(false)">Cancelar</button><button class="b" id="btnSenha" onclick="senhaConfirmar()">Confirmar</button></div></div></div>
 <div class="modal" id="mSug"><div class="card" style="max-width:1000px"><h2>Sugestão de sindicato — empresas sem vínculo</h2>
   <div class="aviso">O app propõe, para cada empresa ativa sem vínculo, o sindicato com mais pontos: mesmo CNAE de empresas já vinculadas, mesmo município, abrangência da CCT e UF. <b>Nada é vinculado sozinho</b>: marque as linhas que aceita e clique em Vincular. Empresa sem sugestão precisa de vínculo manual (Editar). Vínculo criado aqui fica marcado como "sugestão confirmada" no histórico de alterações.</div>
   <div id="sugRes" style="margin-top:8px"></div>
@@ -397,7 +403,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.19.0" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.19.1" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
@@ -586,8 +592,9 @@ function renderPainel() {
   $("vencidas").innerHTML = venc.length ? venc.slice(0, 5).map(i => `<li><span class="dt">${fmtD(i.vigencia_fim)}</span><div class="tx"><a href="#" onclick="abrirInst('${i.id}');return false">${esc(i.numero_registro)}</a> · ${esc(abrevTipo(i.tipo))} — <span title="${esc(i.sindicato?.nome || "")}">${esc(abrev(i.sindicato?.nome || "", 60))}</span><small>${esc(abrev(i.categoria || "", 90) || "categoria não informada")} · o robô avisa quando a renovação for registrada</small></div><span class="tag erro">vencida</span></li>`).join("")
     : `<li><div class="tx" style="color:var(--text-3)">Nenhuma convenção vencida sem renovação registrada.</div></li>`;
   // cobertura
-  const emps = (d.emp || []).filter(e => e.ativo), semResp = emps.filter(e => !e.responsavel_email && !e.gerente_email), sindVig = new Set(vigentes.map(i => i.sindicato_id)), cob = emps.filter(e => (e.vinculos || []).some(v => sindVig.has(v.sindicato_id))).length, pct = emps.length ? Math.round(cob / emps.length * 100) : 0;
-  $("cobertura").innerHTML = `<div class="ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#eef1f5" stroke-width="3.5"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#1a5276" stroke-width="3.5" stroke-dasharray="${pct} 100" transform="rotate(-90 18 18)"/><text x="18" y="21" text-anchor="middle" font-size="8" font-family="DM Mono" fill="#1a2332">${pct}%</text></svg><div class="lg"><b>${cob} de ${emps.length}</b>empresas com convenção vigente${emps.length ? "" : "<br><small style='color:var(--text-3)'>cadastre as empresas para medir</small>"}${(d.emp || []).filter(e => e.ativo && !(e.vinculos || []).length).length ? `<br><small style="color:var(--amber)">${(d.emp || []).filter(e => e.ativo && !(e.vinculos || []).length).length} sem vínculo sindical</small>` : ""}${semResp.length ? `<br><small style="color:var(--red)"><a href="#" onclick="event.stopPropagation();irEmp('sem');return false" style="color:var(--red)">${semResp.length} sem responsável</a> — sem responsável e sem gerente, o escalonamento de ciência não é enviado</small>` : ""}</div></div>`;
+  const semFunc = (d.emp || []).filter(e => e.ativo && e.sem_funcionarios).length;
+  const emps = (d.emp || []).filter(e => e.ativo && !e.sem_funcionarios), semResp = emps.filter(e => !e.responsavel_email && !e.gerente_email), sindVig = new Set(vigentes.map(i => i.sindicato_id)), cob = emps.filter(e => (e.vinculos || []).some(v => sindVig.has(v.sindicato_id))).length, pct = emps.length ? Math.round(cob / emps.length * 100) : 0;
+  $("cobertura").innerHTML = `<div class="ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#eef1f5" stroke-width="3.5"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#1a5276" stroke-width="3.5" stroke-dasharray="${pct} 100" transform="rotate(-90 18 18)"/><text x="18" y="21" text-anchor="middle" font-size="8" font-family="DM Mono" fill="#1a2332">${pct}%</text></svg><div class="lg"><b>${cob} de ${emps.length}</b>empresas com convenção vigente${emps.length ? "" : "<br><small style='color:var(--text-3)'>cadastre as empresas para medir</small>"}${emps.filter(e => !(e.vinculos || []).length).length ? `<br><small style="color:var(--amber)">${emps.filter(e => !(e.vinculos || []).length).length} sem vínculo sindical</small>` : ""}${semFunc ? `<br><small style="color:var(--text-3)">${semFunc} sem funcionários (fora da cobertura)</small>` : ""}${semResp.length ? `<br><small style="color:var(--red)"><a href="#" onclick="event.stopPropagation();irEmp('sem');return false" style="color:var(--red)">${semResp.length} sem responsável</a> — sem responsável e sem gerente, o escalonamento de ciência não é enviado</small>` : ""}</div></div>`;
   // saúde
   $("saudeCard").style.display = emp ? "none" : "block";
   const t = (c, x) => `<span class="tag ${c}">${x}</span>`;
@@ -1313,20 +1320,20 @@ function renderEmp() {
   const all = APP.dados.emp || [], tab = "emp", fn = "renderEmp", nomeS = id => (APP.dados.sind.find(s => s.id === id) || {}).nome || "?";
   const g = id => (document.getElementById(id) || {}).value || "";
   const barra = barraConsulta(tab, [{ id: "fe_uf", label: "UF", opts: uniq(all.map(x => x.uf)), w: 110 }, { id: "fe_sind", label: "Sindicato", opts: APP.dados.sind.map(x => [x.id, x.nome]), w: 220 },
-    { id: "fe_vinc", label: "Vínculo", opts: [["com","com vínculo"],["sem","sem vínculo"]], w: 140 }, { id: "fe_resp", label: "Responsável", opts: [["com","informado"],["sem","não informado"]], w: 150 },
+    { id: "fe_vinc", label: "Vínculo", opts: [["com","com vínculo"],["sem","sem vínculo"]], w: 140 }, { id: "fe_resp", label: "Responsável", opts: [["com","informado"],["sem","não informado"]], w: 150 }, { id: "fe_sf", label: "Situação", opts: [["com","com funcionários"],["sem","sem funcionários"]], w: 160 },
     { id: "fe_act", label: "ACT", opts: [["sim","monitora"],["nao","não"]], w: 120 }, { id: "fe_at", label: "Ativa", opts: [["sim","sim"],["nao","não"]], w: 110 }, { id: "fe_dup", label: "Duplicados", opts: [["cnpj","mesmo CNPJ"]], w: 150 }], fn);
-  const q = g("q_" + tab).toLowerCase(), fu = g("fe_uf"), fs = g("fe_sind"), fv = g("fe_vinc"), fr = g("fe_resp"), fa = g("fe_act"), fat = g("fe_at"), fd = g("fe_dup"), dupE = duplicados(all, "razao_social");
+  const q = g("q_" + tab).toLowerCase(), fu = g("fe_uf"), fs = g("fe_sind"), fv = g("fe_vinc"), fr = g("fe_resp"), fa = g("fe_act"), fat = g("fe_at"), fd = g("fe_dup"), fsf = g("fe_sf"), dupE = duplicados(all, "razao_social");
   let l = all.map(e => ({ ...e, sindicatos_txt: (e.vinculos || []).map(v => nomeS(v.sindicato_id)).join(", "), tem_vinc: !!(e.vinculos || []).length }))
     .filter(e => (!q || [e.razao_social, e.cnpj, fmtCnpj(e.cnpj), e.municipio, e.cnae, e.cnae_descricao, e.responsavel_nome, e.responsavel_email, e.gerente_email, e.sindicatos_txt].join(" ").toLowerCase().includes(q))
-      && (!fu || e.uf === fu) && (!fs || (e.vinculos || []).some(v => v.sindicato_id === fs)) && (!fv || e.tem_vinc === (fv === "com")) && (!fr || !!e.responsavel_email === (fr === "com")) && (!fa || !!e.monitorar_act === (fa === "sim")) && (!fat || !!e.ativo === (fat === "sim")) && (!fd || (fd === "_" ? !!dupE[e.id] : dupE[e.id] === fd)));
+      && (!fu || e.uf === fu) && (!fs || (e.vinculos || []).some(v => v.sindicato_id === fs)) && (!fv || e.tem_vinc === (fv === "com")) && (!fr || !!e.responsavel_email === (fr === "com")) && (!fa || !!e.monitorar_act === (fa === "sim")) && (!fat || !!e.ativo === (fat === "sim")) && (!fd || (fd === "_" ? !!dupE[e.id] : dupE[e.id] === fd)) && (!fsf || !!e.sem_funcionarios === (fsf === "sem")));
   l = aplicarOrd(tab, l);
   const th = (t, c) => thOrd(tab, t, c, fn);
   $("tabEmp").innerHTML = (Object.keys(dupE).length ? `<div class="aviso" style="border-color:var(--red);color:var(--red)"><b>${Object.keys(dupE).length} empresa(s) com o mesmo CNPJ</b> — o banco já bloqueia novos cadastros repetidos; rode o setup_cct_v0.18.2.sql para unificar os existentes.</div>` : "") + barra + contador(l.length, all.length) + `<table><tr>${th("CNPJ","cnpj")}${th("Razão social","razao_social")}${th("Sindicatos","sindicatos_txt")}${th("Responsável","responsavel_email")}${th("Gerente","gerente_email")}${th("ACT","monitorar_act")}${th("Ativa","ativo")}<th></th></tr>` +
     l.map(e => `<tr><td class="cnpj">${fmtCnpj(e.cnpj)}${dupE[e.id] ? `<br><span class="tag erro">CNPJ duplicado</span>` : ""}</td><td class="nome">${esc(e.razao_social)}<br><small style="color:var(--cinza)">${esc([e.municipio,e.uf].filter(Boolean).join("/"))} ${esc(e.cnae||"")}</small></td>
-      <td>${(e.vinculos||[]).map(v => ({ ...v, nome: nomeS(v.sindicato_id) })).sort(ordNome).map(v => `${esc(v.nome)} <small style="color:var(--cinza)">(${PAPEL_TXT[v.papel] || v.papel || "—"})</small>`).join("<br>") || '<span class="tag alerta">sem vínculo</span>'}</td>
+      <td>${(e.vinculos||[]).map(v => ({ ...v, nome: nomeS(v.sindicato_id) })).sort(ordNome).map(v => `${esc(v.nome)} <small style="color:var(--cinza)">(${PAPEL_TXT[v.papel] || v.papel || "—"})</small>`).join("<br>") || (e.sem_funcionarios ? '<span class="tag cinza">não exige</span>' : '<span class="tag alerta">sem vínculo</span>')}${e.sem_funcionarios ? `<br><span class="tag cinza" title="marcada por ${esc(e.sem_funcionarios_por || "?")} em ${fmtDT(e.sem_funcionarios_em)}">sem funcionários</span> <small style="color:var(--text-3)">${fmtD(e.sem_funcionarios_em)} · ${esc(e.sem_funcionarios_por || "")}</small>` : ""}</td>
       <td>${esc(e.responsavel_nome||"")}<br><small>${esc(e.responsavel_email||"")}</small></td><td>${esc(e.gerente_nome||"")}<br><small>${esc(e.gerente_email||"")}</small></td>
       <td>${e.monitorar_act ? '<span class="tag ok">sim</span>' : ""}</td><td>${e.ativo ? "sim" : "não"}</td>
-      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirEmp('${e.id}')">Editar</button> <button class="b sec sm" onclick="excluirEmp('${e.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
+      <td style="white-space:nowrap">${interno() ? (e.sem_funcionarios ? `<button class="b sec sm" onclick="marcarSemFunc('${e.id}', false)" title="volta a exigir sindicato/responsável e a receber ciência">Reativar</button> ` : `<button class="b sec sm" onclick="marcarSemFunc('${e.id}', true)" title="empresa sem empregados: não exige sindicato, não recebe ciência, não é consultada (pede senha)">Sem funcionários</button> `) : ""}<button class="b sec sm" onclick="abrirEmp('${e.id}')">Editar</button> <button class="b sec sm" onclick="excluirEmp('${e.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
     (all.length ? "" : `<div class="aviso">Nenhuma empresa cadastrada. Cadastre as empresas dos clientes e vincule ao sindicato laboral (e patronal) de cada uma.</div>`);
 }
 function abrirEmp(id) {
@@ -1366,6 +1373,35 @@ function renderBuscaSind() {
     : `<small style="color:var(--text-3)">Nenhum sindicato cadastrado com esse nome/CNPJ — use "Cadastrar novo sindicato".</small>`;
 }
 function novoSindDaEmpresa() { const b = $("eBusca").value.trim(); APP.voltarEmp = true; abrirSind(); if (b && /^[\d.\/-]+$/.test(b)) $("sCnpj").value = b; else if (b) $("sNome").value = b; }
+// v0.19.1: confirmação por senha (reautentica no Supabase Auth com o e-mail da sessão; nada é gravado)
+let _senhaCb = null;
+function confirmarSenha(texto) {
+  return new Promise(res => { _senhaCb = res; $("mSenhaTxt").textContent = texto; $("mSenhaEmail").textContent = APP.email; $("mSenhaIn").value = ""; $("mSenhaMsg").textContent = ""; $("btnSenha").disabled = false; $("mSenha").classList.add("on"); setTimeout(() => $("mSenhaIn").focus(), 50); });
+}
+function senhaResolver(v) { $("mSenha").classList.remove("on"); const cb = _senhaCb; _senhaCb = null; if (cb) cb(v); }
+async function senhaConfirmar() {
+  const senha = $("mSenhaIn").value; if (!senha) { $("mSenhaMsg").textContent = "Digite a senha."; return; }
+  $("btnSenha").disabled = true;
+  try {
+    const r = await fetch(CONFIG.url + "/auth/v1/token?grant_type=password", { method: "POST", headers: { apikey: CONFIG.key, "Content-Type": "application/json" }, body: JSON.stringify({ email: APP.email, password: senha }) });
+    const d = await r.json();
+    if (!r.ok || !d.access_token) throw new Error("Senha incorreta.");
+    senhaResolver(true);
+  } catch (e) { $("mSenhaMsg").textContent = e.message; $("btnSenha").disabled = false; }
+}
+async function marcarSemFunc(id, valor) {
+  const e = (APP.dados.emp || []).find(x => x.id === id); if (!e) return;
+  if (!interno()) return msg("Somente a equipe do escritório altera esta marcação.", "erro");
+  const ok = await confirmarSenha(valor
+    ? `Marcar ${e.razao_social} como EMPRESA SEM FUNCIONÁRIOS. Ela deixa de exigir sindicato e responsável, não recebe ciência de convenções, não entra na consulta de ACT nem na reconsulta da Receita, e as ciências pendentes são canceladas. A ação fica no Histórico de alterações com seu usuário.`
+    : `Reativar ${e.razao_social}: volta a exigir sindicato e responsável e a receber ciência das convenções. A ação fica no Histórico de alterações com seu usuário.`);
+  if (!ok) return;
+  try {
+    const r = await api("rpc/cct_marcar_sem_funcionarios", { method: "POST", body: JSON.stringify({ p_empresa: id, p_valor: valor }) });
+    msg(valor ? `${e.razao_social} marcada como sem funcionários${r.ciencias_canceladas ? ` — ${r.ciencias_canceladas} ciência(s) pendente(s) cancelada(s)` : ""}.` : `${e.razao_social} reativada.`);
+    await carregarTudo();
+  } catch (x) { msg(/cct_marcar_sem_funcionarios/.test(x.message) ? "Execute o setup_cct_v0.19.1.sql no Supabase." : x.message, "erro"); }
+}
 // v0.19.0: sugestão de sindicato em lote (só propõe; a confirmação é por linha)
 async function abrirSugLote() {
   if (!interno()) return msg("Somente a equipe do escritório vincula empresas.", "erro");
@@ -1396,7 +1432,8 @@ async function vincularSug() {
 async function salvarEmp() {
   const cnpj = $("eCnpj").value.replace(/\D/g, "");
   if (cnpj.length !== 14 || !$("eNome").value.trim()) return msg("Informe CNPJ (14 dígitos) e razão social.", "erro");
-  if ($("eAtivo").value === "true" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test($("eRespE").value.trim())) return msg("Informe o e-mail do responsável pela empresa — sem ele a ciência das convenções não tem para quem ir (v0.19.0).", "erro");
+  const semF = !!(((APP.dados.emp || []).find(x => x.id === $("eId").value) || {}).sem_funcionarios);
+  if (!semF && $("eAtivo").value === "true" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test($("eRespE").value.trim())) return msg("Informe o e-mail do responsável pela empresa — sem ele a ciência das convenções não tem para quem ir (v0.19.0).", "erro");
   { const ex = (APP.dados.emp || []).find(x => x.cnpj === cnpj && x.id !== $("eId").value); // v0.18.2: um CNPJ, um cadastro
     if (ex) { msg(`CNPJ já cadastrado: ${ex.razao_social}. Abrindo o cadastro existente.`, "erro"); fechar("mEmp"); abrirEmp(ex.id); return; } }
   const d = { tenant_id: APP.tenantId, cnpj, razao_social: $("eNome").value.trim(), uf: $("eUf").value.trim().toUpperCase() || null, municipio: $("eMun").value.trim() || null, cnae: $("eCnae").value.trim() || null,

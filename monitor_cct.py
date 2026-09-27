@@ -46,7 +46,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.19.0"
+VERSAO = "0.19.1"
 # v0.18.5: orçamento de tempo da execução (minutos), informado pelo workflow (timeout-minutes − margem); todas as etapas o respeitam
 ORCAMENTO_MIN = int(os.environ.get("ORCAMENTO_MIN") or "45")
 _INICIO_GLOBAL = time.time()
@@ -625,10 +625,11 @@ def criar_ciencias(tenant, sind, row, empresa=None):
     prazo = prazo_ciencia(tenant)
     alvos = []
     if empresa:
-        alvos = [empresa]
+        alvos = [] if empresa.get("sem_funcionarios") else [empresa]
     elif sind:
-        vinc = sb_get("cct_empresa_sindicato", {"sindicato_id": f"eq.{sind['id']}", "select": "empresa:cct_empresas(id,razao_social,responsavel_email,gerente_email,ativo)"})
-        alvos = [v["empresa"] for v in vinc if v.get("empresa") and v["empresa"].get("ativo", True)]
+        vinc = sb_get("cct_empresa_sindicato", {"sindicato_id": f"eq.{sind['id']}", "select": "empresa:cct_empresas(id,razao_social,responsavel_email,gerente_email,ativo,sem_funcionarios)"})
+        # v0.19.1: empresa marcada "sem funcionários" não recebe ciência
+        alvos = [v["empresa"] for v in vinc if v.get("empresa") and v["empresa"].get("ativo", True) and not v["empresa"].get("sem_funcionarios")]
     linhas = []
     if alvos:
         for e in alvos:
@@ -776,7 +777,7 @@ def reconsultar_receita(tenant, cfg, maximo=40, limite_s=None):
         for s in sb_get_all("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "receita_em": f"lt.{corte}",
                                             "select": "id,cnpj,nome,uf,municipio,cnae,situacao_cadastral,responsavel_email,receita_em", "order": "receita_em.asc", "limit": str(maximo)}):
             fila.append(("sindicato", "cct_sindicatos", s))
-        for e in sb_get_all("cct_empresas", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "or": f"(receita_em.is.null,receita_em.lt.{corte})",
+        for e in sb_get_all("cct_empresas", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "sem_funcionarios": "not.is.true", "or": f"(receita_em.is.null,receita_em.lt.{corte})",
                                           "select": "id,cnpj,razao_social,uf,municipio,cnae,cnae_descricao,situacao_cadastral,responsavel_email,receita_em", "order": "receita_em.asc.nullsfirst", "limit": str(maximo)}):
             fila.append(("empresa", "cct_empresas", e))
     except Exception as e:
@@ -1352,7 +1353,7 @@ def main():
     if maximo and len(sinds) > maximo:
         log(f"fila: {len(sinds)} sindicatos, {maximo} por execução (os demais ficam para a próxima)")
         sinds = sinds[:maximo]
-    emps_act = sb_get_all("cct_empresas", {"tenant_id": f"eq.{tenant}", "monitorar_act": "eq.true", "ativo": "eq.true",
+    emps_act = sb_get_all("cct_empresas", {"tenant_id": f"eq.{tenant}", "monitorar_act": "eq.true", "ativo": "eq.true", "sem_funcionarios": "not.is.true",   # v0.19.1
                                        "select": "id,cnpj,razao_social,responsavel_email,gerente_email", "order": "razao_social"})
     filtro = os.environ.get("APENAS_CNPJ", "").strip()
     if filtro:
