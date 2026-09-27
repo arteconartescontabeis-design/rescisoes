@@ -46,7 +46,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.19.1"
+VERSAO = "0.19.3"
 # v0.18.5: orçamento de tempo da execução (minutos), informado pelo workflow (timeout-minutes − margem); todas as etapas o respeitam
 ORCAMENTO_MIN = int(os.environ.get("ORCAMENTO_MIN") or "45")
 _INICIO_GLOBAL = time.time()
@@ -1136,9 +1136,17 @@ def fila_retentativa(tenant, cfg):
     intervalo_h, maximo = int(cfg.get("retentar_intervalo_h") or 2), int(cfg.get("retentar_max_dia") or 0)
     if maximo <= 0:
         return [], intervalo_h, maximo
-    rows = sb_get("cct_incidentes", {"tenant_id": f"eq.{tenant}", "status": "in.(NOVO,EM_NOVA_TENTATIVA,PERSISTENTE)", "modulo": f"in.({','.join(MODULOS_RETENTAVEIS)})",
-                                     "select": "id,fingerprint,modulo,gravidade,sindicato_id,instrumento_id,mensagem,tentativas_dia,tentativas_data,ultima_tentativa,ultima_ocorrencia,escalado_em",
-                                     "order": "ultima_ocorrencia.asc"})
+    try:
+        rows = sb_get("cct_incidentes", {"tenant_id": f"eq.{tenant}", "status": "in.(NOVO,EM_NOVA_TENTATIVA,PERSISTENTE)", "modulo": f"in.({','.join(MODULOS_RETENTAVEIS)})",
+                                         "select": "id,fingerprint,modulo,gravidade,sindicato_id,instrumento_id,mensagem,tentativas_dia,tentativas_data,ultima_tentativa,ultima_ocorrencia,escalado_em",
+                                         "order": "ultima_ocorrencia.asc"})
+    except Exception as e:   # v0.19.3: falha aqui não derruba a execução — vira incidente e a retentativa fica para depois
+        log(f"  !! fila de retentativa indisponível: {e}")
+        incidente(tenant, "APLICATIVO:retentativa", "APLICATIVO", "ALTO",
+                  f"Retentativa automática desligada nesta execução: o banco não aceitou a consulta de incidentes ({str(e)[:120]}). Execute o setup_cct_v0.19.3.sql",
+                  contexto={"etapa": "fila de retentativa", "erro": str(e)[:600], "o_que_fazer": "rodar sql/setup_cct_v0.19.3.sql no Supabase (cria as colunas de controle em cct_incidentes)"})
+        return [], intervalo_h, 0
+    resolver(tenant, "APLICATIVO:retentativa")
     agora, hoje = datetime.now(BRT), datetime.now(BRT).date().isoformat()
     devidos = []
     for r in rows:
