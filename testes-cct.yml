@@ -1,0 +1,29 @@
+name: CCT Monitor - testes de regras
+
+on:
+  push:
+    paths: ["cct.html", "robo/**", "tests/**", ".github/workflows/testes-cct.yml"]
+  pull_request:
+    paths: ["cct.html", "robo/**", "tests/**"]
+  workflow_dispatch:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Dependencias
+        run: pip install pytest requests
+      - name: Robo compila
+        run: python -m py_compile robo/*.py
+      - name: Regras do robo
+        run: pytest -q tests/
+      - name: Regras do app (cct.html)
+        run: node tests/test_cct_app.js

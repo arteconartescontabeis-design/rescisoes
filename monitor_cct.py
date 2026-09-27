@@ -46,7 +46,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.19.3"
+VERSAO = "0.19.4"
 # v0.18.5: orçamento de tempo da execução (minutos), informado pelo workflow (timeout-minutes − margem); todas as etapas o respeitam
 ORCAMENTO_MIN = int(os.environ.get("ORCAMENTO_MIN") or "45")
 _INICIO_GLOBAL = time.time()
@@ -964,8 +964,8 @@ def ano_do_registro(reg):
     m = _re.search(r"/(\d{4})", reg.get("registro") or "")
     if m:
         return int(m.group(1))
-    m = _re.search(r"(\d{4})", (reg.get("vigencia") or "")[:10][::-1])
-    return None
+    m = _re.search(r"\d{2}/\d{2}/(\d{4})", reg.get("vigencia") or "")   # v0.19.4: início da vigência "dd/mm/aaaa ..." (antes o resultado era descartado)
+    return int(m.group(1)) if m else None
 
 
 def importar_historico(tenant, page, existentes, cfg, limite_s=None):
@@ -1377,7 +1377,6 @@ def main():
         browser = p.chromium.launch(headless=False)  # headed sob xvfb: melhor pontuação no reCAPTCHA
         ctx = browser.new_context(locale="pt-BR", accept_downloads=True)
         page = ctx.new_page()
-        inicio_exec = time.time()
         try:
             for i, s in enumerate(sinds):
                 if restante(7) <= 0:  # v0.18.5: orçamento ORCAMENTO_MIN (workflow) menos reserva para IA/ciências/histórico — o resto fica para a próxima execução
