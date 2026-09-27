@@ -148,7 +148,7 @@
     </section>
 
     <section data-sec="empresas" style="display:none">
-      <div class="card"><div class="topo"><h2>Empresas e enquadramento sindical</h2><div style="display:flex;gap:8px"><button class="b sec" onclick="abrirAtualizar('e')">Atualizar dados na Receita</button><button class="b sec" onclick="abrirLote('e')">Cadastro em lote (CNPJs)</button><button class="b" onclick="abrirEmp()">+ Nova empresa</button></div></div><div id="tabEmp"></div>
+      <div class="card"><div class="topo"><h2>Empresas e enquadramento sindical</h2><div style="display:flex;gap:8px"><button class="b sec" onclick="abrirAtualizar('e')">Atualizar dados na Receita</button><button class="b sec" onclick="abrirLote('e')">Cadastro em lote (CNPJs)</button><button class="b sec" onclick="abrirSugLote()" title="propõe o sindicato mais provável para cada empresa ativa sem vínculo; você confirma linha a linha">Sugerir sindicato (sem vínculo)</button><button class="b" onclick="abrirEmp()">+ Nova empresa</button></div></div><div id="tabEmp"></div>
         <div class="aviso">O responsável da empresa recebe o aviso de convenção nova e os lembretes; o gerente recebe o escalonamento quando o prazo vence. "Monitorar ACT" faz o robô consultar também os Acordos Coletivos da própria empresa no Mediador.</div></div>
     </section>
 
@@ -225,6 +225,7 @@
           <div><label>Repositório do robô (GitHub)</label><input id="cfgGhRepo" placeholder="organizacao/repositorio"></div>
           <div><label>Branch</label><input id="cfgGhBranch" placeholder="main"></div></div>
         <div class="aviso" id="cfgIaUso"></div>
+        <div class="aviso" id="cfgDisparo">Último disparo do robô: —</div>
         <div class="aviso" id="cfgIaDiag"></div>
         <div class="aviso">"Analisar com IA" dispara o robô no GitHub Actions na hora (só análises, sem Mediador). Requer, uma vez, o token no Vault do Supabase: <code>select vault.create_secret('&lt;token&gt;', 'GITHUB_DISPATCH_TOKEN');</code> — token fine-grained do GitHub com permissão <i>Actions: Read and write</i> no repositório acima.</div>
         <div style="margin-top:10px"><button class="b" onclick="salvarConfig()">Salvar parâmetros</button></div></div>
@@ -248,6 +249,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.19.0</td><td>26/09/2026</td><td><b>Consultar agora.</b> Em Sindicatos, cada linha ganha o botão <b>Consultar agora</b>: dispara o robô só para aquele CNPJ, fora da agenda; o resultado aparece em "Consulta do dia" em 2 a 4 minutos (se houver execução em andamento, entra logo depois dela). Responde na hora à pergunta "a convenção já foi registrada?". <b>Paginação real:</b> app e robô passam a ler listas grandes em páginas de 1.000 linhas — antes, ao passar do limite, o robô deixaria de reconhecer convenções antigas e reimportaria com aviso duplicado. <b>Responsável obrigatório:</b> empresa não é salva sem e-mail do responsável; no cadastro em lote o e-mail passa a valer para todas as empresas do lote (obrigatório). <b>Sugerir sindicato para as sem vínculo</b> (Empresas): o app propõe o sindicato mais provável para cada empresa ativa sem vínculo, com os motivos (CNAE, município, abrangência da CCT, UF); você marca as que aceita e só essas são vinculadas — nada é vinculado sozinho. <b>Configurações:</b> mostra a resposta do GitHub ao último disparo do robô (aceito, token inválido, sem permissão, repositório não encontrado) e passa a gravar "Retentativas" e "Reconsultar a Receita a cada N dias" (eram enviados mas não salvos). Requer <b>setup_cct_v0.19.0.sql</b>. Arquivos: cct.html, robo/monitor_cct.py.</td></tr>
           <tr><td>v0.18.5</td><td>26/09/2026</td><td><b>Correções do Relatório de Auditoria de 25–26/09/2026.</b> <b>Painel → Saúde</b> mostra o resultado da <b>última execução principal</b> do robô (sucesso, com alertas, erro parcial/total ou <b>interrompida</b>), com horário e motivo — antes só a situação pela agenda aparecia e uma execução cancelada passava despercebida. <b>Cobertura</b> aponta as <b>empresas sem responsável</b> (clique leva a Empresas já filtrado) — sem responsável e sem gerente, o escalonamento de ciência não tem para quem ir. <b>Sindicatos:</b> as colunas passam a se chamar "Consulta do dia" e "Histórico (N anos)", com explicação, para não confundir a consulta diária com a importação do histórico. <b>Módulo que falha ao recarregar:</b> a faixa informa que a tela está mostrando os dados carregados anteriormente, com o horário (dados desatualizados), em vez de exibi-los como atuais. <b>Nível de acesso:</b> se o banco não responder qual é o seu nível, o app não entra como "usuário" — mostra o erro na tela de login. <b>Convenções → filtro Vigência:</b> convenção sem data final não entra mais em "Vencidas"; nova opção "Sem vigência informada". <b>Datas:</b> "hoje" passa a ser calculado no fuso de Brasília em todas as regras (antes parte usava UTC e virava o dia às 21h). <b>PDF da convenção:</b> aviso em destaque no topo e no título de que é o extrato do Mediador <b>sem os anexos</b>. <b>Filtro de categoria</b> sem opções vazias e sem repetir a mesma categoria com maiúsculas diferentes. <b>Robô v0.18.5:</b> erro de <b>saldo/crédito da API Anthropic</b> vira um único incidente CRÍTICO "IA: sem crédito" (e-mail aos gerentes e ao e-mail de erros críticos), a fila de pareceres fica pausada por 6 h e as convenções continuam "na fila" (não são marcadas como não concluídas nem geram um incidente por convenção); orçamento de tempo lido do workflow (<code>ORCAMENTO_MIN</code>) e respeitado por todas as etapas, inclusive o histórico; categoria da convenção normalizada na importação. <b>Workflow:</b> tempo limite de 45 → 120 min (a execução de 25/09 08:23→09:08 foi cancelada pelo limite antigo). Só <code>cct.html</code>, <code>monitor_cct.py</code> e <code>monitor-cct.yml</code> — sem SQL.</td></tr>
           <tr><td>v0.18.3</td><td>16/09/2026</td><td><b>Duplicidade só pelo CNPJ.</b> Empresas ou sindicatos com o mesmo nome e CNPJ diferente (matriz e filiais) deixam de ser apontados como duplicados — some a marca "duplicado (nome)", a opção "mesmo nome" do filtro e a contagem no aviso; a marca "CNPJ duplicado" e o filtro "mesmo CNPJ" continuam. Só <code>cct.html</code>.</td></tr>
           <tr><td>v0.18.2</td><td>16/09/2026</td><td><b>Um CNPJ, um cadastro.</b> O banco passa a <b>proibir</b> duas empresas ou dois sindicatos com o mesmo CNPJ no escritório (índice único + gatilho com a mensagem "CNPJ já cadastrado: …"); o app confere antes de gravar e, se o CNPJ já existe, abre o cadastro existente em vez de criar outro. <b>Empresas duplicadas excluídas</b> pelo <code>setup_cct_v0.18.2.sql</code>: de cada CNPJ repetido fica um cadastro (o que passou pela Receita, depois o com mais vínculos/ciências/acessos, depois o mais antigo) e todos os vínculos, ciências, acessos de cliente, convenções e alterações cadastrais dos duplicados são reapontados para ele — nada se perde; prévia em <code>duplicados_previa.sql</code>. Só banco e <code>cct.html</code>.</td></tr>
@@ -310,6 +312,10 @@
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mSind')">Cancelar</button><button class="b" onclick="salvarSind()">Salvar</button></div>
 </div></div>
 
+<div class="modal" id="mSug"><div class="card" style="max-width:1000px"><h2>Sugestão de sindicato — empresas sem vínculo</h2>
+  <div class="aviso">O app propõe, para cada empresa ativa sem vínculo, o sindicato com mais pontos: mesmo CNAE de empresas já vinculadas, mesmo município, abrangência da CCT e UF. <b>Nada é vinculado sozinho</b>: marque as linhas que aceita e clique em Vincular. Empresa sem sugestão precisa de vínculo manual (Editar). Vínculo criado aqui fica marcado como "sugestão confirmada" no histórico de alterações.</div>
+  <div id="sugRes" style="margin-top:8px"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="b sec" onclick="fechar('mSug')">Fechar</button><button class="b" id="btnSug" onclick="vincularSug()">Vincular selecionadas</button></div></div></div>
 <div class="modal" id="mEmp"><div class="card"><h2 id="mEmpTit">Empresa</h2>
   <input type="hidden" id="eId">
   <div class="grid g3"><div><label>CNPJ</label><div style="display:flex;gap:6px"><input id="eCnpj" maxlength="18"><button class="b sec sm" type="button" onclick="receita('e')" style="white-space:nowrap">Buscar na Receita</button></div><small id="eRfb" style="color:var(--text-3)"></small></div><div style="grid-column:span 2"><label>Razão social</label><input id="eNome"></div>
@@ -342,7 +348,7 @@
   <div class="grid g2"><div style="grid-column:span 2"><label>CNPJs (um por linha, ou separados por vírgula/espaço — com ou sem pontuação)</label><textarea id="lCnpjs" rows="6" placeholder="84.307.370/0001-66&#10;05.021.016/0001-02"></textarea></div>
     <div id="lOptS"><label>Tipo dos sindicatos</label><select id="lTipo"><option value="">— definir automaticamente pela CCT —</option><option value="laboral">Laboral (empregados)</option><option value="patronal">Patronal</option></select></div>
     <div id="lOptE"><label>Vincular todas ao sindicato (opcional)</label><select id="lSind"><option value="">— não vincular agora —</option></select></div>
-    <div id="lOptE2"><label>E-mail do responsável (opcional, para todas)</label><input id="lResp" type="email"></div></div>
+    <div id="lOptE2"><label>E-mail do responsável (obrigatório, vale para todas as empresas do lote)</label><input id="lResp" type="email" placeholder="quem recebe a ciência das convenções"></div></div>
   <div class="aviso">Para cada CNPJ o app consulta a Receita Federal (BrasilAPI, reserva Minha Receita), preenche razão social, UF, município e CNAE e cadastra. CNPJ já cadastrado é atualizado com os dados da Receita. Falha na consulta não cadastra — fica listada para você tratar.</div>
   <div id="lRes" style="margin-top:8px"></div>
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mLote')">Fechar</button><button class="b" id="btnLote" onclick="rodarLote()">Consultar Receita e cadastrar</button></div>
@@ -391,7 +397,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.18.5" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.19.0" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
@@ -429,6 +435,17 @@ async function api(path, opt={}) {
   return j;
 }
 const get = p => api(p);
+// v0.19.0: listas em páginas de 1.000 (limite por resposta do PostgREST) — sem isso, acima do limite a tela mostraria só parte
+const PAG = 1000;
+async function getTodos(path) {
+  let ini = 0, todos = [];
+  while (true) {
+    const pg = await api(path, { headers: { Range: `${ini}-${ini + PAG - 1}`, "Range-Unit": "items" } });
+    if (!Array.isArray(pg)) return pg;
+    todos = todos.concat(pg); if (pg.length < PAG) break; ini += PAG;
+  }
+  return todos;
+}
 const post = (t, d, prefer="return=representation") => api(t, { method:"POST", body: JSON.stringify(d), headers:{Prefer:prefer} });
 const patch = (t, q, d) => api(t + "?" + q, { method:"PATCH", body: JSON.stringify(d), headers:{Prefer:"return=representation"} });
 const del = (t, q) => api(t + "?" + q, { method:"DELETE" });
@@ -498,7 +515,7 @@ const erroClaro = e => { const m = String(e && e.message || e); if (/Failed to f
 async function carregarModulo(k) {
   const m = MODULOS[k], t = APP.tenantId;
   try {
-    const r = m.rpc ? await api("rpc/" + m.rpc, { method: "POST", body: JSON.stringify({ p_tenant: t }) }) : await get(m.q(t));
+    const r = m.rpc ? await api("rpc/" + m.rpc, { method: "POST", body: JSON.stringify({ p_tenant: t }) }) : (m.um ? await get(m.q(t)) : await getTodos(m.q(t)));
     APP.dados[k] = m.um ? (m.rpc ? r : (r[0] || m.padrao)) : r;
     APP.carregadoEm[k] = new Date(); delete APP.desatualizado[k];
     delete APP.falhas[k];
@@ -625,8 +642,26 @@ function renderSind() {
     `<table><tr>${th("CNPJ","cnpj")}${th("Nome","nome")}${th("Tipo","tipo")}${th("UF","uf")}${th("Última CCT (MTE)","ult_registro")}${th("Monitorar","monitora")}${th("Última consulta","ultima_consulta")}${th("Consulta do dia","ultimo_status")}${th("Histórico (" + (APP.dados.cfg.historico_anos || 5) + " anos)","historico_status")}<th></th></tr>` +
     l.map(s => `<tr><td class="cnpj">${fmtCnpj(s.cnpj)}${dup[s.id] ? `<br><span class="tag erro">CNPJ duplicado</span>` : ""}</td><td class="nome">${esc(s.nome)}${criadoPeloRobo(s) ? ' <span class="tag cinza" title="cadastrado automaticamente pelo robô como parte de uma convenção; não passou pela Receita">robô</span>' : ""}<br><small style="color:var(--cinza)">${esc(s.categoria||"")}</small></td><td>${s.tipo ? esc(s.tipo) + (s.tipo_origem === "cct" ? ' <small style="color:var(--text-3)">(pela CCT)</small>' : "") : '<span class="tag cinza">a definir pela CCT</span>'}</td><td style="white-space:nowrap">${s.uf||""}</td><td style="white-space:nowrap">${s.ult_registro ? `${fmtD(s.ult_registro)}<br><small style="color:var(--text-3)"><a href="#" onclick="abrirInst('${ultCct[s.id].id}');return false">${esc(ultCct[s.id].numero_registro)}</a></small>` : '<span class="tag cinza">sem CCT</span>'}</td>
       <td>${s.monitora ? '<span class="tag ok">sim</span>' : '<span class="tag cinza">não</span>'}</td><td>${fmtDT(s.ultima_consulta)}</td><td>${s.ultimo_status ? tagStatus(s.ultimo_status) : "—"}</td><td>${hist(s)}${s.historico_obs ? `<br><small style="color:var(--text-3)">${esc(s.historico_obs)}</small>` : ""}</td>
-      <td style="white-space:nowrap"><button class="b sec sm" onclick="abrirSind('${s.id}')">Editar</button> <button class="b sec sm" onclick="excluirSind('${s.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
+      <td style="white-space:nowrap">${s.ativo && interno() ? `<button class="b sm" onclick="consultarAgora('${s.id}')" title="dispara o robô só para este CNPJ, fora da agenda; resultado em Consulta do dia em 2–4 min">Consultar agora</button> ` : ""}<button class="b sec sm" onclick="abrirSind('${s.id}')">Editar</button> <button class="b sec sm" onclick="excluirSind('${s.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
     (all.length ? "" : `<div class="aviso">Nenhum sindicato cadastrado. Cadastre o sindicato laboral (e, se quiser, o patronal) de cada cliente.</div>`);
+}
+// v0.19.0: consulta imediata de um sindicato (workflow_dispatch com apenas_cnpj)
+async function consultarAgora(id) {
+  const s = (APP.dados.sind || []).find(x => x.id === id); if (!s) return;
+  if (!confirm(`Consultar ${s.nome} no Mediador agora?\n\nO robô é disparado só para este CNPJ e o resultado aparece em "Consulta do dia" em 2 a 4 minutos (se houver uma execução em andamento, entra logo depois dela). Convenção nova encontrada é importada, analisada e avisada normalmente.`)) return;
+  try {
+    const r = await api("rpc/cct_consultar_agora", { method: "POST", body: JSON.stringify({ p_sindicato: id }) });
+    if (r.disparado) { msg(r.agrupado ? r.motivo : `Robô disparado para ${fmtCnpj(r.cnpj)} — acompanhe em Sindicatos (Consulta do dia) ou em Sistema → Histórico do Robô.`); acompanharConsulta(id, s.ultima_consulta); }
+    else msg("Não foi possível disparar agora — " + (r.motivo || "veja Configurações → Último disparo do robô."), "erro");
+  } catch (e) { msg(e.message, "erro"); }
+}
+function acompanharConsulta(id, antes) {   // recarrega Sindicatos a cada 30 s até a consulta mudar (máx. 10 min)
+  let n = 0; const t = setInterval(async () => {
+    n++; try { await carregarModulo("sind"); } catch {}
+    const s = (APP.dados.sind || []).find(x => x.id === id);
+    if (s && s.ultima_consulta !== antes) { clearInterval(t); renderSind(); msg(`Consulta concluída: ${s.nome} — ${s.ultimo_status || "sem status"}.`); }
+    else if (n >= 20) clearInterval(t);
+  }, 30000);
 }
 function abrirSind(id) {
   const s = APP.dados.sind.find(x => x.id === id) || {};
@@ -1139,6 +1174,7 @@ async function rodarLote() {
   const cnpjs = [...new Set(($("lCnpjs").value.match(/\d[\d.\/-]{12,17}\d/g) || []).map(c => c.replace(/\D/g, "")).filter(c => c.length === 14))];
   if (!cnpjs.length) return msg("Nenhum CNPJ válido encontrado.", "erro");
   const alvo = APP.loteAlvo, tipo = $("lTipo").value, sindId = $("lSind").value, resp = $("lResp").value.trim().toLowerCase() || null;
+  if (alvo === "e" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(resp || "")) return msg("Informe o e-mail do responsável — obrigatório para cadastrar empresas (v0.19.0).", "erro");
   $("btnLote").disabled = true; const linhas = [];
   const render = () => $("lRes").innerHTML = `<table><tr><th>CNPJ</th><th>Razão social</th><th>Município/UF</th><th>CNAE</th><th>Resultado</th></tr>` + linhas.map(l => `<tr><td>${fmtCnpj(l.cnpj)}</td><td>${esc(l.razao || "")}</td><td>${esc(l.mun || "")}</td><td>${esc(l.cnae || "")}</td><td>${l.tag}</td></tr>`).join("") + `</table>`;
   for (const cnpj of cnpjs) {
@@ -1330,9 +1366,37 @@ function renderBuscaSind() {
     : `<small style="color:var(--text-3)">Nenhum sindicato cadastrado com esse nome/CNPJ — use "Cadastrar novo sindicato".</small>`;
 }
 function novoSindDaEmpresa() { const b = $("eBusca").value.trim(); APP.voltarEmp = true; abrirSind(); if (b && /^[\d.\/-]+$/.test(b)) $("sCnpj").value = b; else if (b) $("sNome").value = b; }
+// v0.19.0: sugestão de sindicato em lote (só propõe; a confirmação é por linha)
+async function abrirSugLote() {
+  if (!interno()) return msg("Somente a equipe do escritório vincula empresas.", "erro");
+  $("sugRes").innerHTML = "Calculando sugestões…"; $("btnSug").disabled = true; $("mSug").classList.add("on");
+  try {
+    const rows = await api("rpc/cct_sugerir_lote", { method: "POST", body: JSON.stringify({ p_tenant: APP.tenantId }) });
+    APP.sug = rows;
+    if (!rows.length) { $("sugRes").innerHTML = `<div class="aviso">Todas as empresas ativas já têm vínculo sindical.</div>`; return; }
+    const com = rows.filter(r => r.sindicato_id).length;
+    $("sugRes").innerHTML = `<small style="color:var(--text-3)">${rows.length} empresa(s) sem vínculo · ${com} com sugestão · ${rows.length - com} sem base para sugerir (cadastre o vínculo em Editar)</small>
+      <table style="margin-top:6px"><tr><th><input type="checkbox" onchange="document.querySelectorAll('#sugRes input[data-i]').forEach(c=>c.checked=this.checked)"></th><th>Empresa</th><th>Município/UF · CNAE</th><th>Sindicato sugerido</th><th>Pontos</th><th>Motivos</th></tr>` +
+      rows.map((r, i) => `<tr><td>${r.sindicato_id ? `<input type="checkbox" data-i="${i}">` : ""}</td><td>${esc(r.razao_social)}<br><small class="cnpj" style="color:var(--text-3)">${fmtCnpj(r.cnpj)}</small></td><td><small>${esc([r.municipio, r.uf].filter(Boolean).join("/"))}<br>${esc(r.cnae || "")}</small></td><td>${r.sindicato_id ? `${esc(r.sindicato)} <small style="color:var(--text-3)">(${esc(r.tipo || "?")})</small>${r.alternativas > 0 ? `<br><small style="color:var(--amber)">+${r.alternativas} outra(s) possível(is) — confira em Editar se tiver dúvida</small>` : ""}` : '<span class="tag cinza">sem sugestão</span>'}</td><td>${r.pontos ?? "—"}</td><td><small>${esc((r.motivos || []).join("; "))}</small></td></tr>`).join("") + `</table>`;
+    $("btnSug").disabled = false;
+  } catch (e) { $("sugRes").innerHTML = `<div class="aviso" style="color:var(--red)">${esc(e.message)}${/cct_sugerir_lote/.test(e.message) ? " — execute o setup_cct_v0.19.0.sql no Supabase." : ""}</div>`; }
+}
+async function vincularSug() {
+  const sel = [...document.querySelectorAll('#sugRes input[data-i]:checked')].map(c => APP.sug[+c.dataset.i]);
+  if (!sel.length) return msg("Marque ao menos uma linha.", "erro");
+  if (!confirm(`Vincular ${sel.length} empresa(s) ao sindicato sugerido? A ciência das convenções desses sindicatos passa a ir para o responsável de cada empresa.`)) return;
+  $("btnSug").disabled = true; let ok = 0, err = 0;
+  for (const r of sel) {
+    try { await post("cct_empresa_sindicato", { tenant_id: APP.tenantId, empresa_id: r.empresa_id, sindicato_id: r.sindicato_id, papel: r.tipo || "laboral" }); ok++; }
+    catch (e) { err++; }
+  }
+  msg(`${ok} vínculo(s) criado(s)${err ? `, ${err} com erro` : ""}.`, err ? "erro" : "ok");
+  await carregarTudo(); abrirSugLote();
+}
 async function salvarEmp() {
   const cnpj = $("eCnpj").value.replace(/\D/g, "");
   if (cnpj.length !== 14 || !$("eNome").value.trim()) return msg("Informe CNPJ (14 dígitos) e razão social.", "erro");
+  if ($("eAtivo").value === "true" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test($("eRespE").value.trim())) return msg("Informe o e-mail do responsável pela empresa — sem ele a ciência das convenções não tem para quem ir (v0.19.0).", "erro");
   { const ex = (APP.dados.emp || []).find(x => x.cnpj === cnpj && x.id !== $("eId").value); // v0.18.2: um CNPJ, um cadastro
     if (ex) { msg(`CNPJ já cadastrado: ${ex.razao_social}. Abrindo o cadastro existente.`, "erro"); fechar("mEmp"); abrirEmp(ex.id); return; } }
   const d = { tenant_id: APP.tenantId, cnpj, razao_social: $("eNome").value.trim(), uf: $("eUf").value.trim().toUpperCase() || null, municipio: $("eMun").value.trim() || null, cnae: $("eCnae").value.trim() || null,
@@ -1383,6 +1447,7 @@ function renderConf() {
   $("cfgHorarios").value = cf.horarios_consulta || "06:00"; $("cfgIntervalo").value = cf.intervalo_consultas_s || 20; $("cfgMaxSind").value = cf.max_sindicatos_por_execucao || 0;
   $("cfgHistAuto").value = String(cf.historico_automatico ?? false);
   $("cfgIa").value = String(cf.ia_ativa ?? true); $("cfgIaLim").value = cf.ia_limite_mes ?? 60; $("cfgIaHist").value = String(cf.ia_historico ?? false);
+  carregarStatusDisparo();   // v0.19.0
   $("cfgIaUso").innerHTML = `Uso no mês: <b>${APP.dados.iaUso ?? "?"}</b> de ${cf.ia_limite_mes ?? 60} pareceres.` + (superadm() ? "" : " IA, horários/fila e limpeza são configurações críticas: somente o superadministrador altera.");
   const criticos = ["cfgIa","cfgIaLim","cfgIaHist","cfgHorarios","cfgIntervalo","cfgMaxSind","cfgGhRepo","cfgGhBranch"];
   $("cfgGhRepo").value = cf.github_repo || ""; $("cfgGhBranch").value = cf.github_branch || "";
@@ -1437,6 +1502,18 @@ async function salvarConfig() {
     await carregarTudo(); } catch (e) { msg(e.message, "erro"); }
 }
 
+// v0.19.0: resposta do GitHub ao último disparo (parecer ou consulta imediata)
+async function carregarStatusDisparo() {
+  const el = $("cfgDisparo"); if (!el) return;
+  try {
+    const r = await api("rpc/cct_status_disparo", { method: "POST", body: JSON.stringify({ p_tenant: APP.tenantId }) });
+    if (!r.tem) { el.innerHTML = "Último disparo do robô pelo app: nenhum ainda."; return; }
+    const tipo = String(r.tipo || "").startsWith("consulta:") ? "consulta de " + fmtCnpj(r.tipo.slice(9)) : "parecer por IA";
+    if (r.pendente) { el.innerHTML = `Último disparo do robô (${tipo}, ${fmtDT(r.em)}): aguardando resposta do GitHub…`; return; }
+    const ok = r.http === 204;
+    el.innerHTML = `Último disparo do robô (${tipo}, ${fmtDT(r.em)}): <b style="color:${ok ? "var(--green)" : "var(--red)"}">${esc(r.texto)}</b>${!ok && r.detalhe ? `<br><small style="color:var(--text-3)">${esc(r.detalhe)}</small>` : ""}`;
+  } catch (e) { el.innerHTML = `Último disparo do robô: ${/cct_status_disparo/.test(e.message) ? "execute o setup_cct_v0.19.0.sql" : esc(erroClaro(e))}`; }
+}
 // ---------- boot ----------
 (async () => {
   const s = sessionStorage.getItem("cct_sess");

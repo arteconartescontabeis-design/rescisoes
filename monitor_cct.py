@@ -46,7 +46,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.18.5"
+VERSAO = "0.19.0"
 # v0.18.5: orçamento de tempo da execução (minutos), informado pelo workflow (timeout-minutes − margem); todas as etapas o respeitam
 ORCAMENTO_MIN = int(os.environ.get("ORCAMENTO_MIN") or "45")
 _INICIO_GLOBAL = time.time()
@@ -83,6 +83,27 @@ def sb_get(tabela, params):
     r = requests.get(f"{SB_URL}/rest/v1/{tabela}", headers=H, params=params, timeout=30)
     r.raise_for_status()
     return r.json()
+
+
+PAGINA = 1000   # v0.19.0: limite por resposta do PostgREST (Max rows); listas maiores vêm em páginas
+
+
+def sb_get_all(tabela, params):
+    """v0.19.0: lê a lista inteira, em páginas de PAGINA linhas (Range), para que o robô nunca deixe de enxergar convenções
+    já importadas quando a tabela passar do limite de linhas por resposta — o que faria reimportar e avisar em duplicidade."""
+    todos, ini = [], 0
+    while True:
+        h = dict(H, Range=f"{ini}-{ini + PAGINA - 1}", **{"Range-Unit": "items"})
+        r = requests.get(f"{SB_URL}/rest/v1/{tabela}", headers=h, params=params, timeout=60)
+        if r.status_code == 416:   # fora do intervalo = acabou
+            break
+        r.raise_for_status()
+        pg = r.json()
+        todos.extend(pg)
+        if len(pg) < PAGINA:
+            break
+        ini += PAGINA
+    return todos
 
 
 def sb_insert(tabela, dados, upsert_on=None):
@@ -542,8 +563,8 @@ def analisar_pendentes(tenant, limite_s=None):
     """Instrumentos importados sem análise (analise_status nulo: importação sem parecer, 'Analisar com IA' ou lote por ano).
     v0.17.2: a fila NÃO é consumida sem a chave da IA nem com o limite mensal atingido — fica esperando, com incidente que explica;
     processa dentro de `limite_s` segundos (o que sobrar continua na próxima execução). Devolve o nº de pareceres processados."""
-    pend = sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "analise_status": "is.null",
-                                       "select": "id,numero_registro,sindicato_id", "order": "detectado_em.desc", "limit": "500"})
+    pend = sb_get_all("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "analise_status": "is.null",
+                                           "select": "id,numero_registro,sindicato_id", "order": "detectado_em.desc"})
     if not pend:
         resolver(tenant, "IA:chave-ausente"); resolver(tenant, "IA:limite-mensal")
         return 0
@@ -752,10 +773,10 @@ def reconsultar_receita(tenant, cfg, maximo=40, limite_s=None):
     corte = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat()
     fila = []
     try:
-        for s in sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "receita_em": f"lt.{corte}",
+        for s in sb_get_all("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "receita_em": f"lt.{corte}",
                                             "select": "id,cnpj,nome,uf,municipio,cnae,situacao_cadastral,responsavel_email,receita_em", "order": "receita_em.asc", "limit": str(maximo)}):
             fila.append(("sindicato", "cct_sindicatos", s))
-        for e in sb_get("cct_empresas", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "or": f"(receita_em.is.null,receita_em.lt.{corte})",
+        for e in sb_get_all("cct_empresas", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "or": f"(receita_em.is.null,receita_em.lt.{corte})",
                                           "select": "id,cnpj,razao_social,uf,municipio,cnae,cnae_descricao,situacao_cadastral,responsavel_email,receita_em", "order": "receita_em.asc.nullsfirst", "limit": str(maximo)}):
             fila.append(("empresa", "cct_empresas", e))
     except Exception as e:
@@ -955,7 +976,7 @@ def importar_historico(tenant, page, existentes, cfg, limite_s=None):
     if limite_s is not None and limite_s < 120:
         log(f"HISTÓRICO: sem tempo nesta execução ({int(limite_s)} s) — fica para a próxima"); return 0
     esgotou = lambda: limite_s is not None and time.time() - t0h > limite_s
-    pend = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "historico_status": "in.(PENDENTE,EM_ANDAMENTO)",
+    pend = sb_get_all("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "historico_status": "in.(PENDENTE,EM_ANDAMENTO)",
                                      "select": "id,cnpj,nome,tipo,historico_status", "order": "historico_em.nullsfirst", "limit": "3"})
     if not pend:
         return 0
@@ -1216,7 +1237,7 @@ def modo_complementar(tenant, cfg, motivo):
     devidos, _, _ = fila_retentativa(tenant, cfg)
     ret = (0, 0, 0)
     if devidos:
-        existentes = {r["numero_registro"] for r in sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "select": "numero_registro"})}
+        existentes = {r["numero_registro"] for r in sb_get_all("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "select": "numero_registro"})}
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=False)
             page = browser.new_context(locale="pt-BR", accept_downloads=True).new_page()
@@ -1295,7 +1316,7 @@ def main():
             log("nenhum horário válido configurado; modo complementar"); modo_complementar(tenant, cfg0, "nenhum horário válido configurado"); return
         # devido = último horário configurado já passado. Executa enquanto houver sindicato monitorado NÃO consultado desde então
         # (assim, o que não coube em um disparo de 45 min continua no próximo, e um máximo por execução vira fila natural).
-        todos = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true", "select": "id,ultima_consulta"})
+        todos = sb_get_all("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true", "select": "id,ultima_consulta"})
         pendentes = [x for x in todos if not x.get("ultima_consulta") or datetime.fromisoformat(x["ultima_consulta"].replace("Z", "+00:00")).astimezone(BRT) < devido]
         if todos and not pendentes:
             log(f"nada devido: todos os {len(todos)} sindicatos já consultados desde {devido:%d/%m %H:%M} BRT (horários {cfg0.get('horarios_consulta')})")
@@ -1325,13 +1346,13 @@ def main():
     # FILA: os consultados há mais tempo primeiro; opcionalmente só N por execução; intervalo configurável
     global INTERVALO
     INTERVALO = float(cfg0.get("intervalo_consultas_s") or INTERVALO)
-    sinds = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true",
+    sinds = sb_get_all("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true",
                                       "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email,ultima_consulta", "order": "ultima_consulta.asc.nullsfirst"})
     maximo = int(cfg0.get("max_sindicatos_por_execucao") or 0)
     if maximo and len(sinds) > maximo:
         log(f"fila: {len(sinds)} sindicatos, {maximo} por execução (os demais ficam para a próxima)")
         sinds = sinds[:maximo]
-    emps_act = sb_get("cct_empresas", {"tenant_id": f"eq.{tenant}", "monitorar_act": "eq.true", "ativo": "eq.true",
+    emps_act = sb_get_all("cct_empresas", {"tenant_id": f"eq.{tenant}", "monitorar_act": "eq.true", "ativo": "eq.true",
                                        "select": "id,cnpj,razao_social,responsavel_email,gerente_email", "order": "razao_social"})
     filtro = os.environ.get("APENAS_CNPJ", "").strip()
     if filtro:
@@ -1339,7 +1360,7 @@ def main():
         emps_act = [e for e in emps_act if e["cnpj"] == filtro]
     log(f"{len(sinds)} sindicato(s) e {len(emps_act)} empresa(s) com ACT a monitorar")
     # já importados de fato; os com IMPORTACAO_NAO_CONCLUIDA voltam a ser tentados (seção 92)
-    existentes = {r["numero_registro"] for r in sb_get("cct_instrumentos",
+    existentes = {r["numero_registro"] for r in sb_get_all("cct_instrumentos",
                   {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "select": "numero_registro"})}
     resumo = {"CONSULTA_CONFIRMADA": 0, "CONSULTA_COM_ALERTA": 0, "CONSULTA_NAO_CONCLUIDA": 0, "novos": 0}
 
