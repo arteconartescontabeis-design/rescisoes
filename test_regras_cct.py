@@ -152,3 +152,74 @@ def test_fila_ia_pausada_respeita_6h(mc, monkeypatch):
     assert mc._fila_ia_pausada("t") is None
     monkeypatch.setattr(mc, "sb_get", lambda tab, p: [])
     assert mc._fila_ia_pausada("t") is None
+
+
+# ---------- IA só sob demanda + IA Central (v0.20.0) ----------
+def _preparar_analise(mc, monkeypatch, token):
+    chamadas, patches, incidentes = [], [], []
+    if token:
+        monkeypatch.setenv("IA_GATEWAY_TOKEN", token)
+    else:
+        monkeypatch.delenv("IA_GATEWAY_TOKEN", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    def fake_analisar(dados, anterior=None, usar_ia=True):
+        chamadas.append(usar_ia)
+        return {"status": "CONCLUIDA" if usar_ia else "ANALISE_IA_NAO_CONCLUIDA", "erro_ia": None if usar_ia else "IA desligada",
+                "modelo": None, "valores": [], "comparacao": None, "resumo": None, "destaques": [], "providencias": [], "alertas": [],
+                "pontos_incertos": [], "validacao": [], "descartados": [], "comentarios": [], "duracao_ms": 1}
+    monkeypatch.setattr(mc.analisar_cct, "analisar", fake_analisar, raising=False)
+    monkeypatch.setattr(mc, "sb_rpc", lambda nome, p: 0 if nome == "cct_ia_uso_mes" else None)
+    monkeypatch.setattr(mc, "sb_get", lambda tab, p: [{"origem": "monitoramento"}] if tab == "cct_instrumentos" else [])
+    monkeypatch.setattr(mc, "sb_insert", lambda tab, linhas, upsert_on=None: [{"id": "an1"}])
+    monkeypatch.setattr(mc, "sb_patch", lambda tab, filtro, dados: patches.append(dados))
+    monkeypatch.setattr(mc, "config", lambda t: {"ia_ativa": True, "ia_limite_mes": 60})
+    monkeypatch.setattr(mc, "incidente", lambda *a, **k: incidentes.append(a[1]))
+    monkeypatch.setattr(mc, "resolver", lambda *a, **k: None)
+    monkeypatch.setattr(mc, "log", lambda *a, **k: None)
+    class _R:
+        def delete(self, *a, **k): return None
+    monkeypatch.setattr(mc, "requests", _R(), raising=False)
+    dados = {"metadados": {"numero_registro": "SC000001/2026"}, "clausulas": []}
+    return chamadas, patches, incidentes, dados
+
+def test_importacao_nao_chama_ia_mesmo_com_token(mc, monkeypatch):
+    chamadas, patches, incidentes, dados = _preparar_analise(mc, monkeypatch, "iagw_cct_teste")
+    mc.analisar_instrumento("t", "i1", dados, "s1", sob_demanda=False)
+    assert chamadas == [False]                                        # valores e comparação, sem IA
+    assert patches[-1]["analise_status"] == "ANALISE_IA_NAO_CONCLUIDA"  # fica fora da fila (não é nulo)
+    assert not incidentes                                             # sem incidente: não é falha
+
+def test_analisar_com_ia_usa_token_da_ia_central(mc, monkeypatch):
+    chamadas, patches, incidentes, dados = _preparar_analise(mc, monkeypatch, "iagw_cct_teste")
+    mc.analisar_instrumento("t", "i1", dados, "s1")                   # padrão = sob demanda (botão)
+    assert chamadas == [True]
+    assert patches[-1]["analise_status"] == "CONCLUIDA"
+
+def test_sem_token_da_ia_central_nao_chama_ia(mc, monkeypatch):
+    chamadas, patches, incidentes, dados = _preparar_analise(mc, monkeypatch, None)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-antiga")           # a chave antiga NÃO vale mais
+    mc.analisar_instrumento("t", "i1", dados, "s1")
+    assert chamadas == [False]
+    assert mc.ia_chave_presente() is False
+
+
+def test_parecer_ia_chama_o_gateway_com_o_token(monkeypatch):
+    """analisar_cct real (não o dublê do conftest): endereço, token e mensagem de recusa da IA Central."""
+    import os, sys, types, json, importlib.util
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    spec = importlib.util.spec_from_file_location("analisar_cct_real", os.path.join(raiz, "robo", "analisar_cct.py"))
+    ac = importlib.util.module_from_spec(spec); spec.loader.exec_module(ac)
+    visto = {}
+    class Resp:
+        def __init__(self, code, corpo): self.status_code, self._c, self.text = code, corpo, json.dumps(corpo)
+        def json(self): return self._c
+    def post(url, timeout=None, headers=None, json=None):
+        visto.update(url=url, chave=headers["x-api-key"], modelo=json["model"], usuario=headers.get("x-ia-usuario"))
+        return Resp(429, {"type": "error", "error": {"message": 'Limite diário de IA de "CCT Monitor" atingido.'}})
+    monkeypatch.setitem(sys.modules, "requests", types.SimpleNamespace(post=post))
+    monkeypatch.setenv("IA_GATEWAY_TOKEN", "iagw_cct_teste")
+    parecer, erro = ac.parecer_ia({"metadados": {"numero_registro": "X"}, "clausulas": []}, [], None)
+    assert parecer is None
+    assert visto["url"].endswith("/functions/v1/ia-gateway") and visto["chave"] == "iagw_cct_teste"
+    assert visto["modelo"] == "claude-sonnet-4-6" and visto["usuario"]
+    assert "Limite diário" in erro and "IA Central HTTP 429" in erro

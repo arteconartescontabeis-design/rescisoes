@@ -17,7 +17,7 @@ let fetchImpl = async () => ({ ok: true, status: 200, text: async () => "[]", js
 global.fetch = (...a) => fetchImpl(...a);
 
 // carrega o app (as funções viram globais)
-eval(js + "\n;globalThis.__cct = { dataBR, hojeBR, normCat, catsUnicas, getTodos, fmtCnpj, abrevTipo, renderComFoco, confirmarSenha, senhaConfirmar, marcarSemFunc, consultarAgora, APP, CONFIG };");
+eval(js + "\n;globalThis.__cct = { dataBR, hojeBR, normCat, catsUnicas, getTodos, fmtCnpj, abrevTipo, renderComFoco, confirmarSenha, senhaConfirmar, marcarSemFunc, consultarAgora, tagStatus, APP, CONFIG };");
 const C = globalThis.__cct;
 
 let n = 0, falhas = 0;
@@ -25,6 +25,13 @@ async function t(nome, fn) { try { await fn(); n++; console.log("  ok  " + nome)
 
 (async () => {
   console.log("Regras do app — cct.html " + C.CONFIG.versao);
+
+  // IA só sob demanda (v0.20.0): convenção sem parecer aparece como "sem parecer IA", não como erro
+  await t("tagStatus: ANALISE_IA_NAO_CONCLUIDA vira 'sem parecer IA' (cinza)", () => {
+    const h = C.tagStatus("ANALISE_IA_NAO_CONCLUIDA");
+    assert.ok(/sem parecer IA/.test(h) && /tag cinza/.test(h), h);
+    assert.ok(/tag ok/.test(C.tagStatus("IMPORTADO")));
+  });
 
   // datas no fuso de Brasília (v0.18.5)
   await t("dataBR: 23:30 em Brasília continua no mesmo dia (UTC já virou)", () => {

@@ -19,7 +19,7 @@ Erros mostra em linguagem corrente; (2) nos disparos de hora em hora em que não
 COMPLEMENTAR: refaz SÓ os itens com incidente aberto (consulta/download/importação/armazenamento) a cada N horas, até M
 tentativas por item por dia (cct_config.retentar_intervalo_h / retentar_max_dia) — esgotadas, o incidente vira CRÍTICO —
 e depois processa a fila de pareceres por IA dentro do tempo restante; (3) a fila de IA não é consumida sem a chave
-ANTHROPIC_API_KEY nem com o limite mensal atingido (incidente explica o motivo; a fila espera).
+da IA nem com o limite mensal atingido (incidente explica o motivo; a fila espera). [v0.20.0: chave = IA_GATEWAY_TOKEN]
 
 v0.18.1: (1) o robô NÃO cadastra mais as demais partes das convenções como sindicatos (só define laboral/patronal do
 sindicato monitorado quando estiver em branco) — a relação de sindicatos é a cadastrada pelo escritório; (2) reconsulta
@@ -28,6 +28,11 @@ cct_config.receita_reconsulta_dias (0 = só pelo botão do app), registrando cad
 (3) envio dos avisos CADASTRO_ALTERADO enfileirados pelo app ou pelo robô (ao responsável; sem responsável, aos e-mails
 de erros críticos/gerentes) em toda execução, inclusive nos disparos sem consulta; (4) os e-mails de nova convenção,
 lembrete e escalonamento passam a informar o usuário responsável pela empresa (nome e e-mail).
+
+v0.20.0 (27/09/2026): (1) IA CENTRAL — o parecer por IA passa pelo ia-gateway do Portal Artecon com o token do CCT
+(secret IA_GATEWAY_TOKEN do GitHub); a chave da Anthropic não fica mais no repositório. (2) IA SÓ SOB DEMANDA — a
+convenção nova é importada com valores por cláusula e comparação com a anterior, mas SEM parecer por IA; o parecer só é
+gerado quando alguém clica "Analisar com IA" na convenção (cct_pedir_analise_agora → fila → este robô).
 """
 import hashlib
 import json
@@ -46,7 +51,11 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.19.4"
+VERSAO = "0.20.0"
+# v0.20.0: token do CCT na IA Central (ia-gateway do Portal Artecon)
+def ia_chave_presente():
+    return bool((os.environ.get("IA_GATEWAY_TOKEN") or "").strip())
+
 # v0.18.5: orçamento de tempo da execução (minutos), informado pelo workflow (timeout-minutes − margem); todas as etapas o respeitam
 ORCAMENTO_MIN = int(os.environ.get("ORCAMENTO_MIN") or "45")
 _INICIO_GLOBAL = time.time()
@@ -401,7 +410,7 @@ def importar(tenant, sind, reg, page, consulta_id, empresa=None, origem="monitor
         resolver(tenant, f"IMPORTACAO:{registro}")
         log(f"  IMPORTADO {registro}: {d['total_clausulas']} cláusulas, {len(dados['partes'])} partes")
         if dados["status_importacao"] == "IMPORTADO":
-            analisar_instrumento(tenant, row["id"], d, sind.get("id"))
+            analisar_instrumento(tenant, row["id"], d, sind.get("id"), sob_demanda=False)   # v0.20.0: IA só pelo botão
         return row, dados["status_importacao"] == "IMPORTADO"
     except Exception as e:
         row = sb_insert("cct_instrumentos", dict(base, arquivo_path=arquivo_path, sha256=sha,
@@ -471,17 +480,23 @@ def carregar_dados_instrumento(inst_id):
             "abrangencia_territorial": i.get("abrangencia"), "data_base": i.get("data_base"), "clausulas": cls, "total_clausulas": len(cls)}
 
 
-def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
-    """Gera valores, comparação com a anterior e parecer (IA opcional). Regra 99: IA falhou → ANALISE_IA_NAO_CONCLUIDA."""
+MOTIVO_SOB_DEMANDA = "parecer por IA sob demanda — clique em \"Analisar com IA\" na convenção para gerar"
+
+
+def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None, sob_demanda=True):
+    """Gera valores, comparação com a anterior e parecer (IA opcional). Regra 99: IA falhou → ANALISE_IA_NAO_CONCLUIDA.
+    v0.20.0: sob_demanda=False (importação) grava valores e comparação SEM chamar a IA."""
     try:
         dados = dados or carregar_dados_instrumento(inst_id)
         ant_id = sb_rpc("cct_anterior", {"p_instrumento": inst_id})
         anterior = carregar_dados_instrumento(ant_id) if ant_id else None
         cfg = config(tenant)
         origem_inst = (sb_get("cct_instrumentos", {"id": f"eq.{inst_id}", "select": "origem"}) or [{}])[0].get("origem")
-        usar_ia = bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())
+        usar_ia = ia_chave_presente()
         motivo_sem_ia = None
-        if not usar_ia:
+        if not sob_demanda:
+            usar_ia, motivo_sem_ia = False, MOTIVO_SOB_DEMANDA
+        elif not usar_ia:
             motivo_sem_ia = MOTIVO_SEM_CHAVE
         elif usar_ia and not cfg.get("ia_ativa", True):
             usar_ia, motivo_sem_ia = False, "IA desativada nos parâmetros pelo gerente"
@@ -518,7 +533,7 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
             log(f"  IA sem crédito: {dados['metadados']['numero_registro']} continua na fila")
         elif usar_ia:  # só é incidente quando a IA deveria ter rodado e falhou
             incidente(tenant, f"IA:{inst_id}", "IA", "ATENCAO", f"ANÁLISE POR IA NÃO CONCLUÍDA – {dados['metadados']['numero_registro']}: {r['erro_ia']} (valores e comparação gravados)", sindicato_id, inst_id,
-                      contexto={"registro": dados["metadados"]["numero_registro"], "etapa": "parecer por IA (API Anthropic)", "resposta": r["erro_ia"], "modelo": r.get("modelo")})
+                      contexto={"registro": dados["metadados"]["numero_registro"], "etapa": "parecer por IA (IA Central)", "resposta": r["erro_ia"], "modelo": r.get("modelo")})
         log(f"  ANÁLISE {dados['metadados']['numero_registro']}: {r['status']} — {len(r['valores'])} valores, "
             f"{'comparada com ' + anterior['metadados']['numero_registro'] if anterior else 'sem anterior'}, {r['duracao_ms']} ms")
         return an
@@ -530,7 +545,7 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
         return None
 
 
-MOTIVO_SEM_CHAVE = "chave ANTHROPIC_API_KEY não configurada nos secrets do repositório (GitHub → Settings → Secrets and variables → Actions)"
+MOTIVO_SEM_CHAVE = "token IA_GATEWAY_TOKEN não configurado nos secrets do repositório (GitHub → Settings → Secrets and variables → Actions; o token do CCT é gerado no Portal → Consumo de IA)"
 # v0.18.5: resposta da API Anthropic quando a conta está sem crédito (HTTP 400 "credit balance is too low" / 402) — não é erro da convenção
 _RX_SEM_CREDITO = _re.compile(r"credit balance|insufficient|too low|HTTP 402|billing|purchase credits|saldo", _re.I)
 SEM_CREDITO = {"msg": None}
@@ -554,9 +569,9 @@ def _fila_ia_pausada(tenant):
 
 def _incidente_sem_credito(tenant, msg, na_fila):
     incidente(tenant, "IA:sem-credito", "IA", "CRITICO",
-              f"IA SEM CRÉDITO – a conta da API Anthropic está sem saldo; {na_fila} convenção(ões) aguardam parecer. Recarregue o crédito em console.anthropic.com → Billing; a fila retoma sozinha",
-              contexto={"etapa": "parecer por IA (API Anthropic)", "resposta": msg, "na_fila": na_fila,
-                        "o_que_fazer": "recarregar o crédito da conta da API Anthropic (console.anthropic.com → Billing); depois resolva o incidente ou aguarde 6 h — a fila retoma sozinha"})
+              f"IA SEM CRÉDITO – a conta da API Anthropic está sem saldo; {na_fila} convenção(ões) aguardam parecer. Recarregue em platform.claude.com → Billing e lance a recarga no Portal → Consumo de IA; a fila retoma sozinha",
+              contexto={"etapa": "parecer por IA (IA Central)", "resposta": msg, "na_fila": na_fila,
+                        "o_que_fazer": "recarregar o crédito da conta da Artecon (platform.claude.com → Billing) e lançar a recarga no Portal → Consumo de IA; depois resolva o incidente ou aguarde 6 h — a fila retoma sozinha"})
 
 
 def analisar_pendentes(tenant, limite_s=None):
@@ -572,9 +587,9 @@ def analisar_pendentes(tenant, limite_s=None):
     cfg = config(tenant)
     if not cfg.get("ia_ativa", True):
         log("  fila de IA parada: parecer por IA desligado em Configurações"); return 0
-    if not (os.environ.get("ANTHROPIC_API_KEY") or "").strip():
+    if not ia_chave_presente():
         incidente(tenant, "IA:chave-ausente", "IA", "ALTO", f"PARECER POR IA INDISPONÍVEL – {len(pend)} convenção(ões) na fila e {MOTIVO_SEM_CHAVE}",
-                  contexto={"etapa": "parecer por IA (API Anthropic)", "na_fila": len(pend), "resposta": "o robô subiu sem a variável ANTHROPIC_API_KEY; a fila fica aguardando"})
+                  contexto={"etapa": "parecer por IA (IA Central)", "na_fila": len(pend), "resposta": "o robô subiu sem a variável IA_GATEWAY_TOKEN; a fila fica aguardando"})
         return 0
     resolver(tenant, "IA:chave-ausente")
     pausa = _fila_ia_pausada(tenant)   # v0.18.5
@@ -589,7 +604,7 @@ def analisar_pendentes(tenant, limite_s=None):
         lim = int(cfg.get("ia_limite_mes") or 0)
         if uso >= lim:
             incidente(tenant, "IA:limite-mensal", "IA", "ATENCAO", f"FILA DE IA PARADA – limite mensal de pareceres atingido ({uso}/{lim}); {len(pend) - n} convenção(ões) aguardam (aumente o limite em Configurações ou aguarde o próximo mês)",
-                      contexto={"etapa": "parecer por IA (API Anthropic)", "uso_mes": uso, "limite_mes": lim, "na_fila": len(pend) - n})
+                      contexto={"etapa": "parecer por IA (IA Central)", "uso_mes": uso, "limite_mes": lim, "na_fila": len(pend) - n})
             break
         resolver(tenant, "IA:limite-mensal")
         if limite_s and time.time() - t0 > limite_s:
@@ -1267,7 +1282,7 @@ def modo_complementar(tenant, cfg, motivo):
         partes.append(f"Receita: {rfb[0]} reconsultado(s), {rfb[1]} alterado(s)")
     encerrar_execucao("SEM_CONSULTA", motivo + (" · " + "; ".join(partes) if partes else ""),
                       {"retentativa": {"tentados": ret[0], "resolvidos": ret[1], "escalados": ret[2]}, "ia_pareceres": n_ia, "receita": {"consultados": rfb[0], "alterados": rfb[1]},
-                       "ia_chave_presente": bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())})
+                       "ia_chave_presente": ia_chave_presente()})
 
 
 def main():
@@ -1295,8 +1310,8 @@ def main():
             incidente(tenant, "IA:sob-demanda", "IA", "ALTO", f"Análise sob demanda falhou: {e}", contexto={"etapa": "execução só de pareceres (so_analise)", "resposta": str(e)})
             encerrar_execucao("ERRO_TOTAL", f"análise sob demanda falhou: {e}")
             return
-        chave = bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())
-        encerrar_execucao("SEM_CONSULTA", f"análise por IA sob demanda: {n} parecer(es) processado(s)" + ("" if chave else " — SEM A CHAVE ANTHROPIC_API_KEY (fila aguardando)"),
+        chave = ia_chave_presente()
+        encerrar_execucao("SEM_CONSULTA", f"análise por IA sob demanda: {n} parecer(es) processado(s)" + ("" if chave else " — SEM O TOKEN IA_GATEWAY_TOKEN (fila aguardando)"),
                           {"ia_pareceres": n, "ia_chave_presente": chave})
         return
     forcar = (os.environ.get("FORCAR") or "").lower() in ("1", "true", "sim")
@@ -1454,7 +1469,7 @@ def main():
     resumo["receita"] = {"consultados": resumo_rfb[0], "alterados": resumo_rfb[1]}
     encerrar_execucao(resultado, motivo, {"sindicatos_previstos": previstos, "sindicatos_processados": processados, "novos": resumo["novos"],
                                           "alertas": alertas, "erros": erros, "historico": resumo.get("historico"), "detalhes": resumo,
-                                          "ia_pareceres": resumo.get("ia_pareceres"), "ia_chave_presente": bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())})
+                                          "ia_pareceres": resumo.get("ia_pareceres"), "ia_chave_presente": ia_chave_presente()})
     with open("resumo_execucao.json", "w", encoding="utf-8") as f:
         json.dump({"versao": VERSAO, "origem": ORIGEM, "quando": datetime.now(timezone.utc).isoformat(), **resumo}, f, ensure_ascii=False, indent=2)
 

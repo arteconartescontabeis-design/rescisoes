@@ -70,7 +70,7 @@ jobs:
           FORCAR: ${{ inputs.forcar }}
           SO_ANALISE: ${{ inputs.so_analise }}
           APENAS_CNPJ: ${{ inputs.apenas_cnpj }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          IA_GATEWAY_TOKEN: ${{ secrets.IA_GATEWAY_TOKEN }}   # v0.20.0: token do CCT na IA Central (Portal → Consumo de IA)
           ORIGEM: github-actions
           ORCAMENTO_MIN: "112"      # v0.18.5: orçamento do robô = timeout-minutes menos margem para instalar/encerrar
         run: |
