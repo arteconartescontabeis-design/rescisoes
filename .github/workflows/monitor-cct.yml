@@ -31,11 +31,11 @@ permissions:
 
 jobs:
   monitorar:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Instalar dependencias
@@ -86,7 +86,7 @@ jobs:
             -d '{"p_id":"${{ steps.abrir.outputs.execucao_id }}","p_resultado":"INTERROMPIDA","p_motivo":"o processo do robo terminou (${{ steps.robo.outcome }}) sem registrar o fim — ver log desta execucao"}'
       - name: Guardar log e extratos da execucao
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cct-monitor-${{ github.run_number }}
           path: |
