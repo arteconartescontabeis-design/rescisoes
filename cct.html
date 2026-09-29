@@ -161,7 +161,7 @@
       <div class="card"><div class="topo"><h2>Convenções e Termos Aditivos</h2><div style="display:flex;gap:6px;flex-wrap:wrap"><input id="fInst" placeholder="buscar…" style="width:180px" oninput="renderInst()">
         <select id="fiTipo" onchange="renderInst()" style="width:170px"><option value="">Tipo: todos</option></select><select id="fiSind" onchange="renderInst()" style="width:220px"><option value="">Sindicato: todos</option></select>
         <select id="fiCat" onchange="renderInst()" style="width:200px"><option value="">Categoria: todas</option></select><select id="fiImp" onchange="renderInst()" style="width:170px"><option value="">Importação: todas</option><option value="IMPORTADO">Importado</option><option value="IMPORTACAO_NAO_CONCLUIDA">Não concluída</option></select>
-        <select id="fiOri" onchange="renderInst()" style="width:150px"><option value="">Origem: todas</option><option value="monitoramento">Monitoramento</option><option value="historico">Histórico</option></select><select id="fiVig" onchange="renderInst()" style="width:150px"><option value="">Vigência: todas</option><option value="vigente">Vigentes</option><option value="vencida">Vencidas</option><option value="sem_vig">Sem vigência informada</option></select><span style="display:inline-flex;gap:4px;align-items:center;font-size:12px;color:var(--text-3)">Registro MTE de <input id="fiRegDe" type="date" onchange="renderInst()" style="width:140px"> até <input id="fiRegAte" type="date" onchange="renderInst()" style="width:140px"></span></div></div><div id="tabInst"></div></div>
+        <select id="fiOri" onchange="renderInst()" style="width:150px"><option value="">Origem: todas</option><option value="monitoramento">Monitoramento</option><option value="historico">Histórico</option><option value="solicitacao_transmitida">Solicitação transmitida</option></select><select id="fiSit" onchange="renderInst()" style="width:190px"><option value="">Situação: todas</option><option value="REGISTRADA">Registrada no MTE</option><option value="AGUARDANDO_REGISTRO">Aguardando registro</option><option value="SEM_VINCULO">Sem vínculo (sem aviso)</option></select><select id="fiVig" onchange="renderInst()" style="width:150px"><option value="">Vigência: todas</option><option value="vigente">Vigentes</option><option value="vencida">Vencidas</option><option value="sem_vig">Sem vigência informada</option></select><span style="display:inline-flex;gap:4px;align-items:center;font-size:12px;color:var(--text-3)">Registro MTE de <input id="fiRegDe" type="date" onchange="renderInst()" style="width:140px"> até <input id="fiRegAte" type="date" onchange="renderInst()" style="width:140px"></span></div></div><div id="tabInst"></div></div>
     </section>
 
     <section data-sec="altcad" style="display:none">
@@ -249,6 +249,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.21.0</td><td>29/09/2026</td><td><b>Convenção aguardando registro.</b> O Mediador público só lista instrumentos já registrados; a solicitação transmitida (nº MR…/ano) agora é informada em <b>Sindicatos → Solicitação transmitida</b> (nº, tipo, vigência, data de transmissão). O robô cria a convenção como <span class="tag alerta">aguardando registro</span> (linha âmbar em Convenções, nº da solicitação no lugar do registro), tenta baixar o extrato pelo nº da solicitação e avisa por e-mail com destaque "AINDA NÃO REGISTRADA no MTE" — <b>sem ciência</b>. Quando o registro aparece na consulta, a mesma convenção é promovida (nº SC…/ano, data de registro, cláusulas do texto registrado), as ciências são criadas e sai o e-mail "registro confirmado". Filtro <b>Situação</b> e contagem no Painel. <b>Só notifica quem tem empresa vinculada:</b> convenção de sindicato sem empresa vinculada (ativa e com funcionários) é baixada e guardada com a marca <span class="tag cinza">sem vínculo</span>, sem ciência e sem e-mail. <b>Workflow:</b> limite de 180 min (a rodada completa leva ~1h35) e orçamento interno do robô acompanhando; passa o token da IA Central. Requer <b>sql/setup_cct_v0.21.0.sql</b> (só acrescenta colunas). Arquivos: cct.html, robo/monitor_cct.py, .github/workflows/monitor-cct.yml.</td></tr>
           <tr><td>v0.20.0</td><td>27/09/2026</td><td><b>IA pela IA Central e só sob demanda.</b> O parecer por IA passa pela <b>IA Central do Portal Artecon</b> (uma conta só da Anthropic para todos os aplicativos, com limite e consumo do CCT em Portal → Consumo de IA); o robô usa o secret <code>IA_GATEWAY_TOKEN</code> no lugar da chave antiga. <b>Convenção nova não gera mais parecer automático:</b> ela é importada com os valores por cláusula e a comparação com a anterior, e o parecer só é feito quando alguém clica <b>"Analisar com IA"</b> na convenção. O status dessas convenções aparece como <b>"sem parecer IA"</b> (cinza) em vez de "análise IA não concluída". As convenções que estavam na fila desde a falta de crédito de 15/09 saem da fila (não são analisadas sozinhas). <b>Robô e workflows no lugar certo:</b> o robô em uso (<code>robo/monitor_cct.py</code>) ainda era o v0.18.1 e o workflow era o antigo, porque as versões v0.18.5 a v0.19.5 tinham subido na raiz do repositório; agora vão para <code>robo/</code>, <code>.github/workflows/</code> e <code>tests/</code>. Banco <code>sql/setup_cct_v0.20.0.sql</code>.</td></tr>
           <tr><td>v0.19.5</td><td>27/09/2026</td><td><b>Infraestrutura (GitHub Actions).</b> Os dois workflows (<code>monitor-cct.yml</code> e <code>testes-cct.yml</code>) passam a rodar em <code>ubuntu-24.04</code> fixo em vez de <code>ubuntu-latest</code>: em 19/10/2026 o GitHub migra o "latest" para Ubuntu 26, e a instalação do Chromium/xvfb do robô poderia quebrar sem nenhuma alteração nossa. Actions atualizadas (checkout v5, setup-python v6, setup-node v5, upload-artifact v5) para encerrar o aviso "Node.js 20 deprecated". Só os dois .yml e esta linha.</td></tr>
           <tr><td>v0.19.4</td><td>27/09/2026</td><td><b>Varredura geral e suíte de testes.</b> Removida a ação em lote "Analisar com IA as convenções do ano" (tratada em outra frente). Robô: corrigido o ano da convenção no histórico quando o número de registro não traz o ano (a data de vigência passa a ser usada, como previsto). Categorias das convenções importadas antes da v0.18.5 uniformizadas (setup_cct_v0.19.4.sql). Nova pasta <code>tests/</code> com testes automáticos das regras do robô (categoria, tipo laboral/patronal, datas, ano do registro, orçamento de tempo, paginação, detecção de "sem crédito", empresa sem funcionários fora da ciência, retentativa tolerante a falha) e do app (datas no fuso de Brasília, categorias, filtro de vigência, paginação, CNPJ); workflow <code>testes-cct.yml</code> roda tudo a cada commit e bloqueia publicação com regra quebrada. Arquivos: cct.html, robo/monitor_cct.py, sql/setup_cct_v0.19.4.sql, tests/*, .github/workflows/testes-cct.yml.</td></tr>
@@ -316,6 +317,18 @@
   <div class="grid g2" style="margin-top:8px"><div><label>E-mail do responsável padrão (ciência)</label><input id="sResp" type="email" placeholder="usado quando a empresa não tem o seu"></div><div><label>E-mail do gerente (escalonamento)</label><input id="sGer" type="email"></div></div>
   <div style="margin-top:8px"><label>Observações</label><textarea id="sObs" rows="2"></textarea></div>
   <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mSind')">Cancelar</button><button class="b" onclick="salvarSind()">Salvar</button></div>
+</div></div>
+
+<div class="modal" id="mSolic"><div class="card" style="max-width:760px"><h2>Solicitação transmitida ao MTE (aguardando registro)</h2>
+  <div class="aviso">O Mediador público só lista instrumentos <b>já registrados</b>. Se o sindicato informou que a CCT foi <b>transmitida</b> (nº MR…/ano) mas ainda não registrada, informe aqui: o robô cria a convenção como <b>aguardando registro</b>, tenta baixar o extrato pelo nº da solicitação, avisa por e-mail com destaque "ainda não registrada" (<b>sem ciência</b>) e, quando o registro aparecer, promove a mesma convenção, cria as ciências e avisa "registro confirmado".</div>
+  <input type="hidden" id="solSindId"><div style="margin:8px 0 4px"><b>Sindicato:</b> <span id="solSind"></span></div>
+  <div class="grid g2"><div><label>Nº da solicitação (MR000000/2026)</label><input id="solNum" placeholder="MR061922/2026" maxlength="14"></div>
+    <div><label>Tipo</label><select id="solTipo"><option>Convenção Coletiva</option><option>Termo Aditivo de Convenção Coletiva</option><option>Acordo Coletivo</option><option>Termo Aditivo de Acordo Coletivo</option></select></div>
+    <div><label>Vigência — início</label><input id="solIni" type="date"></div><div><label>Vigência — fim</label><input id="solFim" type="date"></div>
+    <div><label>Data de transmissão ao MTE</label><input id="solData" type="date"></div><div><label>Categoria (opcional)</label><input id="solCat" placeholder="ex.: comerciários do atacado"></div></div>
+  <div style="margin-top:8px"><label>Observação (opcional — entra na convenção)</label><input id="solObs" placeholder="ex.: PDF recebido do sindicato em 26/09"></div>
+  <div id="solLista"></div>
+  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="b sec" onclick="fechar('mSolic')">Fechar</button><button class="b" onclick="salvarSolic()">Colocar na fila</button></div>
 </div></div>
 
 <div class="modal" id="mSenha"><div class="card" style="max-width:460px"><h2>Confirme com sua senha</h2>
@@ -408,7 +421,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.20.0" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.21.0" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
@@ -432,6 +445,8 @@ const fmtDT = d => d ? new Date(d).toLocaleString("pt-BR", {dateStyle:"short", t
 const tagStatus = s => { const m = {CONSULTA_CONFIRMADA:"ok", IMPORTADO:"ok", ENVIADA:"ok", CONSULTA_COM_ALERTA:"alerta", PENDENTE:"alerta", NOTIFICADO:"info", CIENTE:"ok", DISPENSADA:"cinza",
   CONSULTA_NAO_CONCLUIDA:"erro", IMPORTACAO_NAO_CONCLUIDA:"erro", NAO_ENVIADA:"erro", NOVO:"erro", PERSISTENTE:"erro", EM_NOVA_TENTATIVA:"alerta", EM_ANALISE:"info",
   RESOLVIDO_AUTOMATICAMENTE:"ok", RESOLVIDO_MANUALMENTE:"ok", IGNORADO_COM_JUSTIFICATIVA:"cinza", CRITICO:"erro", ALTO:"erro", ATENCAO:"alerta", INFORMATIVO:"info"};
+  if (s === "AGUARDANDO_REGISTRO") return `<span class="tag alerta" title="solicitação transmitida ao MTE, ainda sem nº de registro — a ciência só é cobrada a partir do registro">aguardando registro</span>`;
+  if (s === "SEM_VINCULO") return `<span class="tag cinza" title="o sindicato não tinha empresa vinculada quando a convenção foi detectada — guardada sem ciência e sem e-mail">sem vínculo</span>`;
   if (s === "ANALISE_IA_NAO_CONCLUIDA") return `<span class="tag cinza" title="Sem parecer por IA: use Analisar com IA na convenção (v0.20.0: a IA é só sob demanda)">sem parecer IA</span>`;
   return `<span class="tag ${m[s]||"cinza"}">${esc((s||"").replace(/_/g," "))}</span>`; };
 function msg(t, tipo="ok"){ const m=$("msg"); m.className="msg on "+tipo; m.textContent=t; setTimeout(()=>m.className="msg",4000); }
@@ -617,14 +632,16 @@ function renderPainel() {
     <div><span>Incidentes abertos</span>${abertos.length ? t("erro", abertos.length + " · ver Central") : t("ok", "nenhum")}</div>
     <div><span>E-mail</span>${d.notif[0] ? (d.notif[0].status === "ENVIADA" ? t("ok", "enviando" + (APP.dados.cfg.email_destino_teste ? " · modo teste" : "")) : t("alerta", "última não enviada")) : t("cinza", "sem envios")}</div>
     <div><span>Parecer por IA</span>${d.inst.some(i => i.analise_status === "CONCLUIDA") ? t("ok", "ativo") : t("alerta", "pendente")}</div>
-    <div><span>Importações não concluídas</span>${d.inst.filter(i => i.status_importacao !== "IMPORTADO").length ? t("erro", d.inst.filter(i => i.status_importacao !== "IMPORTADO").length) : t("ok", "0")}</div>`;
+    <div><span>Importações não concluídas</span>${d.inst.filter(i => i.status_importacao !== "IMPORTADO" && i.situacao_registro !== "AGUARDANDO_REGISTRO").length ? t("erro", d.inst.filter(i => i.status_importacao !== "IMPORTADO" && i.situacao_registro !== "AGUARDANDO_REGISTRO").length) : t("ok", "0")}</div>
+    <div><span>Aguardando registro no MTE</span>${d.inst.filter(i => i.situacao_registro === "AGUARDANDO_REGISTRO").length ? `<a href="#" onclick="irConv({sit:'AGUARDANDO_REGISTRO'});return false">${t("alerta", d.inst.filter(i => i.situacao_registro === "AGUARDANDO_REGISTRO").length + " · ver")}</a>` : t("ok", "0")}</div>`;
   $("painelExtra").innerHTML = "";
 }
 // v0.17.3: navegação a partir do Painel
 function irAba(aba) { mostrar(aba); window.scrollTo({ top: 0 }); }
 function irConv(o) {
-  o = o || {}; ["fInst","fiTipo","fiSind","fiCat","fiImp","fiOri","fiVig","fiRegDe","fiRegAte"].forEach(id => { if ($(id)) $(id).value = ""; });
+  o = o || {}; ["fInst","fiTipo","fiSind","fiCat","fiImp","fiOri","fiSit","fiVig","fiRegDe","fiRegAte"].forEach(id => { if ($(id)) $(id).value = ""; });
   if (o.vig) $("fiVig").value = o.vig;
+  if (o.sit && $("fiSit")) $("fiSit").value = o.sit;
   if (o.regDe) { if (typeof o.regDe === "number") { const x = new Date(); x.setDate(x.getDate() - (o.regDe - 1)); $("fiRegDe").value = dataBR(x); } else $("fiRegDe").value = o.regDe; }
   if (o.regAte) $("fiRegAte").value = o.regAte;
   APP.ord = { col: "data_registro", asc: false }; renderInst(); irAba("instrumentos");
@@ -655,8 +672,42 @@ function renderSind() {
     `<table><tr>${th("CNPJ","cnpj")}${th("Nome","nome")}${th("Tipo","tipo")}${th("UF","uf")}${th("Última CCT (MTE)","ult_registro")}${th("Monitorar","monitora")}${th("Última consulta","ultima_consulta")}${th("Consulta do dia","ultimo_status")}${th("Histórico (" + (APP.dados.cfg.historico_anos || 5) + " anos)","historico_status")}<th></th></tr>` +
     l.map(s => `<tr><td class="cnpj">${fmtCnpj(s.cnpj)}${dup[s.id] ? `<br><span class="tag erro">CNPJ duplicado</span>` : ""}</td><td class="nome">${esc(s.nome)}${criadoPeloRobo(s) ? ' <span class="tag cinza" title="cadastrado automaticamente pelo robô como parte de uma convenção; não passou pela Receita">robô</span>' : ""}<br><small style="color:var(--cinza)">${esc(s.categoria||"")}</small></td><td>${s.tipo ? esc(s.tipo) + (s.tipo_origem === "cct" ? ' <small style="color:var(--text-3)">(pela CCT)</small>' : "") : '<span class="tag cinza">a definir pela CCT</span>'}</td><td style="white-space:nowrap">${s.uf||""}</td><td style="white-space:nowrap">${s.ult_registro ? `${fmtD(s.ult_registro)}<br><small style="color:var(--text-3)"><a href="#" onclick="abrirInst('${ultCct[s.id].id}');return false">${esc(ultCct[s.id].numero_registro)}</a></small>` : '<span class="tag cinza">sem CCT</span>'}</td>
       <td>${s.monitora ? '<span class="tag ok">sim</span>' : '<span class="tag cinza">não</span>'}</td><td>${fmtDT(s.ultima_consulta)}</td><td>${s.ultimo_status ? tagStatus(s.ultimo_status) : "—"}</td><td>${hist(s)}${s.historico_obs ? `<br><small style="color:var(--text-3)">${esc(s.historico_obs)}</small>` : ""}</td>
-      <td style="white-space:nowrap">${s.ativo && interno() ? `<button class="b sm" onclick="consultarAgora('${s.id}')" title="dispara o robô só para este CNPJ, fora da agenda; resultado em Consulta do dia em 2–4 min">Consultar agora</button> ` : ""}<button class="b sec sm" onclick="abrirSind('${s.id}')">Editar</button> <button class="b sec sm" onclick="excluirSind('${s.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
+      <td style="white-space:nowrap">${s.ativo && interno() ? `<button class="b sm" onclick="consultarAgora('${s.id}')" title="dispara o robô só para este CNPJ, fora da agenda; resultado em Consulta do dia em 2–4 min">Consultar agora</button> <button class="b sec sm" onclick="abrirSolic('${s.id}')" title="v0.21.0: informe uma CCT já transmitida ao MTE (nº MR…/ano) que ainda não foi registrada; o robô cria a convenção como aguardando registro">Solicitação transmitida</button>${filaSolic(s)} ` : ""}<button class="b sec sm" onclick="abrirSind('${s.id}')">Editar</button> <button class="b sec sm" onclick="excluirSind('${s.id}')">Excluir</button></td></tr>`).join("") + `</table>` +
     (all.length ? "" : `<div class="aviso">Nenhum sindicato cadastrado. Cadastre o sindicato laboral (e, se quiser, o patronal) de cada cliente.</div>`);
+}
+// v0.21.0: solicitação transmitida ao MTE (aguardando registro)
+function filaSolic(s) {
+  const f = (s.solicitacoes_pendentes || []).filter(p => p.status !== "REGISTRADA");
+  if (!f.length) return "";
+  return f.map(p => `<br><span class="tag ${p.status === "CRIADA" ? "alerta" : "info"}" title="${p.status === "CRIADA" ? "convenção criada como aguardando registro; o robô confere o registro a cada consulta" : "na fila: o robô cria a convenção na próxima consulta deste sindicato (ou use Consultar agora)"}">${esc(p.solicitacao)} · ${p.status === "CRIADA" ? "aguardando registro" : "na fila"}</span>`).join("");
+}
+function abrirSolic(id) {
+  const s = (APP.dados.sind || []).find(x => x.id === id); if (!s) return;
+  $("solSindId").value = id; $("solSind").textContent = s.nome; ["solNum","solIni","solFim","solData","solCat","solObs"].forEach(k => $(k).value = ""); $("solTipo").value = "Convenção Coletiva";
+  const f = (s.solicitacoes_pendentes || []);
+  $("solLista").innerHTML = f.length ? `<div style="margin-top:10px"><b>Já informadas:</b><table><tr><th>Solicitação</th><th>Tipo</th><th>Vigência</th><th>Situação</th><th></th></tr>` + f.map((p, i) => `<tr><td>${esc(p.solicitacao)}</td><td>${esc(p.tipo || "")}</td><td>${fmtD(p.vigencia_inicio)} – ${fmtD(p.vigencia_fim)}</td><td>${p.status === "REGISTRADA" ? `<span class="tag ok">registrada · ${esc(p.registro || "")}</span>` : p.status === "CRIADA" ? tagStatus("AGUARDANDO_REGISTRO") : '<span class="tag info">na fila</span>'}</td><td style="text-align:right">${p.status === "CRIADA" || p.status === "REGISTRADA" ? "" : `<button class="b sec sm" onclick="removerSolic('${id}',${i})">Remover</button>`}</td></tr>`).join("") + `</table></div>` : "";
+  $("mSolic").classList.add("on"); $("solNum").focus();
+}
+async function salvarSolic() {
+  const id = $("solSindId").value, s = (APP.dados.sind || []).find(x => x.id === id); if (!s) return;
+  const num = $("solNum").value.trim().toUpperCase().replace(/\s+/g, "");
+  if (!/^[A-Z]{2}\d{6}\/\d{4}$/.test(num)) return msg("Nº da solicitação no formato MR000000/2026 (duas letras, 6 dígitos, barra e ano).", "erro");
+  if (($("solIni").value && $("solFim").value) && $("solIni").value > $("solFim").value) return msg("Vigência: início maior que o fim.", "erro");
+  const fila = (s.solicitacoes_pendentes || []).slice();
+  if (fila.some(p => (p.solicitacao || "").toUpperCase() === num)) return msg("Esta solicitação já foi informada para este sindicato.", "erro");
+  if ((APP.dados.inst || []).some(i => (i.numero_solicitacao || "").toUpperCase() === num)) return msg("Já existe convenção com este nº de solicitação em Convenções.", "erro");
+  fila.push({ solicitacao: num, tipo: $("solTipo").value, vigencia_inicio: $("solIni").value || null, vigencia_fim: $("solFim").value || null, data_transmissao: $("solData").value || null,
+    categoria: $("solCat").value.trim() || null, observacao: $("solObs").value.trim() || null, por: APP.email, em: new Date().toISOString(), status: "PENDENTE" });
+  try { await patch("cct_sindicatos", "id=eq." + id, { solicitacoes_pendentes: fila }); s.solicitacoes_pendentes = fila; fechar("mSolic"); renderSind();
+    msg(`Solicitação ${num} na fila. O robô cria a convenção como "aguardando registro" na próxima consulta deste sindicato — ou clique em Consultar agora.`); }
+  catch (e) { msg(e.message, "erro"); }
+}
+async function removerSolic(id, idx) {
+  const s = (APP.dados.sind || []).find(x => x.id === id); if (!s) return;
+  const fila = (s.solicitacoes_pendentes || []).slice(); const p = fila[idx]; if (!p || p.status === "CRIADA" || p.status === "REGISTRADA") return;
+  if (!confirm(`Remover a solicitação ${p.solicitacao} da fila?`)) return;
+  fila.splice(idx, 1);
+  try { await patch("cct_sindicatos", "id=eq." + id, { solicitacoes_pendentes: fila }); s.solicitacoes_pendentes = fila; abrirSolic(id); renderSind(); } catch (e) { msg(e.message, "erro"); }
 }
 // v0.19.0: consulta imediata de um sindicato (workflow_dispatch com apenas_cnpj)
 async function consultarAgora(id) {
@@ -758,7 +809,7 @@ function abrevTipo(t) { t = String(t || ""); return /aditivo/i.test(t) ? "TA" : 
 function tabInstCompacta(lista) {
   if (!lista.length) return `<div class="aviso">Nenhuma convenção detectada pelo monitoramento ainda.</div>`;
   return `<table class="compacta"><colgroup><col style="width:120px"><col style="width:46px"><col><col><col style="width:160px" class="ov"><col style="width:118px"><col style="width:90px" class="oc"><col style="width:104px" class="oc"><col style="width:80px"></colgroup><tr><th>Registro</th><th>Tipo</th><th>Sindicato</th><th>Categoria</th><th class="ov">Vigência</th><th>Detectada</th><th class="oc">Análise</th><th class="oc">Ciência</th><th></th></tr>` +
-    lista.map(i => `<tr><td><b><a href="#" onclick="abrirInst('${i.id}');return false">${esc(i.numero_registro)}</a></b></td><td title="${esc(i.tipo || "")}">${esc(abrevTipo(i.tipo))}</td><td class="ab" title="${esc(i.sindicato?.nome || "")}">${esc(abrev(i.sindicato?.nome || "", 48))}</td><td class="ab" title="${esc(i.categoria || "")}">${esc(abrev(i.categoria || "", 48) || "—")}</td>
+    lista.map(i => `<tr${i.situacao_registro === "AGUARDANDO_REGISTRO" ? ' style="background:#fef9e7"' : ""}><td><b><a href="#" onclick="abrirInst('${i.id}');return false">${esc(i.numero_registro)}</a></b>${i.situacao_registro === "AGUARDANDO_REGISTRO" ? "<br>" + tagStatus("AGUARDANDO_REGISTRO") : ""}</td><td title="${esc(i.tipo || "")}">${esc(abrevTipo(i.tipo))}</td><td class="ab" title="${esc(i.sindicato?.nome || "")}">${esc(abrev(i.sindicato?.nome || "", 48))}</td><td class="ab" title="${esc(i.categoria || "")}">${esc(abrev(i.categoria || "", 48) || "—")}</td>
       <td class="ov" title="${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}">${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${fmtDT(i.detectado_em)}</td><td class="oc">${i.analise_status ? tagStatus(i.analise_status === "CONCLUIDA" ? "IMPORTADO" : "ATENCAO").replace(/>[^<]+</, ">" + (i.analise_status === "CONCLUIDA" ? "concluída" : "IA pendente") + "<") : "—"}</td><td class="oc">${tagStatus(i.status_ciencia)}</td><td style="text-align:right;overflow:visible">${menuInst(i)}</td></tr>`).join("") + `</table>`;
 }
 function verVencidas() { irConv({ vig: "vencida" }); }
@@ -766,9 +817,9 @@ function tabInst(lista, sortable) {
   if (!lista.length) return `<div class="aviso">Nenhuma convenção com esses filtros.</div>`;
   const th = (t, col, cls) => sortable ? `<th class="${cls || ""}" style="cursor:pointer;user-select:none" onclick="ordenar('${col}')">${t}${APP.ord.col === col ? (APP.ord.asc ? " ▲" : " ▼") : ""}</th>` : `<th class="${cls || ""}">${t}</th>`;
   return `<table><tr>${th("Registro","numero_registro")}${th("Tipo","tipo")}${th("Sindicato","sindicato_nome")}${th("Categoria","categoria")}${th("Vigência","vigencia_inicio")}${th("Registro MTE","data_registro")}${th("Detectada","detectado_em")}${th("Importação","status_importacao")}${th("Análise","analise_status")}${th("Ciência","status_ciencia")}${th("Cláus.","total_clausulas","r")}<th></th></tr>` +
-    lista.map(i => `<tr><td><b>${esc(i.numero_registro)}</b>${i.origem === "historico" ? '<br><span class="tag cinza">histórico</span>' : ""}</td><td>${esc(i.tipo||"")}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.categoria||"")}</td>
-      <td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${fmtD(i.data_registro)}</td><td>${fmtDT(i.detectado_em)}</td><td>${tagStatus(i.status_importacao)}</td><td>${i.analise_status ? tagStatus(i.analise_status === "CONCLUIDA" ? "IMPORTADO" : "ATENCAO").replace(/>[^<]+</, ">" + (i.analise_status === "CONCLUIDA" ? "concluída" : "IA pendente") + "<") : "—"}</td>
-      <td>${tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td style="white-space:nowrap;text-align:right">${menuInst(i)}</td></tr>`).join("") + `</table>`;
+    lista.map(i => { const ag = i.situacao_registro === "AGUARDANDO_REGISTRO"; return `<tr${ag ? ' style="background:#fef9e7"' : ""}><td${ag ? ' style="border-left:4px solid #b7770d"' : ""}><b>${esc(i.numero_registro)}</b>${ag ? '<br>' + tagStatus("AGUARDANDO_REGISTRO") : ""}${i.origem === "historico" ? '<br><span class="tag cinza">histórico</span>' : ""}</td><td>${esc(i.tipo||"")}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.categoria||"")}</td>
+      <td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${ag ? `<span style="color:#b7770d">sem registro${i.data_transmissao ? "<br><small>transmitida " + fmtD(i.data_transmissao) + "</small>" : ""}</span>` : fmtD(i.data_registro)}</td><td>${fmtDT(i.detectado_em)}</td><td>${ag && i.status_importacao !== "IMPORTADO" ? '<span class="tag cinza" title="o extrato só fica disponível no Mediador depois do registro">extrato após registro</span>' : tagStatus(i.status_importacao)}</td><td>${i.analise_status ? tagStatus(i.analise_status === "CONCLUIDA" ? "IMPORTADO" : "ATENCAO").replace(/>[^<]+</, ">" + (i.analise_status === "CONCLUIDA" ? "concluída" : "IA pendente") + "<") : "—"}</td>
+      <td>${ag ? '<span class="tag cinza" title="a ciência só é cobrada a partir do registro no MTE">após registro</span>' : i.sem_vinculo ? tagStatus("SEM_VINCULO") : tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td style="white-space:nowrap;text-align:right">${menuInst(i)}</td></tr>`; }).join("") + `</table>`;
 }
 // v0.18.5: categoria sem vazias e sem repetir a mesma categoria com maiúsculas/espaços diferentes
 const normCat = c => String(c || "").replace(/\s+/g, " ").trim();
@@ -777,9 +828,10 @@ function renderInst() {
   const f = ($("fInst").value || "").toLowerCase(), hoje = hojeBR();
   const opts = (id, vals, pref) => { const sel = $(id), cur = sel.value; if (sel.options.length <= 1 || sel.dataset.n != vals.length) { sel.innerHTML = `<option value="">${pref}</option>` + vals.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join(""); sel.dataset.n = vals.length; sel.value = cur; } };
   opts("fiTipo", [...new Set(APP.dados.inst.map(i => i.tipo).filter(Boolean))].sort(), "Tipo: todos"); opts("fiSind", [...new Set(APP.dados.inst.map(i => i.sindicato?.nome).filter(Boolean))].sort(), "Sindicato: todos"); opts("fiCat", catsUnicas(APP.dados.inst.map(i => i.categoria)), "Categoria: todas");
-  const ft = $("fiTipo").value, fs = $("fiSind").value, fc = $("fiCat").value, fi = $("fiImp").value, fo = $("fiOri").value, fv = $("fiVig").value, rde = $("fiRegDe").value, rate = $("fiRegAte").value;
+  const ft = $("fiTipo").value, fs = $("fiSind").value, fc = $("fiCat").value, fi = $("fiImp").value, fo = $("fiOri").value, fsit = $("fiSit").value, fv = $("fiVig").value, rde = $("fiRegDe").value, rate = $("fiRegAte").value;
   let l = APP.dados.inst.map(i => ({ ...i, sindicato_nome: i.sindicato?.nome || "" })).filter(i => (!f || [i.numero_registro, i.sindicato_nome, i.categoria, i.tipo, i.abrangencia, i.numero_solicitacao].join(" ").toLowerCase().includes(f))
     && (!ft || i.tipo === ft) && (!fs || i.sindicato_nome === fs) && (!fc || normCat(i.categoria).toLowerCase() === fc.toLowerCase()) && (!fi || i.status_importacao === fi) && (!fo || (i.origem || "monitoramento") === fo)
+    && (!fsit || (fsit === "SEM_VINCULO" ? !!i.sem_vinculo : (i.situacao_registro || "REGISTRADA") === fsit))
     && (!fv || (fv === "vigente" ? (i.vigencia_fim || "") >= hoje : fv === "vencida" ? (!!i.vigencia_fim && i.vigencia_fim < hoje) : !i.vigencia_fim))   // v0.18.5: sem data final não é "vencida"
     && (!rde || (i.data_registro || "") >= rde) && (!rate || (i.data_registro || "").slice(0, 10) <= rate));
   const { col, asc } = APP.ord; l.sort((a, b) => { const x = a[col] ?? "", y = b[col] ?? ""; const r = typeof x === "number" ? x - y : String(x).localeCompare(String(y), "pt-BR"); return asc ? r : -r; });
@@ -790,7 +842,8 @@ async function abrirInst(id, aba) {
   $("mInstTit").textContent = `${i.tipo || "Instrumento"} ${i.numero_registro}`;
   $("mInstCab").innerHTML = `<b>Partes:</b> ${(i.partes||[]).map(p => esc(p.nome || p)).join(" × ")}<br><b>Categoria:</b> ${esc(i.categoria||"—")} · <b>Abrangência:</b> ${esc(i.abrangencia||"—")}<br>
     <b>Vigência:</b> ${fmtD(i.vigencia_inicio)} a ${fmtD(i.vigencia_fim)} · <b>Data-base:</b> ${esc(i.data_base||"—")} · <b>Registro MTE:</b> ${fmtD(i.data_registro)} · <b>Processo:</b> ${esc(i.numero_processo||"—")}<br>
-    ${tagStatus(i.status_importacao)} ${tagStatus(i.status_ciencia)} ${i.status_ciencia !== "CIENTE" ? `<button class="b sm" onclick="darCiencia('${i.id}')">Registrar ciência</button>` : ""} ${i.observacoes ? `<br><small style="color:var(--erro)">${esc(i.observacoes)}</small>` : ""}`;
+    ${i.situacao_registro === "AGUARDANDO_REGISTRO" ? `<div style="background:#fef9e7;border:2px solid #b7770d;border-radius:8px;padding:8px 12px;margin:6px 0"><b style="color:#7a4e00">AINDA NÃO REGISTRADA no MTE</b> — solicitação ${esc(i.numero_solicitacao || i.numero_registro)}${i.data_transmissao ? " transmitida em " + fmtD(i.data_transmissao) : ""}. O robô promove esta convenção automaticamente quando o registro aparecer; a ciência só é cobrada a partir do registro.</div>` : ""}${i.registro_detectado_em ? `<small style="color:#1e8449">registro detectado em ${fmtDT(i.registro_detectado_em)} (estava aguardando registro)</small><br>` : ""}
+    ${tagStatus(i.status_importacao)} ${i.sem_vinculo ? tagStatus("SEM_VINCULO") : ""} ${i.situacao_registro === "AGUARDANDO_REGISTRO" ? '<span class="tag cinza">ciência após registro</span>' : tagStatus(i.status_ciencia)} ${i.status_ciencia !== "CIENTE" && i.situacao_registro !== "AGUARDANDO_REGISTRO" ? `<button class="b sm" onclick="darCiencia('${i.id}')">Registrar ciência</button>` : ""} ${i.observacoes ? `<br><small style="color:var(--erro)">${esc(i.observacoes)}</small>` : ""}`;
   const cis = (APP.dados.conf||[]).filter(c => c.instrumento_id === id);
   if (cis.length) $("mInstCab").innerHTML += `<div style="margin-top:8px"><b>Ciências:</b> ` + cis.map(c => `${esc(c.empresa||"sindicato")}: ${tagStatus(c.status)} (prazo ${fmtD(c.prazo)})`).join(" · ") + `</div>`;
   $("btnBaixar").style.display = i.arquivo_path ? "inline-block" : "none";
