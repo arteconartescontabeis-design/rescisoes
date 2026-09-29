@@ -44,6 +44,10 @@ atualiza a MESMA convenção (nº SC.../ano, data de registro, cláusulas), cria
 é baixada e guardada (sem_vinculo=true), sem ciência e sem e-mail. (3) Orçamento de tempo: ORCAMENTO_MIN vem do
 workflow (timeout 180 min).
 v0.21.1 (29/09/2026): só analisar_cct.py — limite de saída da IA 16.000 tokens e leitura tolerante a resposta cortada.
+v0.21.2 (29/09/2026): o aviso "ainda sem registro" vai TAMBÉM ao responsável e ao gerente de cada empresa vinculada (sem ciência),
+não só ao grupo interno de Destinatários; e o cabeçalho do aviso interno lista as empresas avisadas.
+v0.21.3 (29/09/2026): o aviso aos responsáveis é enviado UMA vez por solicitação (marca aviso_resp_em na fila) — inclusive para
+solicitações criadas antes desta versão (ex.: MR061922/2026), na próxima consulta do sindicato.
 """
 import hashlib
 import json
@@ -62,7 +66,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.21.1"
+VERSAO = "0.21.3"
 # v0.20.0: token do CCT na IA Central (ia-gateway do Portal Artecon)
 def ia_chave_presente():
     return bool((os.environ.get("IA_GATEWAY_TOKEN") or "").strip())
@@ -685,7 +689,7 @@ def empresas_vinculadas(tenant, sind):
     if not sind or not sind.get("id"):
         return []
     try:
-        vinc = sb_get("cct_empresa_sindicato", {"sindicato_id": f"eq.{sind['id']}", "select": "empresa:cct_empresas(id,razao_social,ativo,sem_funcionarios)"})
+        vinc = sb_get("cct_empresa_sindicato", {"sindicato_id": f"eq.{sind['id']}", "select": "empresa:cct_empresas(id,razao_social,ativo,sem_funcionarios,responsavel_nome,responsavel_email,gerente_email)"})
         return [v["empresa"] for v in vinc if v.get("empresa") and v["empresa"].get("ativo", True) and not v["empresa"].get("sem_funcionarios")]
     except Exception as e:
         log(f"  !! vínculos: {e}")
@@ -708,6 +712,29 @@ def aviso_sem_registro(p, sind):
             f"{' em ' + _fmt_data(p.get('data_transmissao')) if p.get('data_transmissao') else ''}). "
             f"O texto pode sofrer exigências antes do registro. O CCT Monitor avisará de novo quando o registro sair; "
             f"<b>a ciência só é cobrada a partir do registro</b>.</div>")
+
+
+def avisar_responsaveis(tenant, sind, p, numero, row, vinc, etapas):
+    """v0.21.2/v0.21.3: aviso 'ainda sem registro' ao responsável e ao gerente de cada empresa vinculada — SEM ciência
+    (ela nasce no registro). Enviado uma única vez por solicitação (marca aviso_resp_em na fila)."""
+    env, sem_dest = 0, []
+    for e in vinc:
+        dest = [e.get("responsavel_email"), e.get("gerente_email")]
+        if not any(dest):
+            sem_dest.append(e.get("razao_social") or "?"); continue
+        html_e = (f"<p>Prezado(a) {e.get('responsavel_nome') or 'responsável'} — empresa <b>{e.get('razao_social')}</b>,</p>"
+                  f"<p>O sindicato <b>{sind['nome']}</b> transmitiu ao Mediador (MTE) uma <b>{p.get('tipo') or 'Convenção Coletiva'}</b> nova (solicitação nº {numero}).</p>"
+                  + aviso_sem_registro(p, sind)
+                  + f"<p><b>Vigência informada:</b> {_fmt_data(p.get('vigencia_inicio'))} a {_fmt_data(p.get('vigencia_fim'))}<br>"
+                  f"<b>Cláusulas:</b> {'já disponíveis no CCT Monitor (texto da solicitação, sujeito a alteração até o registro)' if row.get('status_importacao') == 'IMPORTADO' else 'ainda não disponíveis no Mediador'}</p>"
+                  f"<p><b>Nenhuma providência de ciência é exigida agora.</b> Assim que o registro no MTE for confirmado, você receberá o aviso definitivo com o prazo de ciência.</p>")
+        st2 = notificar_para(tenant, "NOVA_CCT", f"Artecon · CCT Monitor — CCT transmitida, AINDA SEM REGISTRO · {e.get('razao_social')} · {numero}", html_e, dest, instrumento_id=row["id"])
+        if st2 == "ENVIADA":
+            env += 1
+    p["aviso_resp_em"] = datetime.now(timezone.utc).isoformat()
+    p["aviso_resp_n"] = env
+    etapas.append(f"[solicitação {numero}] aviso aos responsáveis: {env} de {len(vinc)} empresa(s)" + (f" — sem e-mail cadastrado: {', '.join(sem_dest)[:200]}" if sem_dest else ""))
+    log(f"  SOLICITAÇÃO {numero}: aviso 'ainda sem registro' enviado a {env} de {len(vinc)} empresa(s) vinculada(s)")
 
 
 def processar_solicitacoes(tenant, sind, page, consulta_id, existentes, etapas):
@@ -780,14 +807,17 @@ def processar_solicitacoes(tenant, sind, page, consulta_id, existentes, etapas):
                         etapas.append(f"[solicitação {numero}] extrato indisponível antes do registro (HTTP {status})")
                 except Exception as e:
                     etapas.append(f"[solicitação {numero}] extrato: {type(e).__name__}: {str(e)[:120]}")
+            if p.get("status") == "CRIADA" and vinc and not p.get("aviso_resp_em"):   # v0.21.3: criada antes desta versão, responsáveis ainda não avisados
+                avisar_responsaveis(tenant, sind, p, numero, row, vinc, etapas); mudou = True
             if p.get("status") != "CRIADA":
                 if vinc:
                     html = (f"<p><b>{p.get('tipo') or 'Convenção Coletiva'}</b> transmitida ao Mediador para <b>{sind['nome']}</b>.</p>"
                             + aviso_sem_registro(p, sind)
                             + f"<p><b>Nº da solicitação:</b> {numero}<br><b>Vigência informada:</b> {_fmt_data(p.get('vigencia_inicio'))} a {_fmt_data(p.get('vigencia_fim'))}<br>"
-                            f"<b>Empresas vinculadas:</b> {len(vinc)}<br><b>Cláusulas:</b> {'importadas do extrato da solicitação' if row.get('status_importacao') == 'IMPORTADO' else 'ainda não disponíveis no Mediador'}</p>")
+                            f"<b>Empresas vinculadas (avisadas):</b> {len(vinc)} — {', '.join((e.get('razao_social') or '?') for e in vinc)[:600]}<br><b>Cláusulas:</b> {'importadas do extrato da solicitação' if row.get('status_importacao') == 'IMPORTADO' else 'ainda não disponíveis no Mediador'}</p>")
                     st = notificar(tenant, "NOVA_CCT", f"CCT TRANSMITIDA, AINDA SEM REGISTRO – {sind['nome']} – {numero}", html, instrumento_id=row["id"])
-                    etapas.append(f"[solicitação {numero}] aviso 'ainda sem registro': {st}")
+                    etapas.append(f"[solicitação {numero}] aviso 'ainda sem registro' (grupo interno): {st}")
+                    avisar_responsaveis(tenant, sind, p, numero, row, vinc, etapas); mudou = True
                 else:
                     etapas.append(f"[solicitação {numero}] sem empresa vinculada: guardada sem aviso")
                 p.update(status="CRIADA", instrumento_id=row["id"], criada_em=datetime.now(timezone.utc).isoformat()); mudou = True
