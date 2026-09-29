@@ -31,8 +31,8 @@ permissions:
 
 jobs:
   monitorar:
-    runs-on: ubuntu-24.04        # v0.19.5: fixo (ubuntu-latest vira Ubuntu 26 em 19/10/2026 e pode quebrar Chromium/xvfb)
-    timeout-minutes: 120        # v0.18.5: 45 min cancelava a rodada completa (72 sindicatos + IA + histórico) e ela ficava INTERROMPIDA
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180        # v0.21.0: a rodada completa leva ~1h35; folga para crescer
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -70,9 +70,10 @@ jobs:
           FORCAR: ${{ inputs.forcar }}
           SO_ANALISE: ${{ inputs.so_analise }}
           APENAS_CNPJ: ${{ inputs.apenas_cnpj }}
-          IA_GATEWAY_TOKEN: ${{ secrets.IA_GATEWAY_TOKEN }}   # v0.20.0: token do CCT na IA Central (Portal → Consumo de IA)
+          IA_GATEWAY_TOKEN: ${{ secrets.IA_GATEWAY_TOKEN }}    # v0.20.0: token do CCT na IA Central (Portal → Consumo de IA)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}  # legado; pode ser removido depois que a IA Central estiver confirmada
+          ORCAMENTO_MIN: "170"                                # v0.21.0: orçamento interno do robô = timeout-minutes − 10
           ORIGEM: github-actions
-          ORCAMENTO_MIN: "112"      # v0.18.5: orçamento do robô = timeout-minutes menos margem para instalar/encerrar
         run: |
           if [ "$SO_ANALISE" = "true" ]; then python monitor_cct.py; else xvfb-run -a python monitor_cct.py; fi
       - name: Encerrar execucao se o robo nao encerrou (sempre roda)
