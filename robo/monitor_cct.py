@@ -43,6 +43,7 @@ atualiza a MESMA convenção (nº SC.../ano, data de registro, cláusulas), cria
 (2) SÓ NOTIFICA QUEM TEM EMPRESA VINCULADA — convenção de sindicato sem empresa vinculada (ativa e com funcionários)
 é baixada e guardada (sem_vinculo=true), sem ciência e sem e-mail. (3) Orçamento de tempo: ORCAMENTO_MIN vem do
 workflow (timeout 180 min).
+v0.21.1 (29/09/2026): só analisar_cct.py — limite de saída da IA 16.000 tokens e leitura tolerante a resposta cortada.
 """
 import hashlib
 import json
@@ -61,7 +62,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.21.0"
+VERSAO = "0.21.1"
 # v0.20.0: token do CCT na IA Central (ia-gateway do Portal Artecon)
 def ia_chave_presente():
     return bool((os.environ.get("IA_GATEWAY_TOKEN") or "").strip())

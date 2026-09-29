@@ -5,6 +5,13 @@ analisar_cct.py — Bloco 3 (seções 44-61): extração de valores por cláusul
 3) parecer_ia(...)             — opcional, via IA Central do Portal Artecon (IA_GATEWAY_TOKEN); JSON validado contra as cláusulas
 4) analisar(dados, anterior)   — orquestra e devolve o registro para cct_analises
 Regra 99: se a IA falhar, a análise sai com status ANALISE_IA_NAO_CONCLUIDA e os itens determinísticos permanecem.
+
+v0.21.1 (29/09/2026): a resposta da IA vinha CORTADA pelo limite de saída (6.000 tokens ≈ 18 mil caracteres; erro
+"resposta da IA não é JSON válido: Expecting ',' delimiter … char 17936") e o parecer inteiro — já pago — era descartado.
+Correções: (a) limite de saída 16.000 tokens (IA_MAX_TOKENS); (b) leitura tolerante: se ainda assim a resposta vier
+cortada (stop_reason max_tokens) ou com JSON quebrado, aproveita-se a maior parte válida (itens completos) e fecha-se
+o JSON, marcando "parecer_cortado" na validação; (c) o prompt pede trechos de 30 a 160 caracteres (antes 300) para
+caber mais itens no mesmo limite.
 """
 import difflib
 import json
@@ -14,6 +21,7 @@ import time
 import unicodedata
 
 MODELO_IA = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+IA_MAX_TOKENS = int(os.environ.get("IA_MAX_TOKENS", "16000"))   # v0.21.1 (antes 6000 — cortava o parecer)
 # v0.15.2 (09/09/2026): GitHub Models retirado — o serviço foi desativado pelo GitHub (HTTP 410 "retirement brownout").
 # v0.20.0: parecer por IA pela IA Central (ia-gateway do Portal Artecon) com o token do CCT (IA_GATEWAY_TOKEN).
 # O gateway recebe e devolve exatamente o formato da API da Anthropic; ele controla limites e registra o consumo.
@@ -177,20 +185,21 @@ conhecimento externo, legislação não citada no texto, estimativas ou suposiç
 
 Para garantir isso, CADA destaque, providência e alerta deve trazer:
 - "clausulas": números de ordem [n] das cláusulas de origem (obrigatório);
-- "trecho": cópia LITERAL (caractere por caractere, sem reticências, sem resumir) de um trecho contínuo de 30 a 300
-  caracteres da cláusula citada, que sustenta a afirmação. Itens cujo trecho não for encontrado no texto serão descartados.
+- "trecho": cópia LITERAL (caractere por caractere, sem reticências, sem resumir) de um trecho contínuo de 30 a 160
+  caracteres da cláusula citada, que sustenta a afirmação — escolha o trecho MAIS CURTO que contenha o valor/prazo citado.
+  Itens cujo trecho não for encontrado no texto serão descartados.
 Valores, percentuais, datas e prazos devem ser reproduzidos exatamente como aparecem no texto (mesma grafia).
 
-Seja DETALHADO: percorra todos os grupos de cláusulas (salários, gratificações/auxílios, contrato, relações de trabalho,
-jornada, férias/licenças, saúde/segurança, relações sindicais, disposições gerais) e registre um destaque para cada
-obrigação, valor, prazo ou condição relevante para o DP. As providências são apenas as ações que decorrem de obrigação
-EXPRESSA no texto (ex.: "recolher a contribuição até dia X" quando a cláusula fixa a data).
+Seja DETALHADO, mas OBJETIVO: percorra todos os grupos de cláusulas (salários, gratificações/auxílios, contrato, relações de
+trabalho, jornada, férias/licenças, saúde/segurança, relações sindicais, disposições gerais) e registre um destaque para cada
+obrigação, valor, prazo ou condição relevante para o DP, com o campo "texto" em uma ou duas frases. As providências são
+apenas as ações que decorrem de obrigação EXPRESSA no texto (ex.: "recolher a contribuição até dia X" quando a cláusula fixa a data).
 
 Além disso, em "comentarios" você PODE registrar observações do analista (interpretação, orientação prática, atenção do DP),
 sempre ligadas a uma cláusula. Esses comentários são apresentados separadamente, rotulados como COMENTÁRIO e com aviso
 de que podem conter erro — por isso, mesmo neles, não invente números: qualquer valor citado deve estar no texto.
 
-Responda SOMENTE com JSON válido, sem markdown:
+Responda SOMENTE com JSON válido, sem markdown, compacto (sem quebras de linha desnecessárias):
 {"resumo": "parágrafo só com fatos presentes no texto, com os números exatamente como no texto",
  "destaques": [{"tema": "...", "texto": "...", "clausulas": [n], "trecho": "..."}],
  "providencias": [{"acao": "...", "prazo": "...", "clausulas": [n], "trecho": "..."}],
@@ -213,7 +222,7 @@ def _validar_refs(parecer, dados, valores):
     localizado nela + todos os números/percentuais/datas do item presentes nas cláusulas citadas. O resto é DESCARTADO."""
     ordens = {c["ordem"]: c for c in dados.get("clausulas", [])}
     texto_total = _norm_txt(" ".join(c["texto"] for c in ordens.values()))
-    descartados = []
+    descartados = list(parecer.get("descartados") or [])   # v0.21.1: preserva o aviso de parecer cortado
 
     def valida(item, grupo):
         refs = [o for o in (item.get("clausulas") or []) if isinstance(o, int) and o in ordens]
@@ -238,6 +247,8 @@ def _validar_refs(parecer, dados, valores):
         for item in parecer.get(grupo, []) or []:
             if isinstance(item, str):
                 item = {"texto": item, "clausulas": [], "trecho": ""}
+            if not isinstance(item, dict):
+                continue
             motivo = valida(item, grupo)
             if motivo:
                 descartados.append({"grupo": grupo, "item": (item.get("texto") or item.get("acao") or "")[:160], "motivo": motivo})
@@ -258,6 +269,8 @@ def _validar_refs(parecer, dados, valores):
     for c in parecer.get("comentarios", []) or []:
         if isinstance(c, str):
             c = {"texto": c, "clausulas": []}
+        if not isinstance(c, dict):
+            continue
         refs = [o for o in (c.get("clausulas") or []) if isinstance(o, int) and o in ordens]
         nums = _numeros(c.get("texto") or "")
         if not refs:
@@ -296,13 +309,54 @@ def _material(dados, valores, comparacao, limite_chars=None):
     return (cab + "CLÁUSULAS (resumidas por limite de tamanho):\n" + "\n\n".join(partes))[:limite_chars]
 
 
+def _reparar_json(txt):
+    """v0.21.1: recupera a maior parte válida de um JSON cortado. Percorre o texto controlando strings/escapes e a pilha
+    de chaves/colchetes; guarda a última posição em que um ITEM COMPLETO terminou (fechou um objeto dentro de uma lista,
+    ou fechou uma lista/valor do objeto raiz) e, ao final, corta ali e fecha o que ficou aberto. Retorna (json_str, cortado)."""
+    i = txt.find("{")
+    if i < 0:
+        raise ValueError("resposta sem objeto JSON")
+    txt = txt[i:]
+    pilha, em_str, esc, seguro = [], False, False, None
+    for k, ch in enumerate(txt):
+        if em_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                em_str = False
+            continue
+        if ch == '"':
+            em_str = True
+        elif ch in "{[":
+            pilha.append(ch)
+        elif ch in "}]":
+            if pilha:
+                pilha.pop()
+            if not pilha:
+                return txt[:k + 1], False          # JSON raiz fechado normalmente
+            if len(pilha) <= 2:                     # fechou um item de lista (nível 2) ou uma lista/valor do raiz (nível 1)
+                seguro = (k + 1, list(pilha))
+    if seguro is None:
+        raise ValueError("resposta cortada antes do primeiro item completo")
+    corte, aberta = seguro
+    base = txt[:corte].rstrip().rstrip(",")
+    return base + "".join("]" if c == "[" else "}" for c in reversed(aberta)), True
+
+
 def _parse_json(txt):
+    """Retorna (dict, cortado). Primeiro tenta o JSON inteiro; se falhar, repara (v0.21.1)."""
     txt = re.sub(r"^```(?:json)?|```$", "", txt.strip(), flags=re.M).strip()
     i, j = txt.find("{"), txt.rfind("}")
-    return json.loads(txt[i:j + 1] if i >= 0 and j > i else txt)
+    try:
+        return json.loads(txt[i:j + 1] if i >= 0 and j > i else txt), False
+    except Exception:
+        rep, cortado = _reparar_json(txt)
+        return json.loads(rep), cortado
 
 
-def parecer_ia(dados, valores, comparacao=None, api_key=None, timeout=120):
+def parecer_ia(dados, valores, comparacao=None, api_key=None, timeout=240):
     """Parecer pela IA Central (IA_GATEWAY_TOKEN). Retorna (parecer, erro)."""
     import requests
     key = (api_key or os.environ.get("IA_GATEWAY_TOKEN") or "").strip()
@@ -312,7 +366,7 @@ def parecer_ia(dados, valores, comparacao=None, api_key=None, timeout=120):
         r = requests.post(IA_GATEWAY_URL, timeout=timeout,
                           headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json",
                                    "x-ia-usuario": "CCT Monitor (robô, Analisar com IA)"},
-                          json={"model": MODELO_IA, "max_tokens": 6000, "system": PROMPT_SISTEMA,
+                          json={"model": MODELO_IA, "max_tokens": IA_MAX_TOKENS, "system": PROMPT_SISTEMA,
                                 "messages": [{"role": "user", "content": corpo[:180000]}]})
         if r.status_code != 200:
             try:
@@ -320,16 +374,24 @@ def parecer_ia(dados, valores, comparacao=None, api_key=None, timeout=120):
             except Exception:
                 motivo = r.text
             return None, f"IA Central HTTP {r.status_code}: {str(motivo)[:300]}"
-        txt = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
-        modelo = MODELO_IA
+        resp = r.json()
+        txt = "".join(b.get("text", "") for b in resp.get("content", []) if b.get("type") == "text")
+        stop = resp.get("stop_reason")
+        modelo = resp.get("model") or MODELO_IA
     else:
         return None, "IA_GATEWAY_TOKEN não configurado no GitHub (Settings → Secrets) — parecer por IA não gerado"
     try:
-        parecer = _parse_json(txt)
+        parecer, cortado = _parse_json(txt)
     except Exception as e:
-        return None, f"resposta da IA não é JSON válido: {e}"
+        return None, f"resposta da IA não é JSON válido: {e} (stop_reason={stop}, {len(txt)} caracteres)"
+    if not isinstance(parecer, dict):
+        return None, "resposta da IA não é um objeto JSON"
+    if cortado or stop == "max_tokens":
+        parecer.setdefault("descartados", []).append({"grupo": "parecer_cortado", "item": f"resposta com {len(txt)} caracteres (limite {IA_MAX_TOKENS} tokens)",
+                                                      "motivo": "a IA atingiu o limite de saída; a parte final do parecer foi descartada e os itens completos foram aproveitados"})
     parecer = _validar_refs(parecer, dados, valores)
     parecer["modelo"] = modelo
+    parecer["parecer_cortado"] = bool(cortado or stop == "max_tokens")
     parecer["duracao_ms"] = int((time.time() - t0) * 1000)
     return parecer, None
 
