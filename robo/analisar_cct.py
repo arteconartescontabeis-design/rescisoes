@@ -2,7 +2,7 @@
 analisar_cct.py — Bloco 3 (seções 44-61): extração de valores por cláusula, comparação entre versões e parecer.
 1) extrair_valores(dados)      — determinístico (regex + taxonomia grupo/subgrupo do Mediador); confiança ALTA = valor localizado no texto
 2) comparar(anterior, atual)   — cláusulas novas / excluídas / alteradas (com diff) + variação dos valores
-3) parecer_ia(...)             — opcional, via API Anthropic (ANTHROPIC_API_KEY); JSON validado contra as cláusulas
+3) parecer_ia(...)             — opcional, via IA Central do Portal Artecon (IA_GATEWAY_TOKEN); JSON validado contra as cláusulas
 4) analisar(dados, anterior)   — orquestra e devolve o registro para cct_analises
 Regra 99: se a IA falhar, a análise sai com status ANALISE_IA_NAO_CONCLUIDA e os itens determinísticos permanecem.
 """
@@ -15,7 +15,9 @@ import unicodedata
 
 MODELO_IA = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 # v0.15.2 (09/09/2026): GitHub Models retirado — o serviço foi desativado pelo GitHub (HTTP 410 "retirement brownout").
-# Parecer por IA exclusivamente pela API Anthropic (ANTHROPIC_API_KEY).
+# v0.20.0: parecer por IA pela IA Central (ia-gateway do Portal Artecon) com o token do CCT (IA_GATEWAY_TOKEN).
+# O gateway recebe e devolve exatamente o formato da API da Anthropic; ele controla limites e registra o consumo.
+IA_GATEWAY_URL = os.environ.get("IA_GATEWAY_URL", "https://fbxelwhdiisfmnwrerbl.supabase.co/functions/v1/ia-gateway")
 
 # ----------------------------------------------------------------------------- utilidades
 def norm(s):
@@ -301,22 +303,27 @@ def _parse_json(txt):
 
 
 def parecer_ia(dados, valores, comparacao=None, api_key=None, timeout=120):
-    """Parecer pela API Anthropic (ANTHROPIC_API_KEY). Retorna (parecer, erro)."""
+    """Parecer pela IA Central (IA_GATEWAY_TOKEN). Retorna (parecer, erro)."""
     import requests
-    key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+    key = (api_key or os.environ.get("IA_GATEWAY_TOKEN") or "").strip()
     t0 = time.time()
     if key:
         corpo = _material(dados, valores, comparacao)
-        r = requests.post("https://api.anthropic.com/v1/messages", timeout=timeout,
-                          headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+        r = requests.post(IA_GATEWAY_URL, timeout=timeout,
+                          headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json",
+                                   "x-ia-usuario": "CCT Monitor (robô, Analisar com IA)"},
                           json={"model": MODELO_IA, "max_tokens": 6000, "system": PROMPT_SISTEMA,
                                 "messages": [{"role": "user", "content": corpo[:180000]}]})
         if r.status_code != 200:
-            return None, f"Anthropic HTTP {r.status_code}: {r.text[:300]}"
+            try:
+                motivo = (r.json().get("error") or {}).get("message") or r.text
+            except Exception:
+                motivo = r.text
+            return None, f"IA Central HTTP {r.status_code}: {str(motivo)[:300]}"
         txt = "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
         modelo = MODELO_IA
     else:
-        return None, "ANTHROPIC_API_KEY não configurada no GitHub (Settings → Secrets) — parecer por IA não gerado"
+        return None, "IA_GATEWAY_TOKEN não configurado no GitHub (Settings → Secrets) — parecer por IA não gerado"
     try:
         parecer = _parse_json(txt)
     except Exception as e:
@@ -352,4 +359,4 @@ if __name__ == "__main__":
     import sys
     atual = json.load(open(sys.argv[1], encoding="utf-8"))
     ant = json.load(open(sys.argv[2], encoding="utf-8")) if len(sys.argv) > 2 else None
-    print(json.dumps(analisar(atual, ant, usar_ia=bool(os.environ.get("ANTHROPIC_API_KEY"))), ensure_ascii=False, indent=2))
+    print(json.dumps(analisar(atual, ant, usar_ia=bool(os.environ.get("IA_GATEWAY_TOKEN"))), ensure_ascii=False, indent=2))

@@ -19,7 +19,7 @@ Erros mostra em linguagem corrente; (2) nos disparos de hora em hora em que não
 COMPLEMENTAR: refaz SÓ os itens com incidente aberto (consulta/download/importação/armazenamento) a cada N horas, até M
 tentativas por item por dia (cct_config.retentar_intervalo_h / retentar_max_dia) — esgotadas, o incidente vira CRÍTICO —
 e depois processa a fila de pareceres por IA dentro do tempo restante; (3) a fila de IA não é consumida sem a chave
-ANTHROPIC_API_KEY nem com o limite mensal atingido (incidente explica o motivo; a fila espera).
+da IA nem com o limite mensal atingido (incidente explica o motivo; a fila espera). [v0.20.0: chave = IA_GATEWAY_TOKEN]
 
 v0.18.1: (1) o robô NÃO cadastra mais as demais partes das convenções como sindicatos (só define laboral/patronal do
 sindicato monitorado quando estiver em branco) — a relação de sindicatos é a cadastrada pelo escritório; (2) reconsulta
@@ -28,6 +28,11 @@ cct_config.receita_reconsulta_dias (0 = só pelo botão do app), registrando cad
 (3) envio dos avisos CADASTRO_ALTERADO enfileirados pelo app ou pelo robô (ao responsável; sem responsável, aos e-mails
 de erros críticos/gerentes) em toda execução, inclusive nos disparos sem consulta; (4) os e-mails de nova convenção,
 lembrete e escalonamento passam a informar o usuário responsável pela empresa (nome e e-mail).
+
+v0.20.0 (27/09/2026): (1) IA CENTRAL — o parecer por IA passa pelo ia-gateway do Portal Artecon com o token do CCT
+(secret IA_GATEWAY_TOKEN do GitHub); a chave da Anthropic não fica mais no repositório. (2) IA SÓ SOB DEMANDA — a
+convenção nova é importada com valores por cláusula e comparação com a anterior, mas SEM parecer por IA; o parecer só é
+gerado quando alguém clica "Analisar com IA" na convenção (cct_pedir_analise_agora → fila → este robô).
 """
 import hashlib
 import json
@@ -46,7 +51,20 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.18.1"
+VERSAO = "0.20.0"
+# v0.20.0: token do CCT na IA Central (ia-gateway do Portal Artecon)
+def ia_chave_presente():
+    return bool((os.environ.get("IA_GATEWAY_TOKEN") or "").strip())
+
+# v0.18.5: orçamento de tempo da execução (minutos), informado pelo workflow (timeout-minutes − margem); todas as etapas o respeitam
+ORCAMENTO_MIN = int(os.environ.get("ORCAMENTO_MIN") or "45")
+_INICIO_GLOBAL = time.time()
+
+
+def restante(reserva_min=0):
+    """Segundos que ainda cabem nesta execução, descontada uma reserva para as etapas seguintes."""
+    return ORCAMENTO_MIN * 60 - (time.time() - _INICIO_GLOBAL) - reserva_min * 60
+
 SB_URL = os.environ["SUPABASE_URL"].rstrip("/")
 SB_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 TENANT_CNPJ = os.environ.get("TENANT_CNPJ", "79876769000128")
@@ -74,6 +92,27 @@ def sb_get(tabela, params):
     r = requests.get(f"{SB_URL}/rest/v1/{tabela}", headers=H, params=params, timeout=30)
     r.raise_for_status()
     return r.json()
+
+
+PAGINA = 1000   # v0.19.0: limite por resposta do PostgREST (Max rows); listas maiores vêm em páginas
+
+
+def sb_get_all(tabela, params):
+    """v0.19.0: lê a lista inteira, em páginas de PAGINA linhas (Range), para que o robô nunca deixe de enxergar convenções
+    já importadas quando a tabela passar do limite de linhas por resposta — o que faria reimportar e avisar em duplicidade."""
+    todos, ini = [], 0
+    while True:
+        h = dict(H, Range=f"{ini}-{ini + PAGINA - 1}", **{"Range-Unit": "items"})
+        r = requests.get(f"{SB_URL}/rest/v1/{tabela}", headers=h, params=params, timeout=60)
+        if r.status_code == 416:   # fora do intervalo = acabou
+            break
+        r.raise_for_status()
+        pg = r.json()
+        todos.extend(pg)
+        if len(pg) < PAGINA:
+            break
+        ini += PAGINA
+    return todos
 
 
 def sb_insert(tabela, dados, upsert_on=None):
@@ -354,7 +393,7 @@ def importar(tenant, sind, reg, page, consulta_id, empresa=None, origem="monitor
                      data_registro=data_br(m.get("data_registro")), data_protocolo=data_br(m.get("data_protocolo")),
                      vigencia_inicio=data_br((d.get("vigencia") or {}).get("inicio")) or base.get("vigencia_inicio"),
                      vigencia_fim=data_br((d.get("vigencia") or {}).get("fim")) or base.get("vigencia_fim"),
-                     data_base=d.get("data_base"), categoria=d.get("categoria"), abrangencia=d.get("abrangencia_territorial"),
+                     data_base=d.get("data_base"), categoria=_norm_categoria(d.get("categoria")), abrangencia=d.get("abrangencia_territorial"),
                      partes=d.get("partes") or base["partes"], anexos=d.get("anexos") or [],
                      arquivo_path=arquivo_path, sha256=sha, total_clausulas=d["total_clausulas"],
                      status_importacao="IMPORTADO" if d["total_clausulas"] > 0 else "IMPORTACAO_NAO_CONCLUIDA")
@@ -371,7 +410,7 @@ def importar(tenant, sind, reg, page, consulta_id, empresa=None, origem="monitor
         resolver(tenant, f"IMPORTACAO:{registro}")
         log(f"  IMPORTADO {registro}: {d['total_clausulas']} cláusulas, {len(dados['partes'])} partes")
         if dados["status_importacao"] == "IMPORTADO":
-            analisar_instrumento(tenant, row["id"], d, sind.get("id"))
+            analisar_instrumento(tenant, row["id"], d, sind.get("id"), sob_demanda=False)   # v0.20.0: IA só pelo botão
         return row, dados["status_importacao"] == "IMPORTADO"
     except Exception as e:
         row = sb_insert("cct_instrumentos", dict(base, arquivo_path=arquivo_path, sha256=sha,
@@ -388,6 +427,18 @@ def importar(tenant, sind, reg, page, consulta_id, empresa=None, origem="monitor
 import re as _re
 _RX_LAB = _re.compile(r"\b(EMPREGAD|TRABALHADOR|PROFISSIONA|OPERARI|OPERÁRI|MOTORIST|VIGILANT|SERVIDOR|TECNIC|TÉCNIC|BANCARI|BANCÁRI|COMERCIARI|COMERCIÁRI|CONDUTOR|ENFERM|AUXILIAR|OFICIAI)", _re.I)
 _RX_PAT = _re.compile(r"\b(PATRONAL|EMPRESAS|EMPRESARI|INDUSTRIA|INDÚSTRIA|COMERCIO|COMÉRCIO|LOJIST|VAREJIST|ATACADIST|HOTEIS|HOTÉIS|HOSPITAIS|ESCOLAS|TRANSPORTADOR|CONTABILIST|AGENCIAS|AGÊNCIAS|CONCESSIONARI)", _re.I)
+
+
+def _norm_categoria(c):
+    """v0.18.5: categoria da convenção como veio do extrato, sem espaços repetidos/pontuação final; se vier toda em maiúsculas, em capitalização de título
+    (o Mediador alterna 'TRABALHADORES NO COMÉRCIO' e 'Trabalhadores no Comércio' para a mesma categoria — o filtro do app ficava com repetidas)."""
+    t = _re.sub(r"\s+", " ", str(c or "")).strip().rstrip(".;,")
+    if not t:
+        return None
+    if t == t.upper() and any(ch.isalpha() for ch in t):
+        t = _titulo(t)
+        t = _re.sub(r"\b(De|Do|Da|Dos|Das|E|Em|No|Na|Nos|Nas|Ao|Aos|Por|Para|Com|Sem)\b", lambda m: m.group(1).lower(), t)
+    return t
 
 
 def inferir_tipo(nome, posicao):
@@ -429,17 +480,23 @@ def carregar_dados_instrumento(inst_id):
             "abrangencia_territorial": i.get("abrangencia"), "data_base": i.get("data_base"), "clausulas": cls, "total_clausulas": len(cls)}
 
 
-def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
-    """Gera valores, comparação com a anterior e parecer (IA opcional). Regra 99: IA falhou → ANALISE_IA_NAO_CONCLUIDA."""
+MOTIVO_SOB_DEMANDA = "parecer por IA sob demanda — clique em \"Analisar com IA\" na convenção para gerar"
+
+
+def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None, sob_demanda=True):
+    """Gera valores, comparação com a anterior e parecer (IA opcional). Regra 99: IA falhou → ANALISE_IA_NAO_CONCLUIDA.
+    v0.20.0: sob_demanda=False (importação) grava valores e comparação SEM chamar a IA."""
     try:
         dados = dados or carregar_dados_instrumento(inst_id)
         ant_id = sb_rpc("cct_anterior", {"p_instrumento": inst_id})
         anterior = carregar_dados_instrumento(ant_id) if ant_id else None
         cfg = config(tenant)
         origem_inst = (sb_get("cct_instrumentos", {"id": f"eq.{inst_id}", "select": "origem"}) or [{}])[0].get("origem")
-        usar_ia = bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())
+        usar_ia = ia_chave_presente()
         motivo_sem_ia = None
-        if not usar_ia:
+        if not sob_demanda:
+            usar_ia, motivo_sem_ia = False, MOTIVO_SOB_DEMANDA
+        elif not usar_ia:
             motivo_sem_ia = MOTIVO_SEM_CHAVE
         elif usar_ia and not cfg.get("ia_ativa", True):
             usar_ia, motivo_sem_ia = False, "IA desativada nos parâmetros pelo gerente"
@@ -455,6 +512,10 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
         r = analisar_cct.analisar(dados, anterior, usar_ia=usar_ia)
         if motivo_sem_ia:
             r["erro_ia"] = motivo_sem_ia
+        # v0.18.5: sem crédito na conta → a convenção CONTINUA na fila (analise_status nulo), sem incidente por convenção; quem avisa é analisar_pendentes (um incidente só)
+        sem_credito = bool(usar_ia and r["status"] != "CONCLUIDA" and _RX_SEM_CREDITO.search(r.get("erro_ia") or ""))
+        if sem_credito:
+            SEM_CREDITO["msg"] = r.get("erro_ia")
         versao = 1 + len(sb_get("cct_analises", {"instrumento_id": f"eq.{inst_id}", "select": "id"}))
         an = sb_insert("cct_analises", {"tenant_id": tenant, "instrumento_id": inst_id, "anterior_id": ant_id, "versao": versao, "status": r["status"],
                                         "modelo": r["modelo"], "erro_ia": r["erro_ia"], "resumo": r["resumo"], "destaques": r["destaques"],
@@ -465,12 +526,14 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
         if r["valores"]:
             sb_insert("cct_valores", [{"tenant_id": tenant, "instrumento_id": inst_id, "analise_id": an["id"], **{k: v[k] for k in
                       ("chave", "tema", "descricao", "valor_texto", "valor_num", "unidade", "clausula_ordem", "clausula_titulo", "trecho", "confianca")}} for v in r["valores"]])
-        sb_patch("cct_instrumentos", {"id": f"eq.{inst_id}"}, {"analise_status": r["status"], "analise_em": datetime.now(timezone.utc).isoformat()})
+        sb_patch("cct_instrumentos", {"id": f"eq.{inst_id}"}, {"analise_status": None if sem_credito else r["status"], "analise_em": datetime.now(timezone.utc).isoformat()})
         if r["status"] == "CONCLUIDA":
             resolver(tenant, f"IA:{inst_id}")
+        elif sem_credito:
+            log(f"  IA sem crédito: {dados['metadados']['numero_registro']} continua na fila")
         elif usar_ia:  # só é incidente quando a IA deveria ter rodado e falhou
             incidente(tenant, f"IA:{inst_id}", "IA", "ATENCAO", f"ANÁLISE POR IA NÃO CONCLUÍDA – {dados['metadados']['numero_registro']}: {r['erro_ia']} (valores e comparação gravados)", sindicato_id, inst_id,
-                      contexto={"registro": dados["metadados"]["numero_registro"], "etapa": "parecer por IA (API Anthropic)", "resposta": r["erro_ia"], "modelo": r.get("modelo")})
+                      contexto={"registro": dados["metadados"]["numero_registro"], "etapa": "parecer por IA (IA Central)", "resposta": r["erro_ia"], "modelo": r.get("modelo")})
         log(f"  ANÁLISE {dados['metadados']['numero_registro']}: {r['status']} — {len(r['valores'])} valores, "
             f"{'comparada com ' + anterior['metadados']['numero_registro'] if anterior else 'sem anterior'}, {r['duracao_ms']} ms")
         return an
@@ -482,15 +545,41 @@ def analisar_instrumento(tenant, inst_id, dados=None, sindicato_id=None):
         return None
 
 
-MOTIVO_SEM_CHAVE = "chave ANTHROPIC_API_KEY não configurada nos secrets do repositório (GitHub → Settings → Secrets and variables → Actions)"
+MOTIVO_SEM_CHAVE = "token IA_GATEWAY_TOKEN não configurado nos secrets do repositório (GitHub → Settings → Secrets and variables → Actions; o token do CCT é gerado no Portal → Consumo de IA)"
+# v0.18.5: resposta da API Anthropic quando a conta está sem crédito (HTTP 400 "credit balance is too low" / 402) — não é erro da convenção
+_RX_SEM_CREDITO = _re.compile(r"credit balance|insufficient|too low|HTTP 402|billing|purchase credits|saldo", _re.I)
+SEM_CREDITO = {"msg": None}
+PAUSA_SEM_CREDITO_H = 6
+
+
+def _fila_ia_pausada(tenant):
+    """Há incidente IA:sem-credito aberto há menos de PAUSA_SEM_CREDITO_H horas? Então a fila espera (evita 1 chamada com erro por convenção)."""
+    try:
+        inc = sb_get("cct_incidentes", {"tenant_id": f"eq.{tenant}", "fingerprint": "eq.IA:sem-credito",
+                                        "status": "in.(NOVO,EM_NOVA_TENTATIVA,PERSISTENTE,EM_ANALISE)", "select": "ultima_ocorrencia", "limit": "1"})
+        if inc and inc[0].get("ultima_ocorrencia"):
+            desde = datetime.fromisoformat(inc[0]["ultima_ocorrencia"].replace("Z", "+00:00"))
+            horas = (datetime.now(timezone.utc) - desde).total_seconds() / 3600
+            if horas < PAUSA_SEM_CREDITO_H:
+                return f"fila de IA pausada: conta da API Anthropic sem crédito (incidente aberto há {horas:.1f} h; nova tentativa após {PAUSA_SEM_CREDITO_H} h ou ao resolver o incidente)"
+    except Exception as e:
+        log(f"  !! verificação de crédito: {e}")
+    return None
+
+
+def _incidente_sem_credito(tenant, msg, na_fila):
+    incidente(tenant, "IA:sem-credito", "IA", "CRITICO",
+              f"IA SEM CRÉDITO – a conta da API Anthropic está sem saldo; {na_fila} convenção(ões) aguardam parecer. Recarregue em platform.claude.com → Billing e lance a recarga no Portal → Consumo de IA; a fila retoma sozinha",
+              contexto={"etapa": "parecer por IA (IA Central)", "resposta": msg, "na_fila": na_fila,
+                        "o_que_fazer": "recarregar o crédito da conta da Artecon (platform.claude.com → Billing) e lançar a recarga no Portal → Consumo de IA; depois resolva o incidente ou aguarde 6 h — a fila retoma sozinha"})
 
 
 def analisar_pendentes(tenant, limite_s=None):
     """Instrumentos importados sem análise (analise_status nulo: importação sem parecer, 'Analisar com IA' ou lote por ano).
     v0.17.2: a fila NÃO é consumida sem a chave da IA nem com o limite mensal atingido — fica esperando, com incidente que explica;
     processa dentro de `limite_s` segundos (o que sobrar continua na próxima execução). Devolve o nº de pareceres processados."""
-    pend = sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "analise_status": "is.null",
-                                       "select": "id,numero_registro,sindicato_id", "order": "detectado_em.desc", "limit": "500"})
+    pend = sb_get_all("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "analise_status": "is.null",
+                                           "select": "id,numero_registro,sindicato_id", "order": "detectado_em.desc"})
     if not pend:
         resolver(tenant, "IA:chave-ausente"); resolver(tenant, "IA:limite-mensal")
         return 0
@@ -498,11 +587,14 @@ def analisar_pendentes(tenant, limite_s=None):
     cfg = config(tenant)
     if not cfg.get("ia_ativa", True):
         log("  fila de IA parada: parecer por IA desligado em Configurações"); return 0
-    if not (os.environ.get("ANTHROPIC_API_KEY") or "").strip():
+    if not ia_chave_presente():
         incidente(tenant, "IA:chave-ausente", "IA", "ALTO", f"PARECER POR IA INDISPONÍVEL – {len(pend)} convenção(ões) na fila e {MOTIVO_SEM_CHAVE}",
-                  contexto={"etapa": "parecer por IA (API Anthropic)", "na_fila": len(pend), "resposta": "o robô subiu sem a variável ANTHROPIC_API_KEY; a fila fica aguardando"})
+                  contexto={"etapa": "parecer por IA (IA Central)", "na_fila": len(pend), "resposta": "o robô subiu sem a variável IA_GATEWAY_TOKEN; a fila fica aguardando"})
         return 0
     resolver(tenant, "IA:chave-ausente")
+    pausa = _fila_ia_pausada(tenant)   # v0.18.5
+    if pausa:
+        log(f"  {pausa}"); return 0
     t0, n = time.time(), 0
     for i in pend:
         try:
@@ -512,13 +604,19 @@ def analisar_pendentes(tenant, limite_s=None):
         lim = int(cfg.get("ia_limite_mes") or 0)
         if uso >= lim:
             incidente(tenant, "IA:limite-mensal", "IA", "ATENCAO", f"FILA DE IA PARADA – limite mensal de pareceres atingido ({uso}/{lim}); {len(pend) - n} convenção(ões) aguardam (aumente o limite em Configurações ou aguarde o próximo mês)",
-                      contexto={"etapa": "parecer por IA (API Anthropic)", "uso_mes": uso, "limite_mes": lim, "na_fila": len(pend) - n})
+                      contexto={"etapa": "parecer por IA (IA Central)", "uso_mes": uso, "limite_mes": lim, "na_fila": len(pend) - n})
             break
         resolver(tenant, "IA:limite-mensal")
         if limite_s and time.time() - t0 > limite_s:
             log(f"  tempo esgotado: {len(pend) - n} parecer(es) ficam para a próxima execução"); break
-        analisar_instrumento(tenant, i["id"], sindicato_id=i.get("sindicato_id"))
+        SEM_CREDITO["msg"] = None
+        an = analisar_instrumento(tenant, i["id"], sindicato_id=i.get("sindicato_id"))
+        if SEM_CREDITO["msg"]:   # v0.18.5: um incidente CRÍTICO só e a fila para até o crédito voltar
+            _incidente_sem_credito(tenant, SEM_CREDITO["msg"], len(pend) - n)
+            break
         n += 1
+        if an and an.get("status") == "CONCLUIDA":
+            resolver(tenant, "IA:sem-credito")
     return n
 
 
@@ -542,10 +640,11 @@ def criar_ciencias(tenant, sind, row, empresa=None):
     prazo = prazo_ciencia(tenant)
     alvos = []
     if empresa:
-        alvos = [empresa]
+        alvos = [] if empresa.get("sem_funcionarios") else [empresa]
     elif sind:
-        vinc = sb_get("cct_empresa_sindicato", {"sindicato_id": f"eq.{sind['id']}", "select": "empresa:cct_empresas(id,razao_social,responsavel_email,gerente_email,ativo)"})
-        alvos = [v["empresa"] for v in vinc if v.get("empresa") and v["empresa"].get("ativo", True)]
+        vinc = sb_get("cct_empresa_sindicato", {"sindicato_id": f"eq.{sind['id']}", "select": "empresa:cct_empresas(id,razao_social,responsavel_email,gerente_email,ativo,sem_funcionarios)"})
+        # v0.19.1: empresa marcada "sem funcionários" não recebe ciência
+        alvos = [v["empresa"] for v in vinc if v.get("empresa") and v["empresa"].get("ativo", True) and not v["empresa"].get("sem_funcionarios")]
     linhas = []
     if alvos:
         for e in alvos:
@@ -690,10 +789,10 @@ def reconsultar_receita(tenant, cfg, maximo=40, limite_s=None):
     corte = (datetime.now(timezone.utc) - timedelta(days=dias)).isoformat()
     fila = []
     try:
-        for s in sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "receita_em": f"lt.{corte}",
+        for s in sb_get_all("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "receita_em": f"lt.{corte}",
                                             "select": "id,cnpj,nome,uf,municipio,cnae,situacao_cadastral,responsavel_email,receita_em", "order": "receita_em.asc", "limit": str(maximo)}):
             fila.append(("sindicato", "cct_sindicatos", s))
-        for e in sb_get("cct_empresas", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "or": f"(receita_em.is.null,receita_em.lt.{corte})",
+        for e in sb_get_all("cct_empresas", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "sem_funcionarios": "not.is.true", "or": f"(receita_em.is.null,receita_em.lt.{corte})",
                                           "select": "id,cnpj,razao_social,uf,municipio,cnae,cnae_descricao,situacao_cadastral,responsavel_email,receita_em", "order": "receita_em.asc.nullsfirst", "limit": str(maximo)}):
             fila.append(("empresa", "cct_empresas", e))
     except Exception as e:
@@ -880,28 +979,32 @@ def ano_do_registro(reg):
     m = _re.search(r"/(\d{4})", reg.get("registro") or "")
     if m:
         return int(m.group(1))
-    m = _re.search(r"(\d{4})", (reg.get("vigencia") or "")[:10][::-1])
-    return None
+    m = _re.search(r"\d{2}/\d{2}/(\d{4})", reg.get("vigencia") or "")   # v0.19.4: início da vigência "dd/mm/aaaa ..." (antes o resultado era descartado)
+    return int(m.group(1)) if m else None
 
 
-def importar_historico(tenant, page, existentes, cfg):
+def importar_historico(tenant, page, existentes, cfg, limite_s=None):
     """Para sindicatos com historico_status PENDENTE/EM_ANDAMENTO: consulta 'Todos' (vigentes e não vigentes),
     importa registros dos últimos N anos ainda ausentes — no máximo `max` downloads por execução, com pausas."""
     anos, maximo = int(cfg.get("historico_anos") or 5), int(cfg.get("historico_max_por_execucao") or 8)
     ano_min = datetime.now().year - anos
-    pend = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "historico_status": "in.(PENDENTE,EM_ANDAMENTO)",
+    t0h = time.time()
+    if limite_s is not None and limite_s < 120:
+        log(f"HISTÓRICO: sem tempo nesta execução ({int(limite_s)} s) — fica para a próxima"); return 0
+    esgotou = lambda: limite_s is not None and time.time() - t0h > limite_s
+    pend = sb_get_all("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "ativo": "eq.true", "historico_status": "in.(PENDENTE,EM_ANDAMENTO)",
                                      "select": "id,cnpj,nome,tipo,historico_status", "order": "historico_em.nullsfirst", "limit": "3"})
     if not pend:
         return 0
     log(f"HISTÓRICO: {len(pend)} sindicato(s) pendente(s); limite {maximo} download(s) nesta execução; registros desde {ano_min}")
     feitos = 0
     for sind in pend:
-        if feitos >= maximo:
+        if feitos >= maximo or esgotou():
             break
         sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"historico_status": "EM_ANDAMENTO", "historico_em": datetime.now(timezone.utc).isoformat()})
         faltam, erro_consulta = [], None
         for tipo in TIPOS_MONITORADOS:
-            if feitos >= maximo:
+            if feitos >= maximo or esgotou():
                 break
             pendentes_pg = []
 
@@ -912,7 +1015,7 @@ def importar_historico(tenant, page, existentes, cfg):
                     ano = ano_do_registro(reg)
                     if ano is None or ano < ano_min or reg["registro"] in existentes:
                         continue
-                    if feitos >= maximo:
+                    if feitos >= maximo or esgotou():
                         pendentes_pg.append(reg["registro"]); continue
                     log(f"  HISTÓRICO {reg['registro']} ({reg['tipo']}) — {reg.get('vigencia')}")
                     row, ok = importar(tenant, sind, reg, page, None, None, origem="historico")
@@ -932,7 +1035,7 @@ def importar_historico(tenant, page, existentes, cfg):
             time.sleep(4)
         if erro_consulta:
             sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"historico_obs": f"consulta não concluída: {erro_consulta}"})
-        elif not faltam and feitos < maximo:
+        elif not faltam and feitos < maximo and not esgotou():
             sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"historico_status": "CONCLUIDO", "historico_em": datetime.now(timezone.utc).isoformat(), "historico_obs": f"histórico de {anos} anos importado"})
             log(f"  HISTÓRICO concluído: {sind['nome']}")
         else:
@@ -1048,9 +1151,17 @@ def fila_retentativa(tenant, cfg):
     intervalo_h, maximo = int(cfg.get("retentar_intervalo_h") or 2), int(cfg.get("retentar_max_dia") or 0)
     if maximo <= 0:
         return [], intervalo_h, maximo
-    rows = sb_get("cct_incidentes", {"tenant_id": f"eq.{tenant}", "status": "in.(NOVO,EM_NOVA_TENTATIVA,PERSISTENTE)", "modulo": f"in.({','.join(MODULOS_RETENTAVEIS)})",
-                                     "select": "id,fingerprint,modulo,gravidade,sindicato_id,instrumento_id,mensagem,tentativas_dia,tentativas_data,ultima_tentativa,ultima_ocorrencia,escalado_em",
-                                     "order": "ultima_ocorrencia.asc"})
+    try:
+        rows = sb_get("cct_incidentes", {"tenant_id": f"eq.{tenant}", "status": "in.(NOVO,EM_NOVA_TENTATIVA,PERSISTENTE)", "modulo": f"in.({','.join(MODULOS_RETENTAVEIS)})",
+                                         "select": "id,fingerprint,modulo,gravidade,sindicato_id,instrumento_id,mensagem,tentativas_dia,tentativas_data,ultima_tentativa,ultima_ocorrencia,escalado_em",
+                                         "order": "ultima_ocorrencia.asc"})
+    except Exception as e:   # v0.19.3: falha aqui não derruba a execução — vira incidente e a retentativa fica para depois
+        log(f"  !! fila de retentativa indisponível: {e}")
+        incidente(tenant, "APLICATIVO:retentativa", "APLICATIVO", "ALTO",
+                  f"Retentativa automática desligada nesta execução: o banco não aceitou a consulta de incidentes ({str(e)[:120]}). Execute o setup_cct_v0.19.3.sql",
+                  contexto={"etapa": "fila de retentativa", "erro": str(e)[:600], "o_que_fazer": "rodar sql/setup_cct_v0.19.3.sql no Supabase (cria as colunas de controle em cct_incidentes)"})
+        return [], intervalo_h, 0
+    resolver(tenant, "APLICATIVO:retentativa")
     agora, hoje = datetime.now(BRT), datetime.now(BRT).date().isoformat()
     devidos = []
     for r in rows:
@@ -1150,16 +1261,16 @@ def modo_complementar(tenant, cfg, motivo):
     devidos, _, _ = fila_retentativa(tenant, cfg)
     ret = (0, 0, 0)
     if devidos:
-        existentes = {r["numero_registro"] for r in sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "select": "numero_registro"})}
+        existentes = {r["numero_registro"] for r in sb_get_all("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "select": "numero_registro"})}
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=False)
             page = browser.new_context(locale="pt-BR", accept_downloads=True).new_page()
             try:
-                ret = processar_retentativas(tenant, cfg, page, existentes, limite_s=25 * 60)
+                ret = processar_retentativas(tenant, cfg, page, existentes, limite_s=max(60, restante(18)))
             finally:
                 browser.close()
     try:
-        n_ia = analisar_pendentes(tenant, limite_s=12 * 60 if devidos else 36 * 60)
+        n_ia = analisar_pendentes(tenant, limite_s=max(60, restante(6)))
     except Exception as e:
         log(f"  !! análises pendentes falharam: {e}\n{traceback.format_exc()}")
     partes = []
@@ -1171,7 +1282,7 @@ def modo_complementar(tenant, cfg, motivo):
         partes.append(f"Receita: {rfb[0]} reconsultado(s), {rfb[1]} alterado(s)")
     encerrar_execucao("SEM_CONSULTA", motivo + (" · " + "; ".join(partes) if partes else ""),
                       {"retentativa": {"tentados": ret[0], "resolvidos": ret[1], "escalados": ret[2]}, "ia_pareceres": n_ia, "receita": {"consultados": rfb[0], "alterados": rfb[1]},
-                       "ia_chave_presente": bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())})
+                       "ia_chave_presente": ia_chave_presente()})
 
 
 def main():
@@ -1193,14 +1304,14 @@ def main():
     if SO_ANALISE:
         log("MODO ANÁLISE SOB DEMANDA (disparado pelo app): só pareceres pendentes — sem consulta ao Mediador, sem ciências")
         try:
-            n = analisar_pendentes(tenant, limite_s=38 * 60)
+            n = analisar_pendentes(tenant, limite_s=max(60, restante(5)))
         except Exception as e:
             log(f"  !! análises pendentes falharam: {e}\n{traceback.format_exc()}")
             incidente(tenant, "IA:sob-demanda", "IA", "ALTO", f"Análise sob demanda falhou: {e}", contexto={"etapa": "execução só de pareceres (so_analise)", "resposta": str(e)})
             encerrar_execucao("ERRO_TOTAL", f"análise sob demanda falhou: {e}")
             return
-        chave = bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())
-        encerrar_execucao("SEM_CONSULTA", f"análise por IA sob demanda: {n} parecer(es) processado(s)" + ("" if chave else " — SEM A CHAVE ANTHROPIC_API_KEY (fila aguardando)"),
+        chave = ia_chave_presente()
+        encerrar_execucao("SEM_CONSULTA", f"análise por IA sob demanda: {n} parecer(es) processado(s)" + ("" if chave else " — SEM O TOKEN IA_GATEWAY_TOKEN (fila aguardando)"),
                           {"ia_pareceres": n, "ia_chave_presente": chave})
         return
     forcar = (os.environ.get("FORCAR") or "").lower() in ("1", "true", "sim")
@@ -1229,7 +1340,7 @@ def main():
             log("nenhum horário válido configurado; modo complementar"); modo_complementar(tenant, cfg0, "nenhum horário válido configurado"); return
         # devido = último horário configurado já passado. Executa enquanto houver sindicato monitorado NÃO consultado desde então
         # (assim, o que não coube em um disparo de 45 min continua no próximo, e um máximo por execução vira fila natural).
-        todos = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true", "select": "id,ultima_consulta"})
+        todos = sb_get_all("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true", "select": "id,ultima_consulta"})
         pendentes = [x for x in todos if not x.get("ultima_consulta") or datetime.fromisoformat(x["ultima_consulta"].replace("Z", "+00:00")).astimezone(BRT) < devido]
         if todos and not pendentes:
             log(f"nada devido: todos os {len(todos)} sindicatos já consultados desde {devido:%d/%m %H:%M} BRT (horários {cfg0.get('horarios_consulta')})")
@@ -1259,13 +1370,13 @@ def main():
     # FILA: os consultados há mais tempo primeiro; opcionalmente só N por execução; intervalo configurável
     global INTERVALO
     INTERVALO = float(cfg0.get("intervalo_consultas_s") or INTERVALO)
-    sinds = sb_get("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true",
+    sinds = sb_get_all("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true",
                                       "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email,ultima_consulta", "order": "ultima_consulta.asc.nullsfirst"})
     maximo = int(cfg0.get("max_sindicatos_por_execucao") or 0)
     if maximo and len(sinds) > maximo:
         log(f"fila: {len(sinds)} sindicatos, {maximo} por execução (os demais ficam para a próxima)")
         sinds = sinds[:maximo]
-    emps_act = sb_get("cct_empresas", {"tenant_id": f"eq.{tenant}", "monitorar_act": "eq.true", "ativo": "eq.true",
+    emps_act = sb_get_all("cct_empresas", {"tenant_id": f"eq.{tenant}", "monitorar_act": "eq.true", "ativo": "eq.true", "sem_funcionarios": "not.is.true",   # v0.19.1
                                        "select": "id,cnpj,razao_social,responsavel_email,gerente_email", "order": "razao_social"})
     filtro = os.environ.get("APENAS_CNPJ", "").strip()
     if filtro:
@@ -1273,7 +1384,7 @@ def main():
         emps_act = [e for e in emps_act if e["cnpj"] == filtro]
     log(f"{len(sinds)} sindicato(s) e {len(emps_act)} empresa(s) com ACT a monitorar")
     # já importados de fato; os com IMPORTACAO_NAO_CONCLUIDA voltam a ser tentados (seção 92)
-    existentes = {r["numero_registro"] for r in sb_get("cct_instrumentos",
+    existentes = {r["numero_registro"] for r in sb_get_all("cct_instrumentos",
                   {"tenant_id": f"eq.{tenant}", "status_importacao": "eq.IMPORTADO", "select": "numero_registro"})}
     resumo = {"CONSULTA_CONFIRMADA": 0, "CONSULTA_COM_ALERTA": 0, "CONSULTA_NAO_CONCLUIDA": 0, "novos": 0}
 
@@ -1281,10 +1392,9 @@ def main():
         browser = p.chromium.launch(headless=False)  # headed sob xvfb: melhor pontuação no reCAPTCHA
         ctx = browser.new_context(locale="pt-BR", accept_downloads=True)
         page = ctx.new_page()
-        inicio_exec = time.time()
         try:
             for i, s in enumerate(sinds):
-                if time.time() - inicio_exec > 38 * 60:  # limite do Actions: 45 min — deixa o resto para a próxima execução
+                if restante(7) <= 0:  # v0.18.5: orçamento ORCAMENTO_MIN (workflow) menos reserva para IA/ciências/histórico — o resto fica para a próxima execução
                     log(f"tempo esgotado: {len(sinds) - i} sindicato(s) ficam para a próxima execução"); break
                 try:
                     st, n = processar_sindicato(tenant, s, page, existentes)
@@ -1316,7 +1426,7 @@ def main():
     else:
         resolver(tenant, "APLICATIVO:sem-sindicatos")
     try:
-        resumo["ia_pareceres"] = analisar_pendentes(tenant, limite_s=max(60, 32 * 60 - (time.time() - inicio_exec)))  # o que sobrar continua no próximo disparo
+        resumo["ia_pareceres"] = analisar_pendentes(tenant, limite_s=max(60, restante(12)))  # v0.18.5: o que sobrar continua no próximo disparo
     except Exception as e:
         log(f"  !! análises pendentes falharam: {e}")
     try:
@@ -1331,7 +1441,7 @@ def main():
                 b2 = p2.chromium.launch(headless=False)
                 pg2 = b2.new_context(locale="pt-BR", accept_downloads=True).new_page()
                 try:
-                    n_hist = importar_historico(tenant, pg2, existentes, cfg)
+                    n_hist = importar_historico(tenant, pg2, existentes, cfg, limite_s=max(0, restante(4)))
                     resumo["historico"] = n_hist
                 finally:
                     b2.close()
@@ -1359,7 +1469,7 @@ def main():
     resumo["receita"] = {"consultados": resumo_rfb[0], "alterados": resumo_rfb[1]}
     encerrar_execucao(resultado, motivo, {"sindicatos_previstos": previstos, "sindicatos_processados": processados, "novos": resumo["novos"],
                                           "alertas": alertas, "erros": erros, "historico": resumo.get("historico"), "detalhes": resumo,
-                                          "ia_pareceres": resumo.get("ia_pareceres"), "ia_chave_presente": bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip())})
+                                          "ia_pareceres": resumo.get("ia_pareceres"), "ia_chave_presente": ia_chave_presente()})
     with open("resumo_execucao.json", "w", encoding="utf-8") as f:
         json.dump({"versao": VERSAO, "origem": ORIGEM, "quando": datetime.now(timezone.utc).isoformat(), **resumo}, f, ensure_ascii=False, indent=2)
 
