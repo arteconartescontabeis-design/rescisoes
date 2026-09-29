@@ -27,6 +27,32 @@
   nav button{display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:9px;color:var(--text-3);font-size:13px;font-weight:500;cursor:pointer;transition:var(--tr);border:none;background:none;white-space:nowrap;font-family:inherit}
   nav button:hover{background:var(--bg);color:var(--text-2)} nav button.on{background:var(--gold-lt);color:var(--gold);font-weight:600}
   main{max-width:1240px;margin:0 auto;padding:26px 34px}
+/* v0.21.1: aba Convenções (modelo 4) */
+section[data-sec="instrumentos"] .card{max-width:none}
+@media (min-width:1500px){ body.sec-instrumentos main{max-width:1400px} }
+.cv-resumo{display:flex;gap:18px;font-size:12.5px;color:var(--text-2);margin-top:4px;flex-wrap:wrap} .cv-resumo b{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--text)} .cv-resumo .a b{color:var(--amber)} .cv-resumo .r b{color:var(--red)}
+.cv-chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px} .cv-chip{padding:5px 12px;border-radius:20px;border:1px solid var(--border-lt);font-size:12.5px;color:var(--text-2);cursor:pointer;background:var(--surface);user-select:none} .cv-chip.on{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600} .cv-chip .n{font-family:var(--mono);margin-left:5px;opacity:.75}
+.cv-filtros{display:flex;gap:6px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.cv-sind{display:grid;grid-template-columns:1fr auto;gap:10px 20px;border:1px solid var(--gold-lt);border-left:4px solid var(--gold);background:#f7fafd;border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.cv-sind h3{margin:0;font-size:15.5px;font-weight:700;line-height:1.3} .cv-sind .m{color:var(--text-2);font-size:12.5px;margin-top:3px} .cv-sind .m b{color:var(--text)} .cv-sind .acoes{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start}
+.cv-sind .kp{grid-column:1/-1;display:flex;gap:26px;padding-top:10px;border-top:1px solid var(--gold-lt);font-size:12.5px;color:var(--text-2);flex-wrap:wrap} .cv-sind .kp b{font-family:var(--mono);font-size:16px;font-weight:500;color:var(--text);margin-right:4px} .cv-sind .kp .a b{color:var(--amber)} .cv-sind .kp .r b{color:var(--red)}
+table.cv{table-layout:fixed} table.cv th{font-size:11.5px;text-transform:none;letter-spacing:0;padding:6px 10px 8px} table.cv td{padding:12px 10px;font-size:13px;line-height:1.4}
+table.cv tr.pend td{background:var(--amber-lt)} table.cv td.id{border-left:3px solid transparent} table.cv tr.vig td.id{border-left-color:var(--green)} table.cv tr.pend td.id{border-left-color:var(--amber)} table.cv tr.venc td.id{border-left-color:var(--border-lt)}
+.cv-reg{font-family:var(--mono);font-size:13.5px;font-weight:500;color:var(--gold)} .cv-reg a{color:inherit;text-decoration:none} .cv-reg a:hover{text-decoration:underline}
+.cv-tipo{display:inline-block;margin-top:5px;padding:1px 8px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:.02em;background:var(--gold-lt);color:var(--gold)} .cv-tipo.ta{background:#eef1f5;color:var(--text-2)} .cv-tipo.pend{background:#fbe9c3;color:#7a4e00}
+.cv-sub{display:block;color:var(--text-3);font-size:11.5px;margin-top:4px;line-height:1.5}
+.cv-s{font-weight:600;color:var(--text)} .cv-c{color:var(--text-2);font-size:12.5px;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden} tr.cv-aberta .cv-c{-webkit-line-clamp:unset;display:block} .cv-mais{color:var(--gold);font-size:11.5px;cursor:pointer;display:inline-block;margin-top:2px}
+.cv-vg{font-size:12px;color:var(--text-2);display:flex;justify-content:space-between;font-family:var(--mono)} .cv-vgb{position:relative;height:6px;border-radius:3px;background:var(--surface-2);margin:6px 0 4px}
+.cv-vgb i{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:var(--green)} .cv-vgb.venc i{background:var(--border-lt);width:100%} .cv-vgb.pend i{background:repeating-linear-gradient(90deg,var(--amber) 0 6px,transparent 6px 10px);width:100%;opacity:.7}
+.cv-vgb em{position:absolute;top:-4px;width:2px;height:14px;background:var(--text);border-radius:1px} .cv-vgb em::after{content:"hoje";position:absolute;top:15px;left:-10px;font-size:9.5px;font-style:normal;color:var(--text-3);font-family:var(--font)}
+.cv-vgl{font-size:11.5px;color:var(--text-3);margin-top:12px} .cv-vgl.a{color:var(--amber);font-weight:600} .cv-vgl.r{color:var(--red);font-weight:600}
+.cv-et{display:flex;align-items:flex-start;margin-top:3px} .cv-et>div{display:flex;flex-direction:column;align-items:center;width:52px}
+.cv-et .p{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid var(--border-lt);color:var(--text-3);background:#fff}
+.cv-et .p.ok{background:var(--green);border-color:var(--green);color:#fff} .cv-et .p.al{background:var(--amber);border-color:var(--amber);color:#fff} .cv-et .p.er{background:var(--red);border-color:var(--red);color:#fff} .cv-et .p.ci{background:var(--surface-2);border-color:var(--border-lt);color:var(--text-3)}
+.cv-et small{font-size:10px;color:var(--text-3);margin-top:3px;white-space:nowrap} .cv-et small.al{color:var(--amber);font-weight:600} .cv-et small.er{color:var(--red);font-weight:600}
+.cv-et .l{flex:0 0 auto;width:14px;height:2px;background:var(--border-lt);margin-top:8px} .cv-et .l.ok{background:var(--green)}
+.cv-cnt{font-size:12px;color:var(--text-3);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.cv-leg{font-size:12px;color:var(--text-3);margin-top:14px;line-height:1.7} .cv-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin:0 4px 0 8px}
   /* ===== CARDS ===== */
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
   .card h2{font-family:var(--display);font-size:19px;color:var(--text);margin:0 0 14px}
@@ -158,10 +184,11 @@
     </section>
 
     <section data-sec="instrumentos" style="display:none">
-      <div class="card"><div class="topo"><h2>Convenções e Termos Aditivos</h2><div style="display:flex;gap:6px;flex-wrap:wrap"><input id="fInst" placeholder="buscar…" style="width:180px" oninput="renderInst()">
+      <div class="card"><div class="topo" style="align-items:flex-end"><div><h2>Convenções e Termos Aditivos</h2><div class="cv-resumo" id="instResumo"></div></div><div class="cv-chips" id="instChips"></div></div>
+        <div class="cv-filtros"><input id="fInst" placeholder="buscar por registro, sindicato, categoria…" style="width:260px" oninput="renderInst()">
         <select id="fiTipo" onchange="renderInst()" style="width:170px"><option value="">Tipo: todos</option></select><select id="fiSind" onchange="renderInst()" style="width:220px"><option value="">Sindicato: todos</option></select>
         <select id="fiCat" onchange="renderInst()" style="width:200px"><option value="">Categoria: todas</option></select><select id="fiImp" onchange="renderInst()" style="width:170px"><option value="">Importação: todas</option><option value="IMPORTADO">Importado</option><option value="IMPORTACAO_NAO_CONCLUIDA">Não concluída</option></select>
-        <select id="fiOri" onchange="renderInst()" style="width:150px"><option value="">Origem: todas</option><option value="monitoramento">Monitoramento</option><option value="historico">Histórico</option><option value="solicitacao_transmitida">Solicitação transmitida</option></select><select id="fiSit" onchange="renderInst()" style="width:190px"><option value="">Situação: todas</option><option value="REGISTRADA">Registrada no MTE</option><option value="AGUARDANDO_REGISTRO">Aguardando registro</option><option value="SEM_VINCULO">Sem vínculo (sem aviso)</option></select><select id="fiVig" onchange="renderInst()" style="width:150px"><option value="">Vigência: todas</option><option value="vigente">Vigentes</option><option value="vencida">Vencidas</option><option value="sem_vig">Sem vigência informada</option></select><span style="display:inline-flex;gap:4px;align-items:center;font-size:12px;color:var(--text-3)">Registro MTE de <input id="fiRegDe" type="date" onchange="renderInst()" style="width:140px"> até <input id="fiRegAte" type="date" onchange="renderInst()" style="width:140px"></span></div></div><div id="tabInst"></div></div>
+        <select id="fiOri" onchange="renderInst()" style="width:150px"><option value="">Origem: todas</option><option value="monitoramento">Monitoramento</option><option value="historico">Histórico</option><option value="solicitacao_transmitida">Solicitação transmitida</option></select><select id="fiSit" onchange="renderInst()" style="width:190px"><option value="">Situação: todas</option><option value="REGISTRADA">Registrada no MTE</option><option value="AGUARDANDO_REGISTRO">Aguardando registro</option><option value="SEM_VINCULO">Sem vínculo (sem aviso)</option></select><select id="fiVig" onchange="renderInst()" style="width:150px"><option value="">Vigência: todas</option><option value="vigente">Vigentes</option><option value="vencida">Vencidas</option><option value="sem_vig">Sem vigência informada</option></select><span style="display:inline-flex;gap:4px;align-items:center;font-size:12px;color:var(--text-3)">Registro MTE de <input id="fiRegDe" type="date" onchange="renderInst()" style="width:140px"> até <input id="fiRegAte" type="date" onchange="renderInst()" style="width:140px"></span></div><div id="instSind"></div><div id="tabInst"></div></div>
     </section>
 
     <section data-sec="altcad" style="display:none">
@@ -249,6 +276,7 @@
     <section data-sec="versoes" style="display:none">
       <div class="card"><h2>Versões</h2>
         <table><tr><th style="width:90px">Versão</th><th style="width:110px">Data</th><th>Alterações</th></tr>
+          <tr><td>v0.21.1</td><td>29/09/2026</td><td><b>Aba Convenções redesenhada (modelo 4 aprovado).</b> A lista passa de 12 para 4 colunas: <b>Registro</b> (nº em destaque, selo CCT/TA/ACT e, abaixo, registro no MTE, data de detecção, nº de cláusulas e a marca "histórico"), <b>Sindicato e categoria</b> (sem cortar; categorias longas com "mais"), <b>Vigência</b> como linha do tempo com a marca "hoje" e "vence em N dias" / "vencida há…", e <b>Andamento</b> em três etapas (importada → parecer IA → ciência; o número na ciência é a quantidade de empresas que ainda não registraram). Faixa colorida à esquerda: verde vigente, âmbar aguardando registro, cinza vencida. <b>Atalhos</b> com contagens no topo (Todas · Vigentes · Aguardando registro · Ciência pendente · Sem parecer IA · Vencidas · Importação não concluída) e resumo do acervo ao lado do título. <b>Painel do sindicato</b> acima da lista quando um sindicato é escolhido no filtro (CNPJ, tipo, responsável, consulta do dia, contadores e os botões Consultar agora, Abrir cadastro, Empresas vinculadas, Importar histórico, Solicitação transmitida). Caixa <b>ordenar por</b> com todas as colunas de hoje; clique no cabeçalho continua para Registro, Sindicato e Vigência. Nada foi removido: Ações e tudo que está nele (cláusulas, PDF, extrato, impacto, IA, ciência) seguem iguais. Só cct.html.</td></tr>
           <tr><td>v0.21.0</td><td>29/09/2026</td><td><b>Convenção aguardando registro.</b> O Mediador público só lista instrumentos já registrados; a solicitação transmitida (nº MR…/ano) agora é informada em <b>Sindicatos → Solicitação transmitida</b> (nº, tipo, vigência, data de transmissão). O robô cria a convenção como <span class="tag alerta">aguardando registro</span> (linha âmbar em Convenções, nº da solicitação no lugar do registro), tenta baixar o extrato pelo nº da solicitação e avisa por e-mail com destaque "AINDA NÃO REGISTRADA no MTE" — <b>sem ciência</b>. Quando o registro aparece na consulta, a mesma convenção é promovida (nº SC…/ano, data de registro, cláusulas do texto registrado), as ciências são criadas e sai o e-mail "registro confirmado". Filtro <b>Situação</b> e contagem no Painel. <b>Só notifica quem tem empresa vinculada:</b> convenção de sindicato sem empresa vinculada (ativa e com funcionários) é baixada e guardada com a marca <span class="tag cinza">sem vínculo</span>, sem ciência e sem e-mail. <b>Workflow:</b> limite de 180 min (a rodada completa leva ~1h35) e orçamento interno do robô acompanhando; passa o token da IA Central. Requer <b>sql/setup_cct_v0.21.0.sql</b> (só acrescenta colunas). Arquivos: cct.html, robo/monitor_cct.py, .github/workflows/monitor-cct.yml.</td></tr>
           <tr><td>v0.20.0</td><td>27/09/2026</td><td><b>IA pela IA Central e só sob demanda.</b> O parecer por IA passa pela <b>IA Central do Portal Artecon</b> (uma conta só da Anthropic para todos os aplicativos, com limite e consumo do CCT em Portal → Consumo de IA); o robô usa o secret <code>IA_GATEWAY_TOKEN</code> no lugar da chave antiga. <b>Convenção nova não gera mais parecer automático:</b> ela é importada com os valores por cláusula e a comparação com a anterior, e o parecer só é feito quando alguém clica <b>"Analisar com IA"</b> na convenção. O status dessas convenções aparece como <b>"sem parecer IA"</b> (cinza) em vez de "análise IA não concluída". As convenções que estavam na fila desde a falta de crédito de 15/09 saem da fila (não são analisadas sozinhas). <b>Robô e workflows no lugar certo:</b> o robô em uso (<code>robo/monitor_cct.py</code>) ainda era o v0.18.1 e o workflow era o antigo, porque as versões v0.18.5 a v0.19.5 tinham subido na raiz do repositório; agora vão para <code>robo/</code>, <code>.github/workflows/</code> e <code>tests/</code>. Banco <code>sql/setup_cct_v0.20.0.sql</code>.</td></tr>
           <tr><td>v0.19.5</td><td>27/09/2026</td><td><b>Infraestrutura (GitHub Actions).</b> Os dois workflows (<code>monitor-cct.yml</code> e <code>testes-cct.yml</code>) passam a rodar em <code>ubuntu-24.04</code> fixo em vez de <code>ubuntu-latest</code>: em 19/10/2026 o GitHub migra o "latest" para Ubuntu 26, e a instalação do Chromium/xvfb do robô poderia quebrar sem nenhuma alteração nossa. Actions atualizadas (checkout v5, setup-python v6, setup-node v5, upload-artifact v5) para encerrar o aviso "Node.js 20 deprecated". Só os dois .yml e esta linha.</td></tr>
@@ -421,7 +449,7 @@
 </div></div>
 
 <script>
-const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.21.0" };
+const CONFIG = { url: "https://fbxelwhdiisfmnwrerbl.supabase.co", key: "sb_publishable_iRqjOGU1ialauv_wHYarbw_cRzspHH6", tenantCNPJ: "79876769000128", versao: "v0.21.1" };
 document.getElementById("versao").textContent = CONFIG.versao;
 const APP = { token: null, uid: null, email: null, tenantId: null, dados: {} };
 const NIVEIS = { superadmin: "Superadministrador", gerente: "Administrador", usuario: "Operador / Analista", empresa: "Cliente" };
@@ -520,6 +548,7 @@ function mostrar(aba) {
   document.querySelectorAll("nav button[data-aba]").forEach(b => b.classList.toggle("on", b.dataset.aba === aba));
   $("navSis").classList.toggle("on", ["consultas","erros","versoes","config","auditoria","execucoes","altcad"].includes(aba));
   document.querySelectorAll("section[data-sec]").forEach(s => s.style.display = s.dataset.sec === aba ? "block" : "none");
+  document.body.classList.toggle("sec-instrumentos", aba === "instrumentos");   // v0.21.1: aba Convenções usa a tela mais larga
 }
 
 // ---------- dados ----------
@@ -815,11 +844,41 @@ function tabInstCompacta(lista) {
 function verVencidas() { irConv({ vig: "vencida" }); }
 function tabInst(lista, sortable) {
   if (!lista.length) return `<div class="aviso">Nenhuma convenção com esses filtros.</div>`;
-  const th = (t, col, cls) => sortable ? `<th class="${cls || ""}" style="cursor:pointer;user-select:none" onclick="ordenar('${col}')">${t}${APP.ord.col === col ? (APP.ord.asc ? " ▲" : " ▼") : ""}</th>` : `<th class="${cls || ""}">${t}</th>`;
-  return `<table><tr>${th("Registro","numero_registro")}${th("Tipo","tipo")}${th("Sindicato","sindicato_nome")}${th("Categoria","categoria")}${th("Vigência","vigencia_inicio")}${th("Registro MTE","data_registro")}${th("Detectada","detectado_em")}${th("Importação","status_importacao")}${th("Análise","analise_status")}${th("Ciência","status_ciencia")}${th("Cláus.","total_clausulas","r")}<th></th></tr>` +
-    lista.map(i => { const ag = i.situacao_registro === "AGUARDANDO_REGISTRO"; return `<tr${ag ? ' style="background:#fef9e7"' : ""}><td${ag ? ' style="border-left:4px solid #b7770d"' : ""}><b>${esc(i.numero_registro)}</b>${ag ? '<br>' + tagStatus("AGUARDANDO_REGISTRO") : ""}${i.origem === "historico" ? '<br><span class="tag cinza">histórico</span>' : ""}</td><td>${esc(i.tipo||"")}</td><td>${esc(i.sindicato?.nome||"")}</td><td>${esc(i.categoria||"")}</td>
-      <td>${fmtD(i.vigencia_inicio)} – ${fmtD(i.vigencia_fim)}</td><td>${ag ? `<span style="color:#b7770d">sem registro${i.data_transmissao ? "<br><small>transmitida " + fmtD(i.data_transmissao) + "</small>" : ""}</span>` : fmtD(i.data_registro)}</td><td>${fmtDT(i.detectado_em)}</td><td>${ag && i.status_importacao !== "IMPORTADO" ? '<span class="tag cinza" title="o extrato só fica disponível no Mediador depois do registro">extrato após registro</span>' : tagStatus(i.status_importacao)}</td><td>${i.analise_status ? tagStatus(i.analise_status === "CONCLUIDA" ? "IMPORTADO" : "ATENCAO").replace(/>[^<]+</, ">" + (i.analise_status === "CONCLUIDA" ? "concluída" : "IA pendente") + "<") : "—"}</td>
-      <td>${ag ? '<span class="tag cinza" title="a ciência só é cobrada a partir do registro no MTE">após registro</span>' : i.sem_vinculo ? tagStatus("SEM_VINCULO") : tagStatus(i.status_ciencia)}</td><td class="r">${i.total_clausulas ?? "—"}</td><td style="white-space:nowrap;text-align:right">${menuInst(i)}</td></tr>`; }).join("") + `</table>`;
+  const hoje = hojeBR(), th = (t, col) => sortable && col ? `<th style="cursor:pointer;user-select:none" onclick="ordenar('${col}')">${t}${APP.ord.col === col ? (APP.ord.asc ? " ▲" : " ▼") : ""}</th>` : `<th>${t}</th>`;
+  const dias = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5);
+  const vig = i => {
+    const ini = (i.vigencia_inicio || "").slice(0, 10), fim = (i.vigencia_fim || "").slice(0, 10), dd = d => d ? d.slice(8, 10) + "/" + d.slice(5, 7) + "/" + d.slice(2, 4) : "—";
+    if (!ini && !fim) return `<div class="cv-vgl">sem vigência informada</div>`;
+    const cab = `<div class="cv-vg"><span>${dd(ini)}</span><span>${dd(fim)}</span></div>`;
+    if (i._ag || i.situacao_registro === "AGUARDANDO_REGISTRO") return cab + `<div class="cv-vgb pend"><i></i></div><div class="cv-vgl a">sem registro no MTE</div>`;
+    if (fim && fim < hoje) { const n = dias(fim, hoje); return cab + `<div class="cv-vgb venc"><i></i></div><div class="cv-vgl r">vencida há ${n >= 730 ? Math.floor(n / 365) + " anos" : n >= 60 ? Math.floor(n / 30) + " meses" : n + " dias"}</div>`; }
+    if (!fim) return cab + `<div class="cv-vgb"><i style="width:100%"></i></div><div class="cv-vgl">sem data final</div>`;
+    const tot = ini ? Math.max(1, dias(ini, fim)) : 365, dec = ini ? Math.min(tot, Math.max(0, dias(ini, hoje))) : 0, pct = Math.round(dec / tot * 100), rest = dias(hoje, fim);
+    return cab + `<div class="cv-vgb"><i style="width:${pct}%"></i><em style="left:${pct}%"></em></div><div class="cv-vgl${rest <= 30 ? " a" : ""}">${rest === 0 ? "vence hoje" : "vence em " + rest + " dia" + (rest === 1 ? "" : "s")}</div>`;
+  };
+  const et = i => {
+    const ag = i._ag || i.situacao_registro === "AGUARDANDO_REGISTRO", pend = i._pend || cienciasPend(i.id), imp = i.status_importacao === "IMPORTADO";
+    const e1 = imp ? ["ok", "✓", "importada", ""] : ag ? ["", "·", "extrato após reg.", ""] : ["er", "!", "não concluída", "er"];
+    const e2 = i.analise_status === "CONCLUIDA" ? ["ok", "✓", "parecer", ""] : (i.analise_status === null && imp) ? ["al", "…", "na fila", "al"] : ["", "·", "sem parecer IA", ""];
+    let e3;
+    if (ag) e3 = ["", "·", "após registro", ""];
+    else if (i.status_ciencia === "CIENTE") e3 = ["ok", "✓", "ciente", ""];
+    else if (i.sem_vinculo) e3 = ["ci", "–", "sem vínculo", ""];
+    else if (i.status_ciencia === "DISPENSADA") e3 = ["ci", "–", "dispensada", ""];
+    else if (pend.length) { const atr = pend.some(c => c.prazo && c.prazo < hoje), hj = pend.some(c => c.prazo === hoje); e3 = [atr ? "er" : "al", String(pend.length), atr ? "atrasada" : hj ? "vence hoje" : pend.length === 1 ? "pendente" : "pendentes", atr ? "er" : "al"]; }
+    else e3 = [i.status_ciencia === "NOTIFICADO" ? "al" : "", i.status_ciencia === "NOTIFICADO" ? "!" : "·", i.status_ciencia === "NOTIFICADO" ? "notificada" : "pendente", i.status_ciencia === "NOTIFICADO" ? "al" : ""];
+    const d = ([c, t, l, lc]) => `<div><span class="p ${c}">${t}</span><small class="${lc}">${l}</small></div>`;
+    return `<div class="cv-et">${d(e1)}<span class="l${e1[0] === "ok" ? " ok" : ""}"></span>${d(e2)}<span class="l${e2[0] === "ok" ? " ok" : ""}"></span>${d(e3)}</div>`;
+  };
+  const tipo = i => { const ag = i._ag || i.situacao_registro === "AGUARDANDO_REGISTRO", a = abrevTipo(i.tipo); return `<span class="cv-tipo${ag ? " pend" : a === "TA" ? " ta" : ""}">${esc(a === "TA" ? "Termo aditivo" : a)}${ag ? " · aguardando registro" : ""}</span>`; };
+  const sub = i => { const ag = i._ag || i.situacao_registro === "AGUARDANDO_REGISTRO"; return `<span class="cv-sub">${ag ? `<span style="color:var(--amber)">transmitida ${fmtD(i.data_transmissao)}</span>` : `MTE ${fmtD(i.data_registro)}`}${i.origem === "historico" ? " · histórico" : ""}<br>detectada ${fmtDT(i.detectado_em)}${i.total_clausulas != null ? ` · ${i.total_clausulas} cláus.` : ""}${i.registro_detectado_em ? `<br><span style="color:var(--green)">registro detectado ${fmtDT(i.registro_detectado_em)}</span>` : ""}</span>`; };
+  const cls = i => (i._ag || i.situacao_registro === "AGUARDANDO_REGISTRO") ? "pend" : (i.vigencia_fim && i.vigencia_fim < hoje) ? "venc" : (i.vigencia_fim || "") >= hoje ? "vig" : "";
+  const partes = i => (i.partes || []).map(p => p.nome || p).filter(Boolean);
+  return `<table class="cv"><colgroup><col style="width:168px"><col><col style="width:200px"><col style="width:190px"><col style="width:86px"></colgroup><tr>${th("Registro", "numero_registro")}${th("Sindicato e categoria", "sindicato_nome")}${th("Vigência", "vigencia_fim")}${th("Andamento")}<th></th></tr>` +
+    lista.map(i => `<tr class="${cls(i)}"><td class="id"><div class="cv-reg"><a href="#" onclick="abrirInst('${i.id}');return false">${esc(i.numero_registro)}</a></div>${tipo(i)}${sub(i)}</td>
+      <td><div class="cv-s">${esc(i.sindicato?.nome || i.sindicato_nome || "—")}${partes(i).length > 1 ? ` <span style="font-weight:400;color:var(--text-3)">× ${esc(partes(i).filter(p => p !== (i.sindicato?.nome || "")).slice(0, 1).join(""))}</span>` : ""}</div>${i.categoria ? `<div class="cv-c">${esc(i.categoria)}</div>${String(i.categoria).length > 110 ? `<span class="cv-mais" onclick="const t=this.closest('tr');t.classList.toggle('cv-aberta');this.textContent=t.classList.contains('cv-aberta')?'menos':'mais'">mais</span>` : ""}` : `<div class="cv-c">—</div>`}</td>
+      <td>${vig(i)}</td><td>${et(i)}</td><td style="white-space:nowrap;text-align:right;overflow:visible">${menuInst(i)}</td></tr>`).join("") + `</table>
+    <div class="cv-leg">Faixa à esquerda do registro:<i style="background:var(--green)"></i>vigente<i style="background:var(--amber)"></i>aguardando registro no MTE<i style="background:var(--border-lt)"></i>vencida. A barra de vigência mostra quanto já passou e onde está "hoje". Andamento: importação · parecer por IA · ciência (o número é a quantidade de empresas que ainda não registraram ciência). Cláusulas, extrato, PDF, impacto e ciência continuam em <b>Ações</b>.</div>`;
 }
 // v0.18.5: categoria sem vazias e sem repetir a mesma categoria com maiúsculas/espaços diferentes
 const normCat = c => String(c || "").replace(/\s+/g, " ").trim();
@@ -829,14 +888,38 @@ function renderInst() {
   const opts = (id, vals, pref) => { const sel = $(id), cur = sel.value; if (sel.options.length <= 1 || sel.dataset.n != vals.length) { sel.innerHTML = `<option value="">${pref}</option>` + vals.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join(""); sel.dataset.n = vals.length; sel.value = cur; } };
   opts("fiTipo", [...new Set(APP.dados.inst.map(i => i.tipo).filter(Boolean))].sort(), "Tipo: todos"); opts("fiSind", [...new Set(APP.dados.inst.map(i => i.sindicato?.nome).filter(Boolean))].sort(), "Sindicato: todos"); opts("fiCat", catsUnicas(APP.dados.inst.map(i => i.categoria)), "Categoria: todas");
   const ft = $("fiTipo").value, fs = $("fiSind").value, fc = $("fiCat").value, fi = $("fiImp").value, fo = $("fiOri").value, fsit = $("fiSit").value, fv = $("fiVig").value, rde = $("fiRegDe").value, rate = $("fiRegAte").value;
-  let l = APP.dados.inst.map(i => ({ ...i, sindicato_nome: i.sindicato?.nome || "" })).filter(i => (!f || [i.numero_registro, i.sindicato_nome, i.categoria, i.tipo, i.abrangencia, i.numero_solicitacao].join(" ").toLowerCase().includes(f))
+  const todos = APP.dados.inst.map(i => ({ ...i, sindicato_nome: i.sindicato?.nome || "", _ag: i.situacao_registro === "AGUARDANDO_REGISTRO", _pend: cienciasPend(i.id), _venc: !!i.vigencia_fim && i.vigencia_fim < hoje }));
+  // v0.21.1: atalhos (contagens sobre o acervo inteiro)
+  const chips = [["", "Todas", x => true], ["vig", "Vigentes", x => !x._ag && (x.vigencia_fim || "") >= hoje], ["ag", "Aguardando registro", x => x._ag], ["cie", "Ciência pendente", x => x._pend.length > 0],
+    ["ia", "Sem parecer IA", x => x.status_importacao === "IMPORTADO" && x.analise_status !== "CONCLUIDA" && !x._ag], ["venc", "Vencidas", x => x._venc], ["imp", "Importação não concluída", x => x.status_importacao !== "IMPORTADO" && !x._ag]];
+  APP.instChip = APP.instChip || "";
+  $("instChips").innerHTML = chips.map(([k, t, fn]) => `<span class="cv-chip${APP.instChip === k ? " on" : ""}" onclick="chipInst('${k}')">${t}<span class="n">${todos.filter(fn).length}</span></span>`).join("");
+  $("instResumo").innerHTML = `<span><b>${todos.length}</b> no acervo</span><span><b>${todos.filter(chips[1][2]).length}</b> vigentes</span><span class="a"><b>${todos.filter(chips[2][2]).length}</b> aguardando registro</span><span class="r"><b>${todos.filter(chips[3][2]).length}</b> ciências pendentes</span>`;
+  const chipFn = (chips.find(c => c[0] === APP.instChip) || chips[0])[2];
+  let l = todos.filter(i => chipFn(i) && (!f || [i.numero_registro, i.sindicato_nome, i.categoria, i.tipo, i.abrangencia, i.numero_solicitacao].join(" ").toLowerCase().includes(f))
     && (!ft || i.tipo === ft) && (!fs || i.sindicato_nome === fs) && (!fc || normCat(i.categoria).toLowerCase() === fc.toLowerCase()) && (!fi || i.status_importacao === fi) && (!fo || (i.origem || "monitoramento") === fo)
     && (!fsit || (fsit === "SEM_VINCULO" ? !!i.sem_vinculo : (i.situacao_registro || "REGISTRADA") === fsit))
     && (!fv || (fv === "vigente" ? (i.vigencia_fim || "") >= hoje : fv === "vencida" ? (!!i.vigencia_fim && i.vigencia_fim < hoje) : !i.vigencia_fim))   // v0.18.5: sem data final não é "vencida"
     && (!rde || (i.data_registro || "") >= rde) && (!rate || (i.data_registro || "").slice(0, 10) <= rate));
   const { col, asc } = APP.ord; l.sort((a, b) => { const x = a[col] ?? "", y = b[col] ?? ""; const r = typeof x === "number" ? x - y : String(x).localeCompare(String(y), "pt-BR"); return asc ? r : -r; });
-  $("tabInst").innerHTML = `<div style="font-size:12px;color:var(--text-3);margin-bottom:6px">${l.length} de ${APP.dados.inst.length} · clique no título da coluna para ordenar</div>` + tabInst(l, true);
+  $("instSind").innerHTML = fs ? painelSindConv(fs, todos.filter(i => i.sindicato_nome === fs), hoje) : "";
+  const ORD = [["detectado_em", "Detectada"], ["data_registro", "Registro MTE"], ["vigencia_fim", "Vigência (fim)"], ["sindicato_nome", "Sindicato"], ["tipo", "Tipo"], ["numero_registro", "Registro"], ["status_importacao", "Importação"], ["analise_status", "Análise IA"], ["status_ciencia", "Ciência"], ["total_clausulas", "Nº de cláusulas"]];
+  $("tabInst").innerHTML = `<div class="cv-cnt"><span>${l.length} de ${APP.dados.inst.length}</span><span>ordenar por <select onchange="APP.ord={col:this.value,asc:APP.ord.col===this.value?APP.ord.asc:false};renderInst()" style="padding:4px 8px;font-size:12px">${ORD.map(([c, t]) => `<option value="${c}"${col === c ? " selected" : ""}>${t}</option>`).join("")}</select> <button class="b sec sm" onclick="APP.ord.asc=!APP.ord.asc;renderInst()" title="inverter a ordem">${asc ? "▲ crescente" : "▼ decrescente"}</button></span></div>` + tabInst(l, true);
 }
+function chipInst(k) { APP.instChip = k; renderInst(); }
+function cienciasPend(id) { return (APP.dados.conf || []).filter(c => c.instrumento_id === id && ["PENDENTE", "NOTIFICADO", "ESCALONADO"].includes(c.status)); }
+// v0.21.1: painel do sindicato escolhido no filtro, acima da lista
+function painelSindConv(nome, lista, hoje) {
+  const s = (APP.dados.sind || []).find(x => x.nome === nome); if (!s) return "";
+  const vinc = (APP.dados.emp || []).filter(e => e.ativo !== false && !e.sem_funcionarios && (e.vinculos || []).some(v => v.sindicato_id === s.id));
+  const ult = lista.map(i => i.data_registro || "").sort().pop();
+  const kp = [["", lista.filter(i => !i._ag && (i.vigencia_fim || "") >= hoje).length, "vigentes"], ["a", lista.filter(i => i._ag).length, "aguardando registro"], ["", vinc.length, "empresas vinculadas"], ["r", lista.filter(i => i._pend.length).length, "com ciência pendente"], ["", lista.length, "no acervo"]];
+  const st = s.ultimo_status ? tagStatus(s.ultimo_status) : '<span class="tag cinza">nunca consultado</span>';
+  return `<div class="cv-sind"><div><h3>${esc(s.nome)}</h3><div class="m">CNPJ <b>${fmtCnpj(s.cnpj)}</b>${s.tipo ? ` · ${esc(s.tipo)}` : ""}${s.municipio ? ` · ${esc(s.municipio)}${s.uf ? "/" + esc(s.uf) : ""}` : s.uf ? ` · ${esc(s.uf)}` : ""}${s.responsavel_email ? ` · responsável <b>${esc(s.responsavel_email)}</b>` : ""} · última CCT no MTE <b>${fmtD(ult)}</b> · consulta do dia ${fmtDT(s.ultima_consulta)} ${st}${filaSolic(s)}</div></div>
+    <div class="acoes">${s.ativo && interno() ? `<button class="b sm" onclick="consultarAgora('${s.id}')">Consultar agora</button><button class="b sec sm" onclick="abrirSolic('${s.id}')">Solicitação transmitida</button>` : ""}<button class="b sec sm" onclick="abrirSind('${s.id}')">Abrir cadastro</button><button class="b sec sm" onclick="$('q_emp')&&($('q_emp').value='${esc(s.nome).replace(/'/g, "")}');renderEmp();irAba('empresas')">Empresas vinculadas</button>${interno() && !s.historico_status ? `<button class="b sec sm" onclick="pedirHistorico('${s.id}')">Importar histórico</button>` : ""}</div>
+    <div class="kp">${kp.map(([c, n, t]) => `<span class="${c}"><b>${n}</b>${t}</span>`).join("")}</div></div>`;
+}
+
 async function abrirInst(id, aba) {
   const i = APP.dados.inst.find(x => x.id === id); APP.instAtual = i;
   $("mInstTit").textContent = `${i.tipo || "Instrumento"} ${i.numero_registro}`;
