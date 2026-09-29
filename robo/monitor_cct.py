@@ -33,6 +33,16 @@ v0.20.0 (27/09/2026): (1) IA CENTRAL — o parecer por IA passa pelo ia-gateway 
 (secret IA_GATEWAY_TOKEN do GitHub); a chave da Anthropic não fica mais no repositório. (2) IA SÓ SOB DEMANDA — a
 convenção nova é importada com valores por cláusula e comparação com a anterior, mas SEM parecer por IA; o parecer só é
 gerado quando alguém clica "Analisar com IA" na convenção (cct_pedir_analise_agora → fila → este robô).
+
+v0.21.0 (29/09/2026): (1) SOLICITAÇÃO TRANSMITIDA (aguardando registro) — o Mediador público só lista instrumentos
+REGISTRADOS; a solicitação transmitida (MR.../ano) é informada no app (Sindicatos → Solicitação transmitida) e fica em
+cct_sindicatos.solicitacoes_pendentes; este robô cria a convenção com situacao_registro=AGUARDANDO_REGISTRO (nº da
+solicitação no lugar do registro), tenta baixar o extrato pelo nº da solicitação na sessão do Mediador e avisa por
+e-mail "AINDA NÃO REGISTRADA" — SEM ciência. Quando o registro aparece na consulta, casa pelo nº da solicitação,
+atualiza a MESMA convenção (nº SC.../ano, data de registro, cláusulas), cria as ciências e avisa "registrada".
+(2) SÓ NOTIFICA QUEM TEM EMPRESA VINCULADA — convenção de sindicato sem empresa vinculada (ativa e com funcionários)
+é baixada e guardada (sem_vinculo=true), sem ciência e sem e-mail. (3) Orçamento de tempo: ORCAMENTO_MIN vem do
+workflow (timeout 180 min).
 """
 import hashlib
 import json
@@ -51,7 +61,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.20.0"
+VERSAO = "0.21.0"
 # v0.20.0: token do CCT na IA Central (ia-gateway do Portal Artecon)
 def ia_chave_presente():
     return bool((os.environ.get("IA_GATEWAY_TOKEN") or "").strip())
@@ -668,6 +678,163 @@ def criar_ciencias(tenant, sind, row, empresa=None):
     return criadas
 
 
+# ---------------------------------------------------------------- v0.21.0: vínculo, solicitações transmitidas
+def empresas_vinculadas(tenant, sind):
+    """Empresas ativas e com funcionários vinculadas ao sindicato (v0.21.0). Lista vazia = sem vínculo = sem ciência e sem e-mail."""
+    if not sind or not sind.get("id"):
+        return []
+    try:
+        vinc = sb_get("cct_empresa_sindicato", {"sindicato_id": f"eq.{sind['id']}", "select": "empresa:cct_empresas(id,razao_social,ativo,sem_funcionarios)"})
+        return [v["empresa"] for v in vinc if v.get("empresa") and v["empresa"].get("ativo", True) and not v["empresa"].get("sem_funcionarios")]
+    except Exception as e:
+        log(f"  !! vínculos: {e}")
+        return [{"id": None}]   # em dúvida, trata como vinculado (não silencia aviso por falha de leitura)
+
+
+def _norm_solic(n):
+    return _re.sub(r"\s+", "", (n or "").upper())
+
+
+def _fmt_data(d):
+    d = (d or "")[:10]
+    return f"{d[8:10]}/{d[5:7]}/{d[0:4]}" if len(d) == 10 else "—"
+
+
+def aviso_sem_registro(p, sind):
+    return (f"<div style='background:#fef9e7;border:2px solid #b7770d;border-radius:8px;padding:12px 14px;margin:10px 0'>"
+            f"<b style='color:#7a4e00;font-size:15px'>ATENÇÃO: esta convenção AINDA NÃO ESTÁ REGISTRADA no MTE.</b><br>"
+            f"É uma <b>solicitação transmitida</b> ao Sistema Mediador (nº {p.get('solicitacao')}"
+            f"{' em ' + _fmt_data(p.get('data_transmissao')) if p.get('data_transmissao') else ''}). "
+            f"O texto pode sofrer exigências antes do registro. O CCT Monitor avisará de novo quando o registro sair; "
+            f"<b>a ciência só é cobrada a partir do registro</b>.</div>")
+
+
+def processar_solicitacoes(tenant, sind, page, consulta_id, existentes, etapas):
+    """v0.21.0: cria/atualiza as convenções 'aguardando registro' pedidas no app para este sindicato. Roda dentro da
+    sessão do Mediador (logo após a consulta), porque o extrato pelo nº da solicitação só é servido nessa sessão."""
+    fila = sind.get("solicitacoes_pendentes") or []
+    if not fila or not sind.get("id"):
+        return 0
+    mudou, criadas = False, 0
+    vinc = empresas_vinculadas(tenant, sind)
+    for p in fila:
+        numero = _norm_solic(p.get("solicitacao"))
+        if not numero or p.get("status") == "REGISTRADA":
+            continue
+        try:
+            atual = sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "numero_solicitacao": f"eq.{numero}",
+                                                "select": "id,numero_registro,situacao_registro,status_importacao,total_clausulas"})
+            if atual and any(r.get("situacao_registro") != "AGUARDANDO_REGISTRO" for r in atual):
+                p.update(status="REGISTRADA", instrumento_id=atual[0]["id"]); mudou = True
+                etapas.append(f"[solicitação {numero}] já registrada ({atual[0]['numero_registro']})")
+                continue
+            row = atual[0] if atual else None
+            if row is None:
+                base = {"tenant_id": tenant, "sindicato_id": sind["id"], "numero_registro": numero, "numero_solicitacao": numero,
+                        "tipo": p.get("tipo") or "Convenção Coletiva", "origem": "solicitacao_transmitida", "origem_consulta_id": consulta_id,
+                        "vigencia_inicio": p.get("vigencia_inicio") or None, "vigencia_fim": p.get("vigencia_fim") or None,
+                        "data_transmissao": p.get("data_transmissao") or None, "situacao_registro": "AGUARDANDO_REGISTRO",
+                        "categoria": p.get("categoria") or None, "partes": [{"nome": sind.get("nome")}],
+                        "status_importacao": "IMPORTACAO_NAO_CONCLUIDA", "sem_vinculo": not vinc,
+                        "observacoes": "solicitação transmitida ao MTE, ainda sem registro — extrato indisponível até o registro"
+                                       + (" · sem empresa vinculada: sem ciência e sem e-mail" if not vinc else "")}
+                if p.get("observacao"):
+                    base["observacoes"] += f" · obs.: {p['observacao'][:300]}"
+                row = sb_insert("cct_instrumentos", base, upsert_on="tenant_id,numero_registro")[0]
+                criadas += 1
+                log(f"  SOLICITAÇÃO {numero}: convenção criada como AGUARDANDO REGISTRO")
+            # tenta o extrato pelo nº da solicitação (pode não existir antes do registro — não é erro)
+            if row.get("status_importacao") != "IMPORTADO":
+                try:
+                    status, corpo, trecho = mediador.baixar_extrato(page, numero)
+                    if status == 200 and mediador.extrato_valido(corpo):
+                        caminho = f"extrato_{numero.replace('/', '-')}.doc"
+                        with open(caminho, "wb") as f:
+                            f.write(corpo)
+                        d = extrair(caminho)
+                        if d["total_clausulas"] > 0:
+                            ap = None
+                            try:
+                                ap = sb_upload(f"{tenant}/{numero.replace('/', '-')}.doc", corpo)
+                            except Exception as e:
+                                log(f"  !! storage da solicitação: {e}")
+                            sb_patch("cct_instrumentos", {"id": f"eq.{row['id']}"}, {
+                                "status_importacao": "IMPORTADO", "total_clausulas": d["total_clausulas"], "arquivo_path": ap,
+                                "sha256": hashlib.sha256(corpo).hexdigest(), "categoria": d.get("categoria") or p.get("categoria") or None,
+                                "abrangencia": d.get("abrangencia_territorial"), "data_base": d.get("data_base"), "partes": d.get("partes") or [{"nome": sind.get("nome")}],
+                                "vigencia_inicio": data_br((d.get("vigencia") or {}).get("inicio")) or p.get("vigencia_inicio") or None,
+                                "vigencia_fim": data_br((d.get("vigencia") or {}).get("fim")) or p.get("vigencia_fim") or None,
+                                "denominacao": (d.get("metadados") or {}).get("denominacao"),
+                                "observacoes": "solicitação transmitida ao MTE, ainda sem registro (cláusulas do extrato da solicitação)"
+                                               + (" · sem empresa vinculada: sem ciência e sem e-mail" if not vinc else "")})
+                            sb_insert("cct_clausulas", [{"tenant_id": tenant, "instrumento_id": row["id"], "ordem": c["ordem"], "numero_extenso": c["numero_extenso"],
+                                                         "titulo": c["titulo"], "grupo": c["grupo"], "subgrupo": c["subgrupo"], "texto": c["texto"]} for c in d["clausulas"]],
+                                      upsert_on="instrumento_id,ordem")
+                            row["status_importacao"] = "IMPORTADO"
+                            etapas.append(f"[solicitação {numero}] extrato obtido: {d['total_clausulas']} cláusulas (aguardando registro)")
+                            log(f"  SOLICITAÇÃO {numero}: {d['total_clausulas']} cláusulas importadas do extrato da solicitação")
+                        else:
+                            etapas.append(f"[solicitação {numero}] extrato sem cláusulas antes do registro")
+                    else:
+                        etapas.append(f"[solicitação {numero}] extrato indisponível antes do registro (HTTP {status})")
+                except Exception as e:
+                    etapas.append(f"[solicitação {numero}] extrato: {type(e).__name__}: {str(e)[:120]}")
+            if p.get("status") != "CRIADA":
+                if vinc:
+                    html = (f"<p><b>{p.get('tipo') or 'Convenção Coletiva'}</b> transmitida ao Mediador para <b>{sind['nome']}</b>.</p>"
+                            + aviso_sem_registro(p, sind)
+                            + f"<p><b>Nº da solicitação:</b> {numero}<br><b>Vigência informada:</b> {_fmt_data(p.get('vigencia_inicio'))} a {_fmt_data(p.get('vigencia_fim'))}<br>"
+                            f"<b>Empresas vinculadas:</b> {len(vinc)}<br><b>Cláusulas:</b> {'importadas do extrato da solicitação' if row.get('status_importacao') == 'IMPORTADO' else 'ainda não disponíveis no Mediador'}</p>")
+                    st = notificar(tenant, "NOVA_CCT", f"CCT TRANSMITIDA, AINDA SEM REGISTRO – {sind['nome']} – {numero}", html, instrumento_id=row["id"])
+                    etapas.append(f"[solicitação {numero}] aviso 'ainda sem registro': {st}")
+                else:
+                    etapas.append(f"[solicitação {numero}] sem empresa vinculada: guardada sem aviso")
+                p.update(status="CRIADA", instrumento_id=row["id"], criada_em=datetime.now(timezone.utc).isoformat()); mudou = True
+        except Exception as e:
+            log(f"  !! solicitação {numero}: {e}")
+            etapas.append(f"[solicitação {numero}] ERRO: {str(e)[:160]}")
+            incidente(tenant, f"IMPORTACAO:solicitacao:{numero}", "IMPORTACAO", "ATENCAO", f"Solicitação transmitida {numero} ({sind['nome']}) não pôde ser criada: {e}", sind["id"],
+                      contexto={"sindicato": sind["nome"], "cnpj": sind.get("cnpj"), "solicitacao": numero, "etapa": "criação da convenção aguardando registro", "resposta": str(e)})
+    if mudou:
+        try:
+            sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"solicitacoes_pendentes": fila})
+        except Exception as e:
+            log(f"  !! gravar fila de solicitações: {e}")
+    return criadas
+
+
+def casar_solicitacao(tenant, sind, reg):
+    """v0.21.0: o registro recém-listado corresponde a uma convenção 'aguardando registro'? Então a mesma linha é promovida:
+    recebe o nº de registro (a importação em seguida completa dados e cláusulas). Retorna a linha antiga ou None."""
+    numero = _norm_solic(reg.get("solicitacao"))
+    if not numero:
+        return None
+    try:
+        rows = sb_get("cct_instrumentos", {"tenant_id": f"eq.{tenant}", "numero_solicitacao": f"eq.{numero}", "situacao_registro": "eq.AGUARDANDO_REGISTRO", "select": "id,numero_registro,data_transmissao"})
+    except Exception as e:
+        log(f"  !! casar solicitação: {e}")
+        return None
+    if not rows:
+        return None
+    r = rows[0]
+    try:
+        requests.delete(f"{SB_URL}/rest/v1/cct_clausulas", headers=H, params={"instrumento_id": f"eq.{r['id']}"}, timeout=30)
+        sb_patch("cct_instrumentos", {"id": f"eq.{r['id']}"}, {"numero_registro": reg["registro"], "situacao_registro": "REGISTRADA",
+                                                              "registro_detectado_em": datetime.now(timezone.utc).isoformat(), "observacoes": None,
+                                                              "status_ciencia": "PENDENTE", "sem_vinculo": False})
+        fila = sind.get("solicitacoes_pendentes") or []
+        for p in fila:
+            if _norm_solic(p.get("solicitacao")) == numero:
+                p.update(status="REGISTRADA", registro=reg["registro"], registrada_em=datetime.now(timezone.utc).isoformat())
+        if fila:
+            sb_patch("cct_sindicatos", {"id": f"eq.{sind['id']}"}, {"solicitacoes_pendentes": fila})
+        log(f"  REGISTRO DETECTADO: solicitação {numero} → {reg['registro']} (convenção aguardando registro promovida)")
+    except Exception as e:
+        log(f"  !! promover solicitação {numero}: {e}")
+        return None
+    return r
+
+
 def html_impacto(tenant, instrumento_id, empresa_id=None):
     """Matriz de impacto (seção 53) para o e-mail do responsável: itens-chave + variação + providências."""
     try:
@@ -1088,12 +1255,29 @@ def processar_alvo(tenant, sind, empresa, tipos, page, existentes):
             if reg["registro"] in existentes:
                 continue
             log(f"  NOVO registro {reg['registro']} ({reg['tipo']}) — {reg.get('vigencia')}")
+            esperada = casar_solicitacao(tenant, sind, reg) if not empresa else None   # v0.21.0: era "aguardando registro"?
             row, ok = importar(tenant, sind, reg, page, consulta["id"], empresa)
             existentes.add(reg["registro"])
+            if esperada:
+                row["_esperada"] = esperada
+                etapas.append(f"[{tipo}] {reg['registro']}: registro da solicitação {reg.get('solicitacao')} detectado — convenção promovida")
             # v0.15.2: "Cobrar ciência a partir de" (cct_config.ciencia_inicio) — registro no MTE anterior à data = sem ciência e sem aviso
             ini = (config(tenant).get("ciencia_inicio") or "")[:10]
             data_reg = (row.get("data_registro") or "")[:10]
             dispensada = bool(ini and data_reg and data_reg < ini)
+            # v0.21.0: sindicato sem empresa vinculada → guarda, mas não cria ciência nem avisa por e-mail
+            sem_vinculo = bool(not empresa and sind.get("id") and not empresas_vinculadas(tenant, sind))
+            if sem_vinculo and not dispensada:
+                try:
+                    sb_patch("cct_instrumentos", {"id": f"eq.{row['id']}"}, {"status_ciencia": "DISPENSADA", "sem_vinculo": True,
+                                                                          "observacoes": "sem empresa vinculada ao sindicato — guardada sem ciência e sem e-mail"})
+                except Exception as e:
+                    log(f"  !! marcar sem vínculo: {e}")
+                log(f"  SEM VÍNCULO: {sind['nome']} não tem empresa vinculada — {reg['registro']} guardada sem ciência e sem aviso")
+                etapas.append(f"[{tipo}] {reg['registro']}: {'importado' if ok else 'IMPORTAÇÃO NÃO CONCLUÍDA'} — sem empresa vinculada: sem ciência e sem e-mail")
+                novos.append((reg, row, ok, True))
+                time.sleep(1)
+                continue
             novos.append((reg, row, ok, dispensada))
             if dispensada:
                 try:
@@ -1107,6 +1291,12 @@ def processar_alvo(tenant, sind, empresa, tipos, page, existentes):
                 etapas.append(f"[{tipo}] {reg['registro']}: {'importado' if ok else 'IMPORTAÇÃO NÃO CONCLUÍDA'}")
             time.sleep(1)
         time.sleep(2)
+    if not empresa and sind.get("id"):   # v0.21.0: solicitações transmitidas deste sindicato (na mesma sessão do Mediador)
+        try:
+            processar_solicitacoes(tenant, sind, page, consulta["id"], existentes, etapas)
+        except Exception as e:
+            log(f"  !! solicitações transmitidas: {e}")
+            etapas.append(f"[solicitações] ERRO: {str(e)[:160]}")
 
     falhas = [t for t, (st, _) in por_tipo.items() if st == "CONSULTA_NAO_CONCLUIDA"]
     if len(falhas) == len(tipos):
@@ -1126,8 +1316,13 @@ def processar_alvo(tenant, sind, empresa, tipos, page, existentes):
         if dispensada:
             continue
         partes = "<br>".join(p["nome"] if isinstance(p, dict) else p for p in (row.get("partes") or []))
+        esp = row.get("_esperada")
         html = (f"<p><b>{reg['tipo']}</b> registrada no Mediador para <b>{sind['nome']}</b>.</p>"
-                f"<p><b>Registro:</b> {reg['registro']}<br><b>Solicitação:</b> {reg.get('solicitacao')}<br>"
+                + (f"<div style='background:#eafaf1;border:2px solid #1e8449;border-radius:8px;padding:10px 14px;margin:10px 0'><b style='color:#1e8449'>REGISTRO CONFIRMADO.</b> "
+                   f"Esta convenção estava no CCT Monitor como <b>aguardando registro</b> (solicitação {esp.get('numero_registro')}"
+                   f"{' transmitida em ' + _fmt_data(esp.get('data_transmissao')) if esp.get('data_transmissao') else ''}). "
+                   f"O texto registrado substitui o da solicitação e <b>a partir de agora corre o prazo de ciência</b>.</div>" if esp else "")
+                + f"<p><b>Registro:</b> {reg['registro']}<br><b>Solicitação:</b> {reg.get('solicitacao')}<br>"
                 f"<b>Vigência:</b> {reg.get('vigencia')}<br><b>Partes:</b><br>{partes}</p>"
                 f"<p><b>Importação:</b> {'concluída' if ok else 'NÃO CONCLUÍDA — verificar na Central de Erros'}</p>")
         st = notificar(tenant, "NOVA_CCT", f"NOVA {reg['tipo'].upper()} – {sind['nome']} – {reg['registro']}", html,
@@ -1204,7 +1399,7 @@ def processar_retentativas(tenant, cfg, page, existentes, limite_s):
     for sid, incs in grupos.items():
         if time.time() - t0 > limite_s:
             log(f"  tempo esgotado: {len(grupos) - tentados} sindicato(s) ficam para o próximo disparo"); break
-        sind = (sb_get("cct_sindicatos", {"id": f"eq.{sid}", "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email"}) or [None])[0]
+        sind = (sb_get("cct_sindicatos", {"id": f"eq.{sid}", "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email,solicitacoes_pendentes"}) or [None])[0]
         if not sind:
             continue
         for r in incs:
@@ -1371,7 +1566,7 @@ def main():
     global INTERVALO
     INTERVALO = float(cfg0.get("intervalo_consultas_s") or INTERVALO)
     sinds = sb_get_all("cct_sindicatos", {"tenant_id": f"eq.{tenant}", "monitorar": "eq.true", "ativo": "eq.true",
-                                      "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email,ultima_consulta", "order": "ultima_consulta.asc.nullsfirst"})
+                                      "select": "id,cnpj,nome,tipo,uf,responsavel_email,gerente_email,ultima_consulta,solicitacoes_pendentes", "order": "ultima_consulta.asc.nullsfirst"})
     maximo = int(cfg0.get("max_sindicatos_por_execucao") or 0)
     if maximo and len(sinds) > maximo:
         log(f"fila: {len(sinds)} sindicatos, {maximo} por execução (os demais ficam para a próxima)")
