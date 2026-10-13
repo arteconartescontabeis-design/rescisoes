@@ -17,7 +17,7 @@ let fetchImpl = async () => ({ ok: true, status: 200, text: async () => "[]", js
 global.fetch = (...a) => fetchImpl(...a);
 
 // carrega o app (as funções viram globais)
-eval(js + "\n;globalThis.__cct = { dataBR, hojeBR, normCat, catsUnicas, getTodos, fmtCnpj, abrevTipo, renderComFoco, confirmarSenha, senhaConfirmar, marcarSemFunc, consultarAgora, tagStatus, APP, CONFIG };");
+eval(js + "\n;globalThis.__cct = { dataBR, hojeBR, normCat, catsUnicas, getTodos, fmtCnpj, abrevTipo, renderComFoco, confirmarSenha, senhaConfirmar, marcarSemFunc, consultarAgora, tagStatus, salvarConfig, cfgGerMudou, APP, CONFIG };");
 const C = globalThis.__cct;
 
 let n = 0, falhas = 0;
@@ -95,6 +95,29 @@ async function t(nome, fn) { try { await fn(); n++; console.log("  ok  " + nome)
     assert.ok(!chamadas.some(u => u.includes("cct_marcar_sem_funcionarios")), "não pode gravar com senha errada");
     document.getElementById("mSenhaIn").value = "certa"; await C.senhaConfirmar(); await p.catch(() => {});
     assert.ok(chamadas.some(u => u.includes("cct_marcar_sem_funcionarios")));
+  });
+
+  // gerente do departamento (v0.23.0): "Não" vai ao banco, desabilita o escalonamento e informa os escalonamentos desfeitos
+  await t("salvarConfig envia notificar_gerente=false e informa escalonamentos cancelados", async () => {
+    let corpo = null;
+    fetchImpl = async (url, opt) => {
+      if (url.includes("rpc/cct_salvar_config")) { corpo = JSON.parse(opt.body).p; return { ok: true, status: 200, text: async () => JSON.stringify({ notificar_gerente: false, escalonamentos_cancelados: 3 }) }; }
+      return { ok: true, status: 200, text: async () => "[]" }; };
+    C.APP.nivel = "gerente"; C.APP.tenantId = "t1"; C.APP.dados = { cfg: { notificar_gerente: true }, conf: [{ status: "ESCALONADO" }], emp: [], sind: [], inst: [] };
+    globalThis.carregarTudo = async () => {};
+    document.getElementById("cfgGer").value = "false"; C.cfgGerMudou();
+    assert.strictEqual(document.getElementById("cfgEsc").disabled, true, "escalonar fica sem efeito");
+    await C.salvarConfig();
+    assert.strictEqual(corpo.notificar_gerente, false);
+    assert.match(document.getElementById("msg").textContent, /3 escalonamento\(s\) ao gerente cancelado/);
+    document.getElementById("cfgGer").value = "true"; C.cfgGerMudou();
+    assert.strictEqual(document.getElementById("cfgEsc").disabled, false);
+  });
+  await t("salvarConfig avisa quando a função do banco é anterior à v0.23.0 (mesmo com a coluna criada)", async () => {
+    fetchImpl = async url => ({ ok: true, status: 200, text: async () => url.includes("rpc/cct_salvar_config") ? JSON.stringify({ lembrete_diario: true, notificar_gerente: true }) : "[]" });
+    C.APP.dados.cfg = { notificar_gerente: false };
+    await C.salvarConfig();
+    assert.match(document.getElementById("msg").textContent, /setup_cct_v0\.23\.0\.sql/);
   });
 
   console.log(`\n${n} ok, ${falhas} falha(s)`);
