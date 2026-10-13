@@ -223,3 +223,60 @@ def test_parecer_ia_chama_o_gateway_com_o_token(monkeypatch):
     assert visto["url"].endswith("/functions/v1/ia-gateway") and visto["chave"] == "iagw_cct_teste"
     assert visto["modelo"] == "claude-sonnet-4-6" and visto["usuario"]
     assert "Limite diário" in erro and "IA Central HTTP 429" in erro
+
+
+# ---------- gerente do departamento desligado (v0.23.0) ----------
+def _ciencia(**k):
+    c = {"id": "c1", "empresa": "Emp", "sindicato": "Sind", "empresa_id": "e1", "instrumento_id": "i1", "tipo_instrumento": "CCT",
+         "numero_registro": "SC000001/2026", "vigencia_inicio": "2026-01-01", "vigencia_fim": "2026-12-31", "prazo": "2026-10-01",
+         "responsavel_email": "resp@x", "gerente_email": "ger@x", "status": "NOTIFICADO", "situacao": "ATRASADA", "dias_atraso": 5,
+         "lembretes": 2, "ultimo_lembrete": "2026-10-01T09:00:00+00:00", "notificado_em": "2026-09-28T09:00:00+00:00"}
+    c.update(k); return c
+
+def _rodar_ciencias(mc, monkeypatch, cfg, pend):
+    enviados, patches = [], []
+    monkeypatch.setattr(mc, "config", lambda t: cfg)
+    monkeypatch.setattr(mc, "sb_get", lambda tab, p: pend)
+    monkeypatch.setattr(mc, "sb_patch", lambda tab, params, dados: patches.append((tab, params, dados)))
+    monkeypatch.setattr(mc, "responsavel_txt", lambda t, e: e)
+    monkeypatch.setattr(mc, "html_impacto", lambda *a: "")
+    monkeypatch.setattr(mc, "log", lambda *a, **k: None)
+    monkeypatch.setattr(mc, "notificar_para", lambda tenant, tipo, assunto, html, dest, **k: enviados.append((tipo, list(dest), html)) or "ENVIADA")
+    mc.processar_ciencias("t")
+    return enviados, patches
+
+CFG = {"prazo_ciencia_dias_uteis": 2, "lembrete_diario": True, "escalonar_apos_prazo": True}
+
+def test_gerente_ligado_atrasada_e_escalonada_ao_gerente(mc, monkeypatch):
+    enviados, _ = _rodar_ciencias(mc, monkeypatch, dict(CFG, notificar_gerente=True), [_ciencia()])
+    assert [(t, d) for t, d, _ in enviados] == [("ESCALONAMENTO", ["ger@x", "resp@x"])]
+
+def test_banco_sem_coluna_mantem_escalonamento(mc, monkeypatch):
+    enviados, _ = _rodar_ciencias(mc, monkeypatch, dict(CFG), [_ciencia()])
+    assert enviados[0][0] == "ESCALONAMENTO" and "ger@x" in enviados[0][1]
+
+def test_gerente_desligado_responsavel_continua_no_lembrete(mc, monkeypatch):
+    enviados, patches = _rodar_ciencias(mc, monkeypatch, dict(CFG, notificar_gerente=False), [_ciencia()])
+    assert [(t, d) for t, d, _ in enviados] == [("LEMBRETE", ["resp@x"])]
+    assert "ger@x" not in enviados[0][2]                                  # nem citado no e-mail
+    assert not any(d.get("status") == "ESCALONADO" for _, _, d in patches)
+
+def test_gerente_desligado_desfaz_escalonadas_e_tira_gerente_do_lembrete(mc, monkeypatch):
+    pend = [_ciencia(id="c1", status="ESCALONADO"), _ciencia(id="c2", status="ESCALONADO", notificado_em=None, responsavel_email=None)]
+    enviados, patches = _rodar_ciencias(mc, monkeypatch, dict(CFG, notificar_gerente=False), pend)
+    desfeitos = {p[1]["id"]: p[2]["status"] for p in patches if p[2].get("escalonado_em", "x") is None}
+    assert desfeitos == {"in.(c1)": "NOTIFICADO", "in.(c2)": "PENDENTE"}
+    # c1: só o responsável recebe o lembrete; c2 (sem responsável): ninguém recebe — o gerente não é acionado
+    assert [(t, d) for t, d, _ in enviados] == [("LEMBRETE", ["resp@x"])]
+
+def test_aviso_sem_registro_sem_gerente_quando_desligado(mc, monkeypatch):
+    dests = []
+    monkeypatch.setattr(mc, "config", lambda t: dict(CFG, notificar_gerente=False))
+    monkeypatch.setattr(mc, "log", lambda *a, **k: None)
+    monkeypatch.setattr(mc, "notificar_para", lambda tenant, tipo, assunto, html, dest, **k: dests.append([d for d in dest if d]) or "ENVIADA")
+    vinc = [{"id": "e1", "razao_social": "A", "responsavel_email": "resp@x", "gerente_email": "ger@x"},
+            {"id": "e2", "razao_social": "B", "responsavel_email": None, "gerente_email": "ger2@x"}]
+    etapas = []
+    mc.avisar_responsaveis("t", {"nome": "Sind"}, {"tipo": "CCT"}, "MR000001/2026", {"id": "i1"}, vinc, etapas)
+    assert dests == [["resp@x"]]
+    assert "sem e-mail cadastrado: B" in etapas[0]

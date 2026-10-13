@@ -48,6 +48,10 @@ v0.21.2 (29/09/2026): o aviso "ainda sem registro" vai TAMBÉM ao responsável e
 não só ao grupo interno de Destinatários; e o cabeçalho do aviso interno lista as empresas avisadas.
 v0.21.3 (29/09/2026): o aviso aos responsáveis é enviado UMA vez por solicitação (marca aviso_resp_em na fila) — inclusive para
 solicitações criadas antes desta versão (ex.: MR061922/2026), na próxima consulta do sindicato.
+v0.23.0 (13/10/2026): Configurações → "Notificar o gerente do departamento" (cct_config.notificar_gerente). Com "Não", o
+gerente da empresa/sindicato não recebe e-mail algum — nem escalonamento, nem lembrete, nem o aviso "ainda sem registro" —
+e as ciências que ainda estiverem ESCALONADAS voltam para atrasada (NOTIFICADO; PENDENTE se o responsável nunca foi
+avisado); o responsável continua recebendo o aviso e o lembrete diário, inclusive depois do prazo.
 """
 import hashlib
 import json
@@ -66,7 +70,7 @@ import mediador
 from extrair_cct import extrair
 import analisar_cct
 
-VERSAO = "0.21.3"
+VERSAO = "0.23.0"
 # v0.20.0: token do CCT na IA Central (ia-gateway do Portal Artecon)
 def ia_chave_presente():
     return bool((os.environ.get("IA_GATEWAY_TOKEN") or "").strip())
@@ -638,7 +642,27 @@ def analisar_pendentes(tenant, limite_s=None):
 # ---------------------------------------------------------------- ciência (seções 31-39)
 def config(tenant):
     c = sb_get("cct_config", {"tenant_id": f"eq.{tenant}"})
-    return c[0] if c else {"prazo_ciencia_dias_uteis": 2, "lembrete_diario": True, "escalonar_apos_prazo": True}
+    return c[0] if c else {"prazo_ciencia_dias_uteis": 2, "lembrete_diario": True, "escalonar_apos_prazo": True, "notificar_gerente": True}
+
+
+def notifica_gerente(cfg):
+    """v0.23.0: False só quando desligado em Configurações; banco sem a coluna (antes da v0.23.0) = notifica, como antes."""
+    return cfg.get("notificar_gerente") is not False
+
+
+def cancelar_escalonamentos(pend):
+    """v0.23.0: gerente desligado — desfaz os escalonamentos em aberto (o app já faz isso ao salvar; aqui é a garantia).
+    A ciência volta a NOTIFICADO (PENDENTE se o responsável nunca foi avisado), continua atrasada e o responsável
+    segue no lembrete diário. Atualiza as linhas de `pend` no lugar."""
+    agora = datetime.now(timezone.utc).isoformat()
+    for status in ("NOTIFICADO", "PENDENTE"):
+        grupo = [c for c in pend if c["status"] == "ESCALONADO" and bool(c.get("notificado_em")) == (status == "NOTIFICADO")]
+        if not grupo:
+            continue
+        sb_patch("cct_ciencias", {"id": "in.(" + ",".join(c["id"] for c in grupo) + ")"}, {"status": status, "escalonado_em": None, "updated_at": agora})
+        for c in grupo:
+            c.update(status=status, escalonado_em=None)
+        log(f"ciências: {len(grupo)} escalonamento(s) ao gerente cancelado(s) → {status} (gerente desligado em Configurações)")
 
 
 def prazo_ciencia(tenant):
@@ -718,8 +742,9 @@ def avisar_responsaveis(tenant, sind, p, numero, row, vinc, etapas):
     """v0.21.2/v0.21.3: aviso 'ainda sem registro' ao responsável e ao gerente de cada empresa vinculada — SEM ciência
     (ela nasce no registro). Enviado uma única vez por solicitação (marca aviso_resp_em na fila)."""
     env, sem_dest = 0, []
+    ger_on = notifica_gerente(config(tenant))   # v0.23.0
     for e in vinc:
-        dest = [e.get("responsavel_email"), e.get("gerente_email")]
+        dest = [e.get("responsavel_email"), e.get("gerente_email") if ger_on else None]
         if not any(dest):
             sem_dest.append(e.get("razao_social") or "?"); continue
         html_e = (f"<p>Prezado(a) {e.get('responsavel_nome') or 'responsável'} — empresa <b>{e.get('razao_social')}</b>,</p>"
@@ -1114,18 +1139,25 @@ def processar_ciencias(tenant):
         log(f"ciências: cobrança começa em {ini} (hoje {hoje}) — nada a cobrar")
         return
     pend = sb_get("cct_v_confirmacoes", {"tenant_id": f"eq.{tenant}", "status": "in.(PENDENTE,NOTIFICADO,ESCALONADO)", "select": "*"})
-    log(f"ciências pendentes: {len(pend)}")
+    # v0.23.0: gerente do departamento desligado → nenhum e-mail a ele; escalonamentos em aberto são desfeitos
+    ger_on = notifica_gerente(cfg)
+    if not ger_on:
+        try:
+            cancelar_escalonamentos(pend)
+        except Exception as e:
+            log(f"  !! cancelar escalonamentos: {e}")
+    log(f"ciências pendentes: {len(pend)}" + ("" if ger_on else " (gerente do departamento não é notificado)"))
     for c in pend:
         alvo = c.get("empresa") or c.get("sindicato") or ""
         ja_hoje = (c.get("ultimo_lembrete") or "")[:10] == hoje
         dest_resp = [c["responsavel_email"]] if c.get("responsavel_email") else []
-        dest_ger = [c["gerente_email"]] if c.get("gerente_email") else []
+        dest_ger = [c["gerente_email"]] if ger_on and c.get("gerente_email") else []
         # v0.18.1: o e-mail informa o usuário responsável pela empresa (nome e e-mail); sem empresa, o responsável pelo sindicato
         resp_txt = responsavel_txt(tenant, c.get("responsavel_email"))
         rotulo_resp = "Responsável pela empresa" if c.get("empresa") else "Responsável pelo sindicato"
         pares = [("Convenção", f"{c['tipo_instrumento']} {c['numero_registro']}"), ("Sindicato", c.get("sindicato")), ("Empresa", c.get("empresa")),
                  ("Vigência", f"{fmt_br(c.get('vigencia_inicio'))} a {fmt_br(c.get('vigencia_fim'))}"), (rotulo_resp, resp_txt or "não cadastrado"),
-                 ("Gerente", responsavel_txt(tenant, c.get("gerente_email")) if c.get("gerente_email") else None)]
+                 ("Gerente", responsavel_txt(tenant, c.get("gerente_email")) if dest_ger else None)]
         cab = bloco_chave(pares, ("Prazo para ciência", fmt_br(c.get("prazo")), c["situacao"].replace("_", " ").lower() if c.get("situacao") else ""))
         botoes = [("Registrar ciência", APP_URL), ("Ver convenção completa", APP_URL)]
         if c["status"] == "PENDENTE" and dest_resp:
@@ -1135,7 +1167,7 @@ def processar_ciencias(tenant):
             if st == "ENVIADA":
                 sb_patch("cct_ciencias", {"id": f"eq.{c['id']}"}, {"status": "NOTIFICADO", "notificado_em": datetime.now(timezone.utc).isoformat()})
             continue
-        if c["situacao"] == "ATRASADA" and cfg.get("escalonar_apos_prazo", True) and c["status"] != "ESCALONADO":
+        if c["situacao"] == "ATRASADA" and ger_on and cfg.get("escalonar_apos_prazo", True) and c["status"] != "ESCALONADO":
             st = notificar_para(tenant, "ESCALONAMENTO", f"Artecon · CCT Monitor — Ciência pendente com prazo vencido · {alvo} · {c['numero_registro']}",
                                 html_padrao("Ciência pendente — prazo vencido", cab + f'<p style="color:#c0392b"><b>{("O " + rotulo_resp.lower() + ", " + resp_txt + ",") if resp_txt else "O responsável"} ainda não registrou ciência</b> ({c["dias_atraso"]} dia(s) de atraso). Este aviso foi escalonado ao gerente.</p>',
                                             "CCT Monitor · Escalonamento ao gerente", botoes), dest_ger + dest_resp, ciencia_id=c["id"], pronto=True)
